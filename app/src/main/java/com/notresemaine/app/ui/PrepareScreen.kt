@@ -37,14 +37,12 @@ fun PrepareScreen(vm: AppViewModel, settings: AppSettings, dateIso: String, onDo
     var task2 by remember { mutableStateOf("") }
     var wake by remember { mutableStateOf("") }
     var focus by remember { mutableStateOf("") }
-    var existingSecondary by remember { mutableStateOf(listOf<String>()) }
     var loaded by remember { mutableStateOf(false) }
 
     LaunchedEffect(dateIso) {
         val tasks = vm.repo.db.tasks().byDate(settings.myUserId, dateIso).first()
         priority = tasks.firstOrNull { it.isPriority }?.title ?: ""
         val secondary = tasks.filter { !it.isPriority && !it.isSport }.map { it.title }
-        existingSecondary = secondary
         task1 = secondary.getOrNull(0) ?: ""
         task2 = secondary.getOrNull(1) ?: ""
         val plan = vm.repo.db.dayPlans().byDate(settings.myUserId, dateIso).first()
@@ -152,7 +150,6 @@ fun PrepareScreen(vm: AppViewModel, settings: AppSettings, dateIso: String, onDo
                     date = dateIso,
                     priority = priority,
                     secondary = listOf(task1, task2),
-                    existingSecondary = existingSecondary,
                     wakeTime = wake,
                     focusBlocks = focus
                 )

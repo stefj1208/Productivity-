@@ -93,6 +93,31 @@ class Repository private constructor(context: Context) {
         }
     }
 
+    /**
+     * Aligne les tâches secondaires d'un jour sur la liste saisie :
+     * les titres retirés sont supprimés, les nouveaux ajoutés (pas de doublon).
+     */
+    suspend fun reconcileSecondary(userId: String, date: String, titles: List<String>) {
+        val wanted = titles.map { it.trim() }.filter { it.isNotBlank() }
+        val current = db.tasks().byDateOnce(userId, date).filter { !it.isPriority && !it.isSport }
+        current.filter { it.title !in wanted }.forEach {
+            db.tasks().upsert(it.copy(deleted = true, updatedAt = now()))
+        }
+        val existingTitles = current.map { it.title }
+        wanted.filter { it !in existingTitles }.forEach { title ->
+            db.tasks().upsert(
+                TaskEntity(
+                    id = UUID.randomUUID().toString(),
+                    userId = userId,
+                    title = title,
+                    date = date,
+                    weekStart = Dates.weekStartIso(java.time.LocalDate.parse(date)),
+                    updatedAt = now()
+                )
+            )
+        }
+    }
+
     // ----- Plan du jour (réveil, blocs de concentration) -----
 
     suspend fun saveDayPlan(userId: String, date: String, wakeTime: String?, focusBlocks: String?) {

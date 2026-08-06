@@ -11,6 +11,7 @@ Application Android pour deux personnes : planifier la semaine, préparer le len
 À chaque mise à jour du code, GitHub fabrique automatiquement le fichier d'installation (APK). Pour le récupérer :
 
 1. Sur GitHub, ouvrez ce projet puis l'onglet **Actions** (en haut).
+   - **Si cet onglet est vide** : GitHub Actions est probablement désactivé sur le dépôt. Allez dans **Settings → Actions → General**, choisissez **Allow all actions and reusable workflows**, enregistrez. S'il affiche un bouton du type « I understand my workflows, go ahead and enable them », cliquez-le. La prochaine mise à jour du code déclenchera la fabrication de l'APK (ou ouvrez le workflow « Construire l'APK » et cliquez **Run workflow**).
 2. Cliquez sur la dernière exécution **« Construire l'APK »** avec une coche verte ✓.
 3. Tout en bas de la page, section **Artifacts** : cliquez sur **NotreSemaine-APK** pour télécharger un fichier ZIP.
 4. Envoyez ce ZIP sur chaque téléphone (par e-mail, câble, ou Google Drive), ouvrez-le : il contient `app-debug.apk`.

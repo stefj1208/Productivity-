@@ -94,17 +94,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         date: String,
         priority: String,
         secondary: List<String>,
-        existingSecondary: List<String>,
         wakeTime: String?,
         focusBlocks: String?
     ) {
         viewModelScope.launch {
             if (priority.isNotBlank()) repo.setDayPriority(myId(), date, priority)
-            secondary.filter { it.isNotBlank() && it !in existingSecondary }.forEach {
-                if (repo.addTask(myId(), it, date, null) == AddResult.DayFull) {
-                    toast("Maximum ${Repository.MAX_TASKS_PER_DAY} tâches par jour — c'est voulu.")
-                }
-            }
+            repo.reconcileSecondary(myId(), date, secondary)
             repo.saveDayPlan(myId(), date, wakeTime, focusBlocks)
             requestSync()
             toast("C'est prêt ✓")

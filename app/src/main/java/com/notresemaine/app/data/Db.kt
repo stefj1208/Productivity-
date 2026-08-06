@@ -72,6 +72,9 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE userId = :userId AND date = :date AND deleted = 0 ORDER BY isPriority DESC, updatedAt")
     fun byDate(userId: String, date: String): Flow<List<TaskEntity>>
 
+    @Query("SELECT * FROM tasks WHERE userId = :userId AND date = :date AND deleted = 0")
+    suspend fun byDateOnce(userId: String, date: String): List<TaskEntity>
+
     @Query("SELECT * FROM tasks WHERE weekStart = :weekStart AND deleted = 0 ORDER BY date, isPriority DESC")
     fun byWeekAllUsers(weekStart: String): Flow<List<TaskEntity>>
 
