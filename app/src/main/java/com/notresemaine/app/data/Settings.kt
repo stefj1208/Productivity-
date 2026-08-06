@@ -3,6 +3,7 @@ package com.notresemaine.app.data
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -29,7 +30,14 @@ data class AppSettings(
     val refreshToken: String = "",
     val coupleCode: String = "",
     val lastPullTs: Long = 0L,
-    val lastPushTs: Long = 0L
+    val lastPushTs: Long = 0L,
+    // Rituel du matin
+    val wakeAlarm: String = "05:00",
+    // Pacte d'écran
+    val pacteEnabled: Boolean = false,
+    val socialApps: String = "",        // noms de paquets séparés par des virgules
+    val dailyLimitMinutes: Int = 45,
+    val graceUntil: Long = 0L           // pause accordée par le partenaire (horodatage local)
 )
 
 class SettingsStore(private val context: Context) {
@@ -52,6 +60,11 @@ class SettingsStore(private val context: Context) {
         val coupleCode = stringPreferencesKey("coupleCode")
         val lastPullTs = longPreferencesKey("lastPullTs")
         val lastPushTs = longPreferencesKey("lastPushTs")
+        val wakeAlarm = stringPreferencesKey("wakeAlarm")
+        val pacteEnabled = booleanPreferencesKey("pacteEnabled")
+        val socialApps = stringPreferencesKey("socialApps")
+        val dailyLimitMinutes = intPreferencesKey("dailyLimitMinutes")
+        val graceUntil = longPreferencesKey("graceUntil")
     }
 
     val flow: Flow<AppSettings> = context.dataStore.data.map { p ->
@@ -72,7 +85,12 @@ class SettingsStore(private val context: Context) {
             refreshToken = p[K.refreshToken] ?: "",
             coupleCode = p[K.coupleCode] ?: "",
             lastPullTs = p[K.lastPullTs] ?: 0L,
-            lastPushTs = p[K.lastPushTs] ?: 0L
+            lastPushTs = p[K.lastPushTs] ?: 0L,
+            wakeAlarm = p[K.wakeAlarm] ?: "05:00",
+            pacteEnabled = p[K.pacteEnabled] ?: false,
+            socialApps = p[K.socialApps] ?: "",
+            dailyLimitMinutes = p[K.dailyLimitMinutes] ?: 45,
+            graceUntil = p[K.graceUntil] ?: 0L
         )
     }
 
@@ -143,6 +161,22 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setCoupleCode(code: String) {
         context.dataStore.edit { p -> p[K.coupleCode] = code }
+    }
+
+    suspend fun setWakeAlarm(time: String) {
+        context.dataStore.edit { p -> p[K.wakeAlarm] = time }
+    }
+
+    suspend fun setPacte(enabled: Boolean, socialApps: String, limitMinutes: Int) {
+        context.dataStore.edit { p ->
+            p[K.pacteEnabled] = enabled
+            p[K.socialApps] = socialApps
+            p[K.dailyLimitMinutes] = limitMinutes
+        }
+    }
+
+    suspend fun setGraceUntil(ts: Long) {
+        context.dataStore.edit { p -> p[K.graceUntil] = ts }
     }
 
     suspend fun setSyncMarks(pull: Long, push: Long) {

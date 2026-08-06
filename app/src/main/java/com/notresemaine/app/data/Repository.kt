@@ -171,6 +171,220 @@ class Repository private constructor(context: Context) {
         )
     }
 
+    // ----- Objectifs « clé en main » -----
+
+    /** Crée un objectif ; refuse au-delà de la limite (Essentialisme : moins mais mieux). */
+    suspend fun addGoal(
+        userId: String, title: String, domain: String,
+        sessionsPerWeek: Int, minutesPerSession: Int,
+        preferredTime: String, preferredDays: List<Int>,
+        nextAction: String, isPrivate: Boolean
+    ): Boolean {
+        if (db.goals().countActive(userId) >= GoalTemplates.MAX_ACTIVE_GOALS) return false
+        db.goals().upsert(
+            GoalEntity(
+                id = UUID.randomUUID().toString(),
+                userId = userId,
+                title = title.trim(),
+                domain = domain,
+                sessionsPerWeek = sessionsPerWeek.coerceIn(1, 7),
+                minutesPerSession = minutesPerSession.coerceIn(5, 180),
+                preferredTime = preferredTime,
+                preferredDays = preferredDays.joinToString(","),
+                nextAction = nextAction.trim(),
+                isPrivate = isPrivate,
+                updatedAt = now()
+            )
+        )
+        return true
+    }
+
+    suspend fun setGoalActive(goalId: String, active: Boolean) {
+        val g = db.goals().byId(goalId) ?: return
+        db.goals().upsert(g.copy(active = active, updatedAt = now()))
+    }
+
+    suspend fun deleteGoal(goalId: String) {
+        val g = db.goals().byId(goalId) ?: return
+        db.goals().upsert(g.copy(deleted = true, active = false, updatedAt = now()))
+    }
+
+    /**
+     * Génère les séances de la semaine pour chaque objectif actif :
+     * placées sur les jours préférés, sans doublon si on relance.
+     * Retourne le nombre de séances créées.
+     */
+    suspend fun planGoalSessions(userId: String, weekStart: String): Int {
+        val goals = db.goals().activeOnce(userId)
+        if (goals.isEmpty()) return 0
+        val existing = db.tasks().byWeekOnce(userId, weekStart)
+        val days = Dates.daysOfWeek(weekStart)
+        var created = 0
+        goals.forEach { goal ->
+            val already = existing.count { it.goalId == goal.id }
+            val preferred = goal.preferredDays.split(",").mapNotNull { it.trim().toIntOrNull() }
+            // Jours préférés d'abord, puis les autres si l'objectif demande plus de séances.
+            val ordered = (preferred + (1..7).filter { it !in preferred }).map { days[it - 1] }
+            val moment = when (goal.preferredTime) {
+                "matin" -> "le matin"
+                "midi" -> "le midi"
+                else -> "le soir"
+            }
+            var toCreate = goal.sessionsPerWeek - already
+            for (day in ordered) {
+                if (toCreate <= 0) break
+                if (existing.any { it.goalId == goal.id && it.date == day }) continue
+                db.tasks().upsert(
+                    TaskEntity(
+                        id = UUID.randomUUID().toString(),
+                        userId = userId,
+                        title = "${goal.title} · ${goal.minutesPerSession} min $moment",
+                        date = day,
+                        weekStart = weekStart,
+                        isSport = goal.domain == "sante",
+                        goalId = goal.id,
+                        updatedAt = now()
+                    )
+                )
+                created++
+                toCreate--
+            }
+        }
+        return created
+    }
+
+    // ----- Rituel du matin -----
+
+    /** Séquence S.A.V.E.R.S. par défaut (Miracle Morning), créée au premier passage. */
+    suspend fun ensureRitualSteps(userId: String) {
+        if (db.ritual().stepsOnce(userId).isNotEmpty()) return
+        listOf(
+            "Silence / méditation" to 5,
+            "Affirmations" to 2,
+            "Visualisation" to 3,
+            "Exercice" to 7,
+            "Lecture" to 10,
+            "Écriture / journal" to 3
+        ).forEachIndexed { index, (name, minutes) ->
+            db.ritual().upsertStep(
+                RitualStepEntity(
+                    id = UUID.randomUUID().toString(),
+                    userId = userId,
+                    name = name,
+                    minutes = minutes,
+                    position = index,
+                    updatedAt = now()
+                )
+            )
+        }
+    }
+
+    suspend fun saveRitualStep(step: RitualStepEntity) {
+        db.ritual().upsertStep(step.copy(updatedAt = now()))
+    }
+
+    suspend fun completeRitual(userId: String, minutes: Int) {
+        val date = Dates.todayIso()
+        db.ritual().upsertLog(
+            RitualLogEntity(id = "$userId:$date", userId = userId, date = date, minutes = minutes, updatedAt = now())
+        )
+    }
+
+    /** Série de jours consécutifs (aujourd'hui ou hier compris). */
+    fun ritualStreak(logs: List<RitualLogEntity>, userId: String): Int {
+        val dates = logs.filter { it.userId == userId && !it.deleted }.map { it.date }.toSet()
+        var day = java.time.LocalDate.now()
+        if (day.format(Dates.ISO) !in dates) day = day.minusDays(1)
+        var streak = 0
+        while (day.format(Dates.ISO) in dates) {
+            streak++
+            day = day.minusDays(1)
+        }
+        return streak
+    }
+
+    // ----- Capture rapide (GTD) -----
+
+    /** Capture une note : datée si une date est reconnue, sinon boîte de réception. */
+    suspend fun capture(userId: String, text: String): String {
+        val parsed = CaptureParser.parse(text)
+        if (parsed.title.isBlank()) return ""
+        return if (parsed.date != null &&
+            db.tasks().countForDay(userId, parsed.date) < MAX_TASKS_PER_DAY
+        ) {
+            db.tasks().upsert(
+                TaskEntity(
+                    id = UUID.randomUUID().toString(),
+                    userId = userId,
+                    title = parsed.title,
+                    date = parsed.date,
+                    weekStart = Dates.weekStartIso(java.time.LocalDate.parse(parsed.date)),
+                    updatedAt = now()
+                )
+            )
+            "Noté pour ${Dates.shortLabel(parsed.date)} ✓"
+        } else {
+            db.inbox().upsert(
+                InboxItemEntity(
+                    id = UUID.randomUUID().toString(),
+                    userId = userId,
+                    text = parsed.title,
+                    updatedAt = now()
+                )
+            )
+            "Dans la boîte de réception ✓"
+        }
+    }
+
+    suspend fun resolveInbox(itemId: String, action: String, weekStart: String) {
+        val item = db.inbox().byId(itemId) ?: return
+        when (action) {
+            "planifier" -> {
+                db.tasks().upsert(
+                    TaskEntity(
+                        id = UUID.randomUUID().toString(),
+                        userId = item.userId,
+                        title = item.text,
+                        date = null,
+                        weekStart = weekStart,
+                        updatedAt = now()
+                    )
+                )
+                db.inbox().upsert(item.copy(processed = true, updatedAt = now()))
+            }
+            "fait" -> db.inbox().upsert(item.copy(processed = true, updatedAt = now()))
+            else -> db.inbox().upsert(item.copy(deleted = true, updatedAt = now()))
+        }
+    }
+
+    // ----- Pacte d'écran -----
+
+    suspend fun saveUsageDay(userId: String, date: String, totalMin: Int, socialMin: Int, unlocks: Int) {
+        db.usage().upsert(
+            UsageDayEntity(
+                id = "$userId:$date", userId = userId, date = date,
+                totalMinutes = totalMin, socialMinutes = socialMin, unlocks = unlocks,
+                updatedAt = now()
+            )
+        )
+    }
+
+    suspend fun requestGrace(fromUser: String, toUser: String, minutes: Int) {
+        db.grace().upsert(
+            GraceRequestEntity(
+                id = UUID.randomUUID().toString(),
+                fromUser = fromUser, toUser = toUser,
+                date = Dates.todayIso(), minutes = minutes,
+                status = "pending", updatedAt = now()
+            )
+        )
+    }
+
+    suspend fun answerGrace(requestId: String, granted: Boolean) {
+        val r = db.grace().byId(requestId) ?: return
+        db.grace().upsert(r.copy(status = if (granted) "granted" else "denied", updatedAt = now()))
+    }
+
     /** Quand on se connecte à la synchro, l'identifiant local devient l'identifiant du compte. */
     suspend fun migrateUserId(oldId: String, newId: String) {
         if (oldId == newId || oldId.isBlank()) return
@@ -178,6 +392,7 @@ class Repository private constructor(context: Context) {
         db.tasks().migrateUser(oldId, newId, t)
         db.dayPlans().migrateUser(oldId, newId, t)
         db.weekPlans().migrateUser(oldId, newId, t)
+        db.goals().migrateUser(oldId, newId, t)
         val profile = db.profiles().byId(oldId)
         if (profile != null) {
             db.profiles().delete(oldId)

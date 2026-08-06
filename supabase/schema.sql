@@ -69,6 +69,60 @@ create table if not exists encouragements (
   updated_at bigint not null default 0
 );
 
+create table if not exists goals (
+  id text primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  couple_id uuid,
+  title text not null default '',
+  domain text not null default 'autre',
+  sessions_per_week int not null default 3,
+  minutes_per_session int not null default 30,
+  preferred_time text not null default 'soir',
+  preferred_days text not null default '',
+  next_action text not null default '',
+  is_private boolean not null default false,
+  active boolean not null default true,
+  deleted boolean not null default false,
+  updated_at bigint not null default 0
+);
+
+create table if not exists ritual_logs (
+  id text primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  couple_id uuid,
+  date text not null,
+  minutes int not null default 0,
+  deleted boolean not null default false,
+  updated_at bigint not null default 0
+);
+
+create table if not exists usage_days (
+  id text primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  couple_id uuid,
+  date text not null,
+  total_minutes int not null default 0,
+  social_minutes int not null default 0,
+  unlocks int not null default 0,
+  deleted boolean not null default false,
+  updated_at bigint not null default 0
+);
+
+create table if not exists grace_requests (
+  id text primary key,
+  from_user uuid not null references auth.users(id) on delete cascade,
+  to_user uuid not null,
+  couple_id uuid,
+  date text not null,
+  minutes int not null default 15,
+  status text not null default 'pending',
+  deleted boolean not null default false,
+  updated_at bigint not null default 0
+);
+
+-- Mise à jour depuis la V1 (sans effet sur une base neuve)
+alter table tasks add column if not exists goal_id text;
+
 -- ---------- Fonctions ----------
 
 -- Le couple de la personne connectée (contourne proprement la récursion RLS).
@@ -97,6 +151,14 @@ create or replace trigger day_plans_stamp before insert or update on day_plans
 create or replace trigger week_plans_stamp before insert or update on week_plans
   for each row execute function stamp_couple();
 create or replace trigger encouragements_stamp before insert or update on encouragements
+  for each row execute function stamp_couple();
+create or replace trigger goals_stamp before insert or update on goals
+  for each row execute function stamp_couple();
+create or replace trigger ritual_logs_stamp before insert or update on ritual_logs
+  for each row execute function stamp_couple();
+create or replace trigger usage_days_stamp before insert or update on usage_days
+  for each row execute function stamp_couple();
+create or replace trigger grace_requests_stamp before insert or update on grace_requests
   for each row execute function stamp_couple();
 
 -- Crée l'espace couple et renvoie le code à partager (6 caractères).
@@ -142,6 +204,35 @@ alter table day_plans enable row level security;
 alter table week_plans enable row level security;
 alter table encouragements enable row level security;
 
+-- Ré-exécutable sans erreur : on supprime les règles avant de les recréer.
+drop policy if exists profiles_select on profiles;
+drop policy if exists profiles_insert on profiles;
+drop policy if exists profiles_update on profiles;
+drop policy if exists tasks_select on tasks;
+drop policy if exists tasks_insert on tasks;
+drop policy if exists tasks_update on tasks;
+drop policy if exists day_plans_select on day_plans;
+drop policy if exists day_plans_insert on day_plans;
+drop policy if exists day_plans_update on day_plans;
+drop policy if exists week_plans_select on week_plans;
+drop policy if exists week_plans_insert on week_plans;
+drop policy if exists week_plans_update on week_plans;
+drop policy if exists encouragements_select on encouragements;
+drop policy if exists encouragements_insert on encouragements;
+drop policy if exists encouragements_update on encouragements;
+drop policy if exists goals_select on goals;
+drop policy if exists goals_insert on goals;
+drop policy if exists goals_update on goals;
+drop policy if exists ritual_logs_select on ritual_logs;
+drop policy if exists ritual_logs_insert on ritual_logs;
+drop policy if exists ritual_logs_update on ritual_logs;
+drop policy if exists usage_days_select on usage_days;
+drop policy if exists usage_days_insert on usage_days;
+drop policy if exists usage_days_update on usage_days;
+drop policy if exists grace_select on grace_requests;
+drop policy if exists grace_insert on grace_requests;
+drop policy if exists grace_update on grace_requests;
+
 create policy profiles_select on profiles for select
   using (id = auth.uid() or (couple_id is not null and couple_id = my_couple()));
 create policy profiles_insert on profiles for insert
@@ -177,3 +268,40 @@ create policy encouragements_insert on encouragements for insert
   with check (from_user = auth.uid());
 create policy encouragements_update on encouragements for update
   using (from_user = auth.uid());
+
+alter table goals enable row level security;
+alter table ritual_logs enable row level security;
+alter table usage_days enable row level security;
+alter table grace_requests enable row level security;
+
+-- Un objectif « privé » n'est jamais visible par le partenaire.
+create policy goals_select on goals for select
+  using (user_id = auth.uid()
+         or (couple_id is not null and couple_id = my_couple() and is_private = false));
+create policy goals_insert on goals for insert
+  with check (user_id = auth.uid());
+create policy goals_update on goals for update
+  using (user_id = auth.uid());
+
+create policy ritual_logs_select on ritual_logs for select
+  using (user_id = auth.uid() or (couple_id is not null and couple_id = my_couple()));
+create policy ritual_logs_insert on ritual_logs for insert
+  with check (user_id = auth.uid());
+create policy ritual_logs_update on ritual_logs for update
+  using (user_id = auth.uid());
+
+create policy usage_days_select on usage_days for select
+  using (user_id = auth.uid() or (couple_id is not null and couple_id = my_couple()));
+create policy usage_days_insert on usage_days for insert
+  with check (user_id = auth.uid());
+create policy usage_days_update on usage_days for update
+  using (user_id = auth.uid());
+
+-- La demande est créée par celui qui a dépassé ; la réponse vient du partenaire.
+create policy grace_select on grace_requests for select
+  using (from_user = auth.uid() or to_user = auth.uid()
+         or (couple_id is not null and couple_id = my_couple()));
+create policy grace_insert on grace_requests for insert
+  with check (from_user = auth.uid());
+create policy grace_update on grace_requests for update
+  using (from_user = auth.uid() or to_user = auth.uid());

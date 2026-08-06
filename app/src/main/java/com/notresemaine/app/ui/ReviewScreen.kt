@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -22,15 +23,18 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.notresemaine.app.data.AppSettings
 import com.notresemaine.app.data.Dates
+import com.notresemaine.app.data.Tips
 import com.notresemaine.app.ui.theme.accentFor
 
 /**
  * Revue du dimanche, écran par écran :
- * 1 Bilan · 2 J'abandonne · 3 LA priorité · 4 Répartition · 5 Sport · 6 Validation
+ * 1 Bilan · 2 Boîte de réception · 3 J'abandonne · 4 LA priorité ·
+ * 5 Répartition · 6 Sport · 7 Validation
  */
 @Composable
 fun ReviewScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
@@ -52,6 +56,12 @@ fun ReviewScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
         .collectAsState(initial = emptyList())
     val thisWeekPlan by remember(myId) { vm.repo.db.weekPlans().byWeek(myId, weekStart) }
         .collectAsState(initial = null)
+    val inbox by remember(myId) { vm.repo.db.inbox().pending(myId) }
+        .collectAsState(initial = emptyList())
+    val goals by remember { vm.repo.db.goals().all() }
+        .collectAsState(initial = emptyList())
+    val lastWeekUsage by remember { vm.repo.db.usage().since(lastWeekStart) }
+        .collectAsState(initial = emptyList())
 
     // Préremplit une seule fois avec ce qui existe déjà pour cette semaine.
     if (!loadedPlan && thisWeekPlan != null) {
@@ -62,12 +72,14 @@ fun ReviewScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
 
     val titles = listOf(
         "Bilan de la semaine passée",
+        "Vider la boîte de réception",
         "Qu'est-ce que j'abandonne ?",
         "LA priorité de la semaine",
         "Répartir sur les jours",
         "Les séances de sport",
         "Validation"
     )
+    val lastStep = titles.size - 1
 
     Column(
         modifier = Modifier
@@ -81,8 +93,15 @@ fun ReviewScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
         ) {
             Spacer(Modifier.height(20.dp))
             Text(
-                text = "${step + 1}/6 · ${titles[step]}",
+                text = "${step + 1}/${titles.size} · ${titles[step]}",
                 style = MaterialTheme.typography.titleLarge
+            )
+            val tip = Tips.review(step)
+            Text(
+                text = "📖 ${tip.book} — ${tip.text}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 6.dp)
             )
             Spacer(Modifier.height(20.dp))
 
@@ -95,6 +114,16 @@ fun ReviewScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
                         else "$done tâches faites sur $total planifiées.",
                         style = MaterialTheme.typography.bodyLarge
                     )
+                    val myUsage = lastWeekUsage.filter { it.userId == myId }
+                    if (myUsage.isNotEmpty()) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = "Écran : ${myUsage.sumOf { it.totalMinutes } / 60} h sur la période, " +
+                                "dont ${myUsage.sumOf { it.socialMinutes } / 60} h de réseaux.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     val lp = lastWeekPlan?.priority
                     if (lp != null) {
                         Spacer(Modifier.height(10.dp))
@@ -125,6 +154,37 @@ fun ReviewScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
                 }
 
                 1 -> {
+                    if (inbox.isEmpty()) {
+                        Text(
+                            text = "Boîte de réception vide. Tête libre ✓",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    } else {
+                        Text(
+                            text = "${inbox.size} notes à trier. Une décision par note, pas plus.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        inbox.forEach { item ->
+                            Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                                Text(item.text, style = MaterialTheme.typography.bodyLarge)
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedButton(onClick = { vm.resolveInbox(item.id, "planifier") }) {
+                                        Text("Planifier")
+                                    }
+                                    TextButton(onClick = { vm.resolveInbox(item.id, "fait") }) {
+                                        Text("Déjà fait")
+                                    }
+                                    TextButton(onClick = { vm.resolveInbox(item.id, "supprimer") }) {
+                                        Text("Jeter")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                2 -> {
                     Text(
                         text = "Faire moins, mais mieux. À quoi dis-tu non cette semaine ?",
                         style = MaterialTheme.typography.bodyLarge,
@@ -140,7 +200,7 @@ fun ReviewScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
                     )
                 }
 
-                2 -> {
+                3 -> {
                     Text(
                         text = "Une seule. Celle qui rend le reste plus simple ou inutile.",
                         style = MaterialTheme.typography.bodyLarge,
@@ -154,11 +214,34 @@ fun ReviewScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
                         textStyle = MaterialTheme.typography.bodyLarge,
                         modifier = Modifier.fillMaxWidth()
                     )
+                    val suggestions = goals
+                        .filter { it.userId == myId && it.active && it.nextAction.isNotBlank() }
+                    if (suggestions.isNotEmpty()) {
+                        Spacer(Modifier.height(12.dp))
+                        SectionLabel("SUGGESTIONS (mes objectifs)")
+                        suggestions.forEach { goal ->
+                            FilterChip(
+                                selected = priority == goal.nextAction,
+                                onClick = { priority = goal.nextAction },
+                                label = {
+                                    Text(goal.nextAction, style = MaterialTheme.typography.labelLarge)
+                                },
+                                modifier = Modifier.height(48.dp)
+                            )
+                        }
+                    }
                 }
 
-                3 -> {
+                4 -> {
+                    val myGoals = goals.filter { it.userId == myId && it.active }
+                    if (myGoals.isNotEmpty()) {
+                        OutlinedButton(onClick = { vm.planGoalSessions(weekStart) }) {
+                            Text("Placer les séances de mes objectifs")
+                        }
+                        Spacer(Modifier.height(12.dp))
+                    }
                     var newTask by remember { mutableStateOf("") }
-                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         OutlinedTextField(
                             value = newTask,
                             onValueChange = { newTask = it },
@@ -173,7 +256,7 @@ fun ReviewScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
                         }) { Text("Ajouter") }
                     }
                     Spacer(Modifier.height(12.dp))
-                    val pool = thisWeekTasks.filter { !it.isSport && !it.isPriority }
+                    val pool = thisWeekTasks.filter { !it.isSport && !it.isPriority && it.goalId == null }
                     if (pool.isEmpty()) {
                         Text(
                             text = "Rien à répartir pour l'instant.",
@@ -183,7 +266,7 @@ fun ReviewScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
                     }
                     pool.forEach { task ->
                         Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     task.title,
                                     style = MaterialTheme.typography.bodyLarge,
@@ -200,7 +283,7 @@ fun ReviewScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
                     }
                 }
 
-                4 -> {
+                5 -> {
                     var newSport by remember { mutableStateOf("") }
                     Text(
                         text = "Quelles séances, quels jours ?",
@@ -208,7 +291,7 @@ fun ReviewScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(12.dp))
-                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         OutlinedTextField(
                             value = newSport,
                             onValueChange = { newSport = it },
@@ -225,7 +308,7 @@ fun ReviewScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
                     Spacer(Modifier.height(12.dp))
                     thisWeekTasks.filter { it.isSport }.forEach { task ->
                         Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     "🏃 ${task.title}",
                                     style = MaterialTheme.typography.bodyLarge,
@@ -242,7 +325,7 @@ fun ReviewScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
                     }
                 }
 
-                5 -> {
+                6 -> {
                     Text(
                         text = "Priorité : ${priority.ifBlank { "—" }}",
                         style = MaterialTheme.typography.titleLarge,
@@ -259,14 +342,14 @@ fun ReviewScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
                     Spacer(Modifier.height(10.dp))
                     val planned = thisWeekTasks.count { it.date != null }
                     val sport = thisWeekTasks.count { it.isSport }
+                    val sessions = thisWeekTasks.count { it.goalId != null }
                     Text(
-                        text = "$planned tâches réparties, dont $sport séances de sport.",
+                        text = "$planned tâches réparties, dont $sport séances de sport et $sessions séances d'objectifs.",
                         style = MaterialTheme.typography.bodyLarge
                     )
                     Spacer(Modifier.height(16.dp))
                     Text(
-                        text = "Une fois validée, la semaine est visible par vous deux. " +
-                            "Les menus et la liste de courses arriveront dans une prochaine étape du projet.",
+                        text = "Une fois validée, la semaine est visible par vous deux.",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -288,12 +371,12 @@ fun ReviewScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
                 Text(if (step == 0) "Quitter" else "Retour")
             }
             BigButton(
-                text = if (step == 5) "Valider notre semaine" else "Continuer",
-                enabled = step != 2 || priority.isNotBlank(),
+                text = if (step == lastStep) "Valider notre semaine" else "Continuer",
+                enabled = step != 3 || priority.isNotBlank(),
                 onClick = {
                     // Enregistre au fil de l'eau pour ne rien perdre si on quitte.
-                    vm.saveWeekPlan(weekStart, priority, abandon, validate = step == 5)
-                    if (step == 5) onDone() else step++
+                    vm.saveWeekPlan(weekStart, priority, abandon, validate = step == lastStep)
+                    if (step == lastStep) onDone() else step++
                 },
                 modifier = Modifier.weight(1f)
             )

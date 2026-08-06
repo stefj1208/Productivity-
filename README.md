@@ -2,7 +2,7 @@
 
 Application Android pour deux personnes : planifier la semaine, préparer le lendemain en 2 minutes, suivre UNE priorité par jour et par semaine, et se soutenir mutuellement — sans surcharge, sans gamification.
 
-**Version actuelle : V1** — planification hebdomadaire (Revue du dimanche), préparation de la veille, priorité du jour, espace partagé couple. Les mesures automatiques, le rituel du matin, les menus et l'IA locale arriveront dans les étapes suivantes (voir la feuille de route en bas).
+**Version actuelle : V2** — tout la V1, plus : objectifs « clé en main » générés depuis une bibliothèque (langue, sport, lecture…), rituel du matin S.A.V.E.R.S. avec minuteur et réveil, capture rapide avec analyse du français (« plombier mardi » → tâche datée), conseils des 6 livres au bon moment, mesure du temps d'écran, et le **Pacte d'écran** : au-delà de la limite quotidienne, blocage que seul le partenaire peut lever à distance.
 
 ---
 
@@ -31,18 +31,19 @@ Application Android pour deux personnes : planifier la semaine, préparer le len
 
 | Écran | Rôle |
 |---|---|
-| **Aujourd'hui** | LA priorité du jour en très gros, 2 tâches secondaires max, réveil et bloc de concentration prévus. Bouton « Préparer demain » en bas. |
-| **Semaine** | Les 7 jours, la priorité de la semaine, l'ajout et la répartition des tâches (un tap sur un jour). Bouton « Revue du dimanche ». |
-| **Nous** | Vos deux semaines côte à côte (une fois la synchronisation activée) + bouton « Envoyer un bravo 👏 ». Pas de classement, pas de compétition. |
-| **Réglages** | Profil, heures des rappels, thème, synchronisation. |
+| **Aujourd'hui** | LA priorité du jour en très gros, le rituel du matin, le conseil du jour, 2 tâches secondaires max, bloc de concentration. Bouton « Préparer demain » en bas. |
+| **Semaine** | Les 7 jours, la priorité de la semaine, la répartition des tâches (un tap sur un jour). Bouton « Revue du dimanche » (7 étapes guidées, boîte de réception comprise). |
+| **Objectifs** | La bibliothèque « clé en main » : choisissez « Apprendre une langue » ou « (Re)prendre le sport », répondez à 3 questions, l'app place les séances de la semaine à votre place et suit la progression. |
+| **Nous** | Vos deux semaines côte à côte, bouton « bravo 👏 », temps d'écran de chacun, et les demandes de pause du Pacte à accorder ou non. |
+| **Réglages** | (roue dentée en haut de l'écran Aujourd'hui) Profil, rappels, thème, synchronisation, Temps d'écran & Pacte, « La méthode ». |
 
-Principes appliqués (issus des 6 méthodes du cahier des charges) :
-- **Une seule priorité** par jour et par semaine — obligatoire, tout le reste est secondaire.
-- **Limite dure : 3 tâches par jour maximum.** L'application refuse la 4ᵉ, volontairement.
-- **« Qu'est-ce que j'abandonne cette semaine ? »** est une étape à part entière de la revue du dimanche.
-- **Blocs de concentration** notés la veille et affichés le matin.
-- **Aucune culpabilisation** : un objectif manqué s'affiche en gris neutre, jamais en rouge. Aucun badge, aucune série.
-- **2 rappels maximum par jour**, aux heures que vous choisissez, désactivables.
+Ce que l'application applique des 6 livres (détail dans l'écran « La méthode ») :
+- **Une seule priorité** par jour et par semaine (One Thing) ; **3 tâches par jour maximum** et **3 objectifs actifs maximum** (Essentialisme) — l'app refuse le surplus, volontairement.
+- **Rituel S.A.V.E.R.S.** avec minuteur enchaîné, série de jours et bouton qui règle le réveil (Miracle Morning).
+- **Capture partout en 3 secondes** avec le bouton « + », tri de la boîte de réception chaque dimanche (GTD). « Rappeler le plombier mardi » devient tout seul une tâche datée mardi — sans IA, par analyse du texte.
+- **Blocs de concentration** décidés la veille, séances d'objectifs protégées (Deep Work).
+- **Pacte d'écran** : limite quotidienne sur les applis choisies, déblocage uniquement par le partenaire (élimination des distractions, Semaine de 4 heures).
+- **Aucune culpabilisation** : gris neutre pour un objectif manqué, aucun badge, 2 rappels/jour maximum.
 
 ## 3. Architecture en langage simple
 
@@ -51,20 +52,25 @@ Principes appliqués (issus des 6 méthodes du cahier des charges) :
 - **La synchronisation** (facultative) passe par **Supabase**, un service hébergé en Europe : chacun a son compte, vous reliez les deux comptes avec un code à 6 caractères, et seuls vous deux pouvez lire vos données (règles de sécurité vérifiées par le serveur, pas seulement par l'application).
 - **Les rappels** sont des notifications locales — rien ne part sur internet pour vous les envoyer.
 
-## 4. Honnêteté sur la suite (à lire avant les prochaines étapes)
+## 4. Permissions à accorder (une fois, guidées dans l'app)
 
-- **Temps d'écran (S23 + Honor) : faisable.** L'API Android `UsageStatsManager` fonctionne sur les deux téléphones. Il faudra accorder une permission spéciale dans les réglages Android (je vous guiderai pas à pas), et sur le **Honor 400 Pro** il faudra en plus exclure l'app de l'optimisation de batterie de MagicOS, sinon la relève quotidienne sera tuée en arrière-plan.
-- **Health Connect : faisable, mais attention au contenu.** Health Connect ne contient que ce qu'une montre, un bracelet ou une appli sportive y écrit. **Sans objet connecté, sommeil et fréquence cardiaque seront vides.** La saisie manuelle de secours (< 10 secondes) est prévue au cahier des charges et sera incluse. Les pas peuvent être comptés par le téléphone seul si une appli source les écrit dans Health Connect (par exemple Samsung Health sur le S23).
-- **IA locale : faisable avec des limites.** Sur le S23 (8 Go de RAM, le maillon faible), un modèle Gemma 3n autour de 2 milliards de paramètres en int4 est le bon calibre via MediaPipe. Réaliste : capture en langage naturel, tri de la boîte de réception, liste de courses, résumé factuel — oui. Questions ouvertes « intelligentes » adaptées à votre semaine — qualité moyenne à ce gabarit, à tester avant de promettre.
+Pour le temps d'écran et le Pacte, Android exige une permission spéciale hors de l'application :
+Réglages (roue dentée) → **Temps d'écran & Pacte** → suivre les 4 étapes affichées (l'app ouvre le bon écran Android toute seule).
 
-## 5. Feuille de route (ordre du cahier des charges)
+**Important sur le Honor 400 Pro (MagicOS)** : Paramètres → Batterie → Lancement d'applications → Notre Semaine → désactiver « Gestion automatique » et tout autoriser en manuel. Sans cela, MagicOS tue la surveillance en arrière-plan. Sur le S23 : Paramètres → Batterie → « Non restreinte ».
 
-1. ✅ **V1** — semaine, veille, priorité du jour, espace partagé *(vous êtes ici : testez-la)*
-2. ⬜ Mesures automatiques (temps d'écran, Health Connect + saisies de secours)
-3. ⬜ Rituel du matin (séquence + minuteur + régularité)
-4. ⬜ Menus de la semaine + liste de courses
-5. ⬜ Capture rapide + objectifs personnels et communs
-6. ⬜ IA locale (en dernier, en commençant par la capture en langage naturel)
+Réaliste, pour être honnête :
+- Le blocage repose sur la détection de l'appli au premier plan : il s'affiche en général en 2 à 5 secondes. Ce n'est pas un verrou inviolable (désinstaller l'app le contourne) — c'est un **pacte**, tenu à deux.
+- La demande de pause part instantanément ; le partenaire la voit à l'ouverture de son application (pas de notification poussée en V2).
+- **IA locale : abandonnée d'un commun accord.** L'analyse de texte intégrée (dates et mots-clés français) couvre la capture. Si un jour vous voulez des résumés rédigés, l'option serait l'API Claude — mais vos données partiraient dans le cloud, à décider ensemble.
+
+## 5. Feuille de route
+
+1. ✅ **V1** — semaine, veille, priorité du jour, espace partagé
+2. ✅ **V2** — objectifs clé en main, rituel du matin + réveil, capture GTD + analyse du français, conseils des 6 livres, temps d'écran + Pacte
+3. ⬜ Health Connect (sommeil, pas, séances) + saisies de secours < 10 s — attention : vide sans montre/bracelet ou appli source (ex. Samsung Health)
+4. ⬜ Menus de la semaine + liste de courses générée
+5. ⬜ Graphiques 4 semaines (sommeil, sport, écran) dans l'onglet Semaine
 
 ## 6. Pour les curieux : compiler soi-même
 

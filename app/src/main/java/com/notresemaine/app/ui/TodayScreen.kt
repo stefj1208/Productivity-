@@ -15,6 +15,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.Circle
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -32,7 +33,13 @@ import com.notresemaine.app.ui.theme.NeutralGray
 import com.notresemaine.app.ui.theme.accentFor
 
 @Composable
-fun TodayScreen(vm: AppViewModel, settings: AppSettings, onPrepare: (String) -> Unit) {
+fun TodayScreen(
+    vm: AppViewModel,
+    settings: AppSettings,
+    onPrepare: (String) -> Unit,
+    onRitual: () -> Unit,
+    onSettings: () -> Unit
+) {
     val today = Dates.todayIso()
     val myId = settings.myUserId
     val accent = accentFor(settings.myColor)
@@ -45,9 +52,13 @@ fun TodayScreen(vm: AppViewModel, settings: AppSettings, onPrepare: (String) -> 
         .collectAsState(initial = emptyList())
     val profiles by remember { vm.repo.db.profiles().all() }
         .collectAsState(initial = emptyList())
+    val ritualLogs by remember { vm.repo.db.ritual().logs() }
+        .collectAsState(initial = emptyList())
 
     val priority = tasks.firstOrNull { it.isPriority }
     val others = tasks.filter { !it.isPriority }
+    val hour = java.time.LocalTime.now().hour
+    val ritualDone = ritualLogs.any { it.userId == myId && it.date == today && !it.deleted }
 
     Column(
         modifier = Modifier
@@ -60,11 +71,49 @@ fun TodayScreen(vm: AppViewModel, settings: AppSettings, onPrepare: (String) -> 
                 .verticalScroll(rememberScrollState())
         ) {
             Spacer(Modifier.height(20.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = Dates.longLabel(today),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
+                androidx.compose.material3.IconButton(onClick = onSettings) {
+                    Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Filled.Settings,
+                        contentDescription = "Réglages",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            val tip = if (hour < 12) com.notresemaine.app.data.Tips.morning() else com.notresemaine.app.data.Tips.evening()
             Text(
-                text = Dates.longLabel(today),
-                style = MaterialTheme.typography.bodyLarge,
+                text = "📖 ${tip.book} — ${tip.text}",
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+
+            if (hour < 12 && !ritualDone) {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = "🌅 Commencer le rituel du matin",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = accent,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .defaultMinSize(minHeight = 48.dp)
+                        .clickable { onRitual() }
+                        .padding(vertical = 12.dp)
+                )
+            } else if (ritualDone) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "🌅 Rituel fait · série : ${vm.repo.ritualStreak(ritualLogs, myId)} jours",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.clickable { onRitual() }
+                )
+            }
 
             if (bravos.isNotEmpty()) {
                 val fromName = profiles.firstOrNull { it.id == bravos.first().fromUser }?.name ?: "Ton binôme"

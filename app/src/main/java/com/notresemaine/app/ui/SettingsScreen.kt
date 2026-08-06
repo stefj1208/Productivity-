@@ -36,7 +36,12 @@ import com.notresemaine.app.ui.theme.accentFor
 import com.notresemaine.app.ui.theme.accentLabel
 
 @Composable
-fun SettingsScreen(vm: AppViewModel, settings: AppSettings) {
+fun SettingsScreen(
+    vm: AppViewModel,
+    settings: AppSettings,
+    onMethod: () -> Unit,
+    onScreenTime: () -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -45,6 +50,14 @@ fun SettingsScreen(vm: AppViewModel, settings: AppSettings) {
     ) {
         Spacer(Modifier.height(20.dp))
         Text(text = "Réglages", style = MaterialTheme.typography.titleLarge)
+
+        Spacer(Modifier.height(12.dp))
+        TextButton(onClick = onScreenTime, modifier = Modifier.height(48.dp)) {
+            Text("📵 Temps d'écran & Pacte →")
+        }
+        TextButton(onClick = onMethod, modifier = Modifier.height(48.dp)) {
+            Text("📖 La méthode (les 6 livres) →")
+        }
 
         // ----- Profil -----
         Spacer(Modifier.height(20.dp))

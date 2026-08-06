@@ -20,6 +20,7 @@ data class TaskEntity(
     val weekStart: String?,   // lundi de la semaine, yyyy-MM-dd
     val isPriority: Boolean = false,
     val isSport: Boolean = false,
+    val goalId: String? = null, // séance générée par un objectif
     val done: Boolean = false,
     val deleted: Boolean = false,
     val updatedAt: Long
@@ -67,6 +68,84 @@ data class EncouragementEntity(
     val updatedAt: Long
 )
 
+/** Objectif « clé en main » : l'app génère les séances de la semaine à partir de ces réglages. */
+@Entity(tableName = "goals")
+data class GoalEntity(
+    @PrimaryKey val id: String,
+    val userId: String,
+    val title: String,
+    val domain: String,          // sante, couple, travail, finances, apprentissage, autre
+    val sessionsPerWeek: Int,
+    val minutesPerSession: Int,
+    val preferredTime: String,   // matin, midi, soir
+    val preferredDays: String,   // jours ISO séparés par des virgules : "1,3,5"
+    val nextAction: String,      // LA prochaine action (méthode GTD / One Thing)
+    val isPrivate: Boolean = false,
+    val active: Boolean = true,
+    val deleted: Boolean = false,
+    val updatedAt: Long
+)
+
+/** Étape du rituel du matin (S.A.V.E.R.S.) — locale au téléphone. */
+@Entity(tableName = "ritual_steps")
+data class RitualStepEntity(
+    @PrimaryKey val id: String,
+    val userId: String,
+    val name: String,
+    val minutes: Int,
+    val position: Int,
+    val enabled: Boolean = true,
+    val updatedAt: Long
+)
+
+/** Rituel accompli tel jour — synchronisé (le partenaire voit la série). */
+@Entity(tableName = "ritual_logs")
+data class RitualLogEntity(
+    @PrimaryKey val id: String, // "$userId:$date"
+    val userId: String,
+    val date: String,
+    val minutes: Int,
+    val deleted: Boolean = false,
+    val updatedAt: Long
+)
+
+/** Note en vrac (boîte de réception GTD) — locale au téléphone. */
+@Entity(tableName = "inbox_items")
+data class InboxItemEntity(
+    @PrimaryKey val id: String,
+    val userId: String,
+    val text: String,
+    val processed: Boolean = false,
+    val deleted: Boolean = false,
+    val updatedAt: Long
+)
+
+/** Temps d'écran d'une journée — synchronisé (visibilité mutuelle du Pacte). */
+@Entity(tableName = "usage_days")
+data class UsageDayEntity(
+    @PrimaryKey val id: String, // "$userId:$date"
+    val userId: String,
+    val date: String,
+    val totalMinutes: Int,
+    val socialMinutes: Int,
+    val unlocks: Int,
+    val deleted: Boolean = false,
+    val updatedAt: Long
+)
+
+/** Demande de déverrouillage du Pacte d'écran, accordée ou non par le partenaire. */
+@Entity(tableName = "grace_requests")
+data class GraceRequestEntity(
+    @PrimaryKey val id: String,
+    val fromUser: String,   // celui qui a dépassé sa limite
+    val toUser: String,     // le partenaire qui peut accorder
+    val date: String,
+    val minutes: Int,
+    val status: String,     // pending | granted | denied
+    val deleted: Boolean = false,
+    val updatedAt: Long
+)
+
 @Dao
 interface TaskDao {
     @Query("SELECT * FROM tasks WHERE userId = :userId AND date = :date AND deleted = 0 ORDER BY isPriority DESC, updatedAt")
@@ -84,7 +163,7 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE userId = :userId AND weekStart = :weekStart AND deleted = 0")
     suspend fun byWeekOnce(userId: String, weekStart: String): List<TaskEntity>
 
-    @Query("SELECT COUNT(*) FROM tasks WHERE userId = :userId AND date = :date AND deleted = 0 AND isSport = 0")
+    @Query("SELECT COUNT(*) FROM tasks WHERE userId = :userId AND date = :date AND deleted = 0 AND isSport = 0 AND goalId IS NULL")
     suspend fun countForDay(userId: String, date: String): Int
 
     @Query("SELECT * FROM tasks WHERE userId = :userId AND date = :date AND isPriority = 1 AND deleted = 0 LIMIT 1")
@@ -153,6 +232,9 @@ interface ProfileDao {
     @Query("SELECT * FROM profiles WHERE id = :id")
     suspend fun byId(id: String): ProfileEntity?
 
+    @Query("SELECT * FROM profiles WHERE id != :myId LIMIT 1")
+    suspend fun partnerOf(myId: String): ProfileEntity?
+
     @Query("SELECT * FROM profiles WHERE updatedAt > :ts")
     suspend fun modifiedSince(ts: Long): List<ProfileEntity>
 
@@ -178,12 +260,113 @@ interface EncouragementDao {
     suspend fun upsert(e: EncouragementEntity)
 }
 
+@Dao
+interface GoalDao {
+    @Query("SELECT * FROM goals WHERE deleted = 0 ORDER BY active DESC, updatedAt DESC")
+    fun all(): Flow<List<GoalEntity>>
+
+    @Query("SELECT * FROM goals WHERE userId = :userId AND active = 1 AND deleted = 0")
+    suspend fun activeOnce(userId: String): List<GoalEntity>
+
+    @Query("SELECT COUNT(*) FROM goals WHERE userId = :userId AND active = 1 AND deleted = 0")
+    suspend fun countActive(userId: String): Int
+
+    @Query("SELECT * FROM goals WHERE id = :id")
+    suspend fun byId(id: String): GoalEntity?
+
+    @Query("SELECT * FROM goals WHERE updatedAt > :ts")
+    suspend fun modifiedSince(ts: Long): List<GoalEntity>
+
+    @Query("UPDATE goals SET userId = :newId, updatedAt = :now WHERE userId = :oldId")
+    suspend fun migrateUser(oldId: String, newId: String, now: Long)
+
+    @Upsert
+    suspend fun upsert(goal: GoalEntity)
+}
+
+@Dao
+interface RitualDao {
+    @Query("SELECT * FROM ritual_steps WHERE userId = :userId ORDER BY position")
+    fun steps(userId: String): Flow<List<RitualStepEntity>>
+
+    @Query("SELECT * FROM ritual_steps WHERE userId = :userId ORDER BY position")
+    suspend fun stepsOnce(userId: String): List<RitualStepEntity>
+
+    @Query("DELETE FROM ritual_steps WHERE id = :id")
+    suspend fun deleteStep(id: String)
+
+    @Upsert
+    suspend fun upsertStep(step: RitualStepEntity)
+
+    @Query("SELECT * FROM ritual_logs WHERE deleted = 0 ORDER BY date DESC LIMIT 90")
+    fun logs(): Flow<List<RitualLogEntity>>
+
+    @Query("SELECT * FROM ritual_logs WHERE id = :id")
+    suspend fun logById(id: String): RitualLogEntity?
+
+    @Query("SELECT * FROM ritual_logs WHERE updatedAt > :ts")
+    suspend fun logsModifiedSince(ts: Long): List<RitualLogEntity>
+
+    @Upsert
+    suspend fun upsertLog(log: RitualLogEntity)
+}
+
+@Dao
+interface InboxDao {
+    @Query("SELECT * FROM inbox_items WHERE userId = :userId AND processed = 0 AND deleted = 0 ORDER BY updatedAt")
+    fun pending(userId: String): Flow<List<InboxItemEntity>>
+
+    @Query("SELECT COUNT(*) FROM inbox_items WHERE userId = :userId AND processed = 0 AND deleted = 0")
+    fun pendingCount(userId: String): Flow<Int>
+
+    @Query("SELECT * FROM inbox_items WHERE id = :id")
+    suspend fun byId(id: String): InboxItemEntity?
+
+    @Upsert
+    suspend fun upsert(item: InboxItemEntity)
+}
+
+@Dao
+interface UsageDao {
+    @Query("SELECT * FROM usage_days WHERE date >= :fromDate AND deleted = 0 ORDER BY date")
+    fun since(fromDate: String): Flow<List<UsageDayEntity>>
+
+    @Query("SELECT * FROM usage_days WHERE id = :id")
+    suspend fun byId(id: String): UsageDayEntity?
+
+    @Query("SELECT * FROM usage_days WHERE updatedAt > :ts")
+    suspend fun modifiedSince(ts: Long): List<UsageDayEntity>
+
+    @Upsert
+    suspend fun upsert(day: UsageDayEntity)
+}
+
+@Dao
+interface GraceDao {
+    @Query("SELECT * FROM grace_requests WHERE date = :date AND deleted = 0 ORDER BY updatedAt DESC")
+    fun forDate(date: String): Flow<List<GraceRequestEntity>>
+
+    @Query("SELECT * FROM grace_requests WHERE fromUser = :userId AND date = :date AND status = 'granted' AND deleted = 0 ORDER BY updatedAt DESC LIMIT 1")
+    suspend fun lastGranted(userId: String, date: String): GraceRequestEntity?
+
+    @Query("SELECT * FROM grace_requests WHERE id = :id")
+    suspend fun byId(id: String): GraceRequestEntity?
+
+    @Query("SELECT * FROM grace_requests WHERE updatedAt > :ts")
+    suspend fun modifiedSince(ts: Long): List<GraceRequestEntity>
+
+    @Upsert
+    suspend fun upsert(request: GraceRequestEntity)
+}
+
 @Database(
     entities = [
         TaskEntity::class, DayPlanEntity::class, WeekPlanEntity::class,
-        ProfileEntity::class, EncouragementEntity::class
+        ProfileEntity::class, EncouragementEntity::class,
+        GoalEntity::class, RitualStepEntity::class, RitualLogEntity::class,
+        InboxItemEntity::class, UsageDayEntity::class, GraceRequestEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDb : RoomDatabase() {
@@ -192,6 +375,11 @@ abstract class AppDb : RoomDatabase() {
     abstract fun weekPlans(): WeekPlanDao
     abstract fun profiles(): ProfileDao
     abstract fun encouragements(): EncouragementDao
+    abstract fun goals(): GoalDao
+    abstract fun ritual(): RitualDao
+    abstract fun inbox(): InboxDao
+    abstract fun usage(): UsageDao
+    abstract fun grace(): GraceDao
 
     companion object {
         @Volatile private var instance: AppDb? = null

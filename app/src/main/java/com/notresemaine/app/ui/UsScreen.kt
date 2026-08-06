@@ -38,6 +38,10 @@ fun UsScreen(vm: AppViewModel, settings: AppSettings, onGoToSettings: () -> Unit
         .collectAsState(initial = emptyList())
     val weekTasks by remember { vm.repo.db.tasks().byWeekAllUsers(weekStart) }
         .collectAsState(initial = emptyList())
+    val usageDays by remember { vm.repo.db.usage().since(today) }
+        .collectAsState(initial = emptyList())
+    val graces by remember { vm.repo.db.grace().forDate(today) }
+        .collectAsState(initial = emptyList())
 
     val me = profiles.firstOrNull { it.id == myId }
         ?: ProfileEntity(myId, settings.myName, settings.myColor, 0)
@@ -88,6 +92,50 @@ fun UsScreen(vm: AppViewModel, settings: AppSettings, onGoToSettings: () -> Unit
                         todayTasks = weekTasks.filter { it.userId == partner.id && it.date == today },
                         modifier = Modifier.weight(1f)
                     )
+                }
+
+                // ----- Pacte d'écran : demandes de pause à accorder -----
+                val pendingForMe = graces.filter { it.toUser == myId && it.status == "pending" }
+                if (pendingForMe.isNotEmpty()) {
+                    Spacer(Modifier.height(24.dp))
+                    SectionLabel("PACTE D'ÉCRAN — DEMANDE DE PAUSE")
+                    pendingForMe.forEach { request ->
+                        Text(
+                            text = "${partner.name} a atteint sa limite et demande ${request.minutes} min.",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Row {
+                            androidx.compose.material3.OutlinedButton(
+                                onClick = { vm.answerGrace(request.id, true) },
+                                modifier = Modifier.padding(top = 8.dp, end = 12.dp)
+                            ) { Text("Accorder ${request.minutes} min") }
+                            androidx.compose.material3.TextButton(
+                                onClick = { vm.answerGrace(request.id, false) },
+                                modifier = Modifier.padding(top = 8.dp)
+                            ) { Text("Pas aujourd'hui") }
+                        }
+                    }
+                }
+
+                val myUsage = usageDays.firstOrNull { it.userId == myId }
+                val partnerUsage = usageDays.firstOrNull { it.userId == partner.id }
+                if (myUsage != null || partnerUsage != null) {
+                    Spacer(Modifier.height(24.dp))
+                    SectionLabel("ÉCRAN AUJOURD'HUI")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(20.dp)
+                    ) {
+                        listOf(me to myUsage, partner to partnerUsage).forEach { (person, usage) ->
+                            Text(
+                                text = "${person.name.take(1)} · " +
+                                    if (usage != null) "réseaux ${usage.socialMinutes} min" else "—",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
                 }
             }
             Spacer(Modifier.height(20.dp))

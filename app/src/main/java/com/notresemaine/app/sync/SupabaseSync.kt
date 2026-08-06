@@ -2,9 +2,13 @@ package com.notresemaine.app.sync
 
 import com.notresemaine.app.data.DayPlanEntity
 import com.notresemaine.app.data.EncouragementEntity
+import com.notresemaine.app.data.GoalEntity
+import com.notresemaine.app.data.GraceRequestEntity
 import com.notresemaine.app.data.ProfileEntity
 import com.notresemaine.app.data.Repository
+import com.notresemaine.app.data.RitualLogEntity
 import com.notresemaine.app.data.TaskEntity
+import com.notresemaine.app.data.UsageDayEntity
 import com.notresemaine.app.data.WeekPlanEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -34,7 +38,59 @@ data class TaskDto(
     @SerialName("week_start") val weekStart: String? = null,
     @SerialName("is_priority") val isPriority: Boolean = false,
     @SerialName("is_sport") val isSport: Boolean = false,
+    @SerialName("goal_id") val goalId: String? = null,
     val done: Boolean = false,
+    val deleted: Boolean = false,
+    @SerialName("updated_at") val updatedAt: Long
+)
+
+@Serializable
+data class GoalDto(
+    val id: String,
+    @SerialName("user_id") val userId: String,
+    val title: String,
+    val domain: String,
+    @SerialName("sessions_per_week") val sessionsPerWeek: Int,
+    @SerialName("minutes_per_session") val minutesPerSession: Int,
+    @SerialName("preferred_time") val preferredTime: String,
+    @SerialName("preferred_days") val preferredDays: String,
+    @SerialName("next_action") val nextAction: String,
+    @SerialName("is_private") val isPrivate: Boolean = false,
+    val active: Boolean = true,
+    val deleted: Boolean = false,
+    @SerialName("updated_at") val updatedAt: Long
+)
+
+@Serializable
+data class RitualLogDto(
+    val id: String,
+    @SerialName("user_id") val userId: String,
+    val date: String,
+    val minutes: Int,
+    val deleted: Boolean = false,
+    @SerialName("updated_at") val updatedAt: Long
+)
+
+@Serializable
+data class UsageDayDto(
+    val id: String,
+    @SerialName("user_id") val userId: String,
+    val date: String,
+    @SerialName("total_minutes") val totalMinutes: Int,
+    @SerialName("social_minutes") val socialMinutes: Int,
+    val unlocks: Int,
+    val deleted: Boolean = false,
+    @SerialName("updated_at") val updatedAt: Long
+)
+
+@Serializable
+data class GraceRequestDto(
+    val id: String,
+    @SerialName("from_user") val fromUser: String,
+    @SerialName("to_user") val toUser: String,
+    val date: String,
+    val minutes: Int,
+    val status: String,
     val deleted: Boolean = false,
     @SerialName("updated_at") val updatedAt: Long
 )
@@ -274,8 +330,29 @@ class SyncManager(private val repo: Repository) {
                 // Envoi : uniquement mes lignes modifiées depuis le dernier envoi.
                 val tasks = db.tasks().modifiedSince(s.lastPushTs).filter { it.userId == myId }
                 api.upsert("tasks", token, tasks.map {
-                    TaskDto(it.id, it.userId, it.title, it.date, it.weekStart, it.isPriority, it.isSport, it.done, it.deleted, it.updatedAt)
+                    TaskDto(it.id, it.userId, it.title, it.date, it.weekStart, it.isPriority, it.isSport, it.goalId, it.done, it.deleted, it.updatedAt)
                 }, TaskDto.serializer())
+
+                val goals = db.goals().modifiedSince(s.lastPushTs).filter { it.userId == myId }
+                api.upsert("goals", token, goals.map {
+                    GoalDto(it.id, it.userId, it.title, it.domain, it.sessionsPerWeek, it.minutesPerSession,
+                        it.preferredTime, it.preferredDays, it.nextAction, it.isPrivate, it.active, it.deleted, it.updatedAt)
+                }, GoalDto.serializer())
+
+                val ritualLogs = db.ritual().logsModifiedSince(s.lastPushTs).filter { it.userId == myId }
+                api.upsert("ritual_logs", token, ritualLogs.map {
+                    RitualLogDto(it.id, it.userId, it.date, it.minutes, it.deleted, it.updatedAt)
+                }, RitualLogDto.serializer())
+
+                val usageDays = db.usage().modifiedSince(s.lastPushTs).filter { it.userId == myId }
+                api.upsert("usage_days", token, usageDays.map {
+                    UsageDayDto(it.id, it.userId, it.date, it.totalMinutes, it.socialMinutes, it.unlocks, it.deleted, it.updatedAt)
+                }, UsageDayDto.serializer())
+
+                val graces = db.grace().modifiedSince(s.lastPushTs).filter { it.fromUser == myId || it.toUser == myId }
+                api.upsert("grace_requests", token, graces.map {
+                    GraceRequestDto(it.id, it.fromUser, it.toUser, it.date, it.minutes, it.status, it.deleted, it.updatedAt)
+                }, GraceRequestDto.serializer())
 
                 val dayPlans = db.dayPlans().modifiedSince(s.lastPushTs).filter { it.userId == myId }
                 api.upsert("day_plans", token, dayPlans.map {
@@ -299,7 +376,9 @@ class SyncManager(private val repo: Repository) {
 
                 val pushMark = (tasks.map { it.updatedAt } + dayPlans.map { it.updatedAt } +
                         weekPlans.map { it.updatedAt } + profiles.map { it.updatedAt } +
-                        encouragements.map { it.updatedAt } + s.lastPushTs).max()
+                        encouragements.map { it.updatedAt } + goals.map { it.updatedAt } +
+                        ritualLogs.map { it.updatedAt } + usageDays.map { it.updatedAt } +
+                        graces.map { it.updatedAt } + s.lastPushTs).max()
 
                 // Réception : tout ce qui a changé dans le couple ; la ligne la plus récente gagne.
                 var pullMark = s.lastPullTs
@@ -308,7 +387,37 @@ class SyncManager(private val repo: Repository) {
                     pullMark = maxOf(pullMark, dto.updatedAt)
                     val local = db.tasks().byId(dto.id)
                     if (local == null || dto.updatedAt > local.updatedAt) {
-                        db.tasks().upsert(TaskEntity(dto.id, dto.userId, dto.title, dto.date, dto.weekStart, dto.isPriority, dto.isSport, dto.done, dto.deleted, dto.updatedAt))
+                        db.tasks().upsert(TaskEntity(dto.id, dto.userId, dto.title, dto.date, dto.weekStart, dto.isPriority, dto.isSport, dto.goalId, dto.done, dto.deleted, dto.updatedAt))
+                    }
+                }
+                api.select("goals", token, s.lastPullTs, GoalDto.serializer()).forEach { dto ->
+                    pullMark = maxOf(pullMark, dto.updatedAt)
+                    val local = db.goals().byId(dto.id)
+                    if (local == null || dto.updatedAt > local.updatedAt) {
+                        db.goals().upsert(GoalEntity(dto.id, dto.userId, dto.title, dto.domain, dto.sessionsPerWeek,
+                            dto.minutesPerSession, dto.preferredTime, dto.preferredDays, dto.nextAction,
+                            dto.isPrivate, dto.active, dto.deleted, dto.updatedAt))
+                    }
+                }
+                api.select("ritual_logs", token, s.lastPullTs, RitualLogDto.serializer()).forEach { dto ->
+                    pullMark = maxOf(pullMark, dto.updatedAt)
+                    val local = db.ritual().logById(dto.id)
+                    if (local == null || dto.updatedAt > local.updatedAt) {
+                        db.ritual().upsertLog(RitualLogEntity(dto.id, dto.userId, dto.date, dto.minutes, dto.deleted, dto.updatedAt))
+                    }
+                }
+                api.select("usage_days", token, s.lastPullTs, UsageDayDto.serializer()).forEach { dto ->
+                    pullMark = maxOf(pullMark, dto.updatedAt)
+                    val local = db.usage().byId(dto.id)
+                    if (local == null || dto.updatedAt > local.updatedAt) {
+                        db.usage().upsert(UsageDayEntity(dto.id, dto.userId, dto.date, dto.totalMinutes, dto.socialMinutes, dto.unlocks, dto.deleted, dto.updatedAt))
+                    }
+                }
+                api.select("grace_requests", token, s.lastPullTs, GraceRequestDto.serializer()).forEach { dto ->
+                    pullMark = maxOf(pullMark, dto.updatedAt)
+                    val local = db.grace().byId(dto.id)
+                    if (local == null || dto.updatedAt > local.updatedAt) {
+                        db.grace().upsert(GraceRequestEntity(dto.id, dto.fromUser, dto.toUser, dto.date, dto.minutes, dto.status, dto.deleted, dto.updatedAt))
                     }
                 }
                 api.select("day_plans", token, s.lastPullTs, DayPlanDto.serializer()).forEach { dto ->

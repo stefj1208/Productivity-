@@ -5,8 +5,12 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.notresemaine.app.data.AddResult
 import com.notresemaine.app.data.AppSettings
+import com.notresemaine.app.data.GoalTemplates
 import com.notresemaine.app.data.Repository
+import com.notresemaine.app.data.RitualStepEntity
 import com.notresemaine.app.notif.Reminders
+import com.notresemaine.app.pacte.BlockerService
+import com.notresemaine.app.pacte.UsageWorker
 import com.notresemaine.app.sync.SyncManager
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -113,6 +117,105 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             repo.saveWeekPlan(myId(), weekStart, priority, abandon, validate)
             requestSync()
             if (validate) toast("Semaine validée ✓")
+        }
+    }
+
+    // ----- Objectifs -----
+
+    fun addGoal(
+        title: String, domain: String, sessionsPerWeek: Int, minutesPerSession: Int,
+        preferredTime: String, preferredDays: List<Int>, nextAction: String, isPrivate: Boolean
+    ) {
+        viewModelScope.launch {
+            val ok = repo.addGoal(myId(), title, domain, sessionsPerWeek, minutesPerSession, preferredTime, preferredDays, nextAction, isPrivate)
+            if (ok) {
+                toast("Objectif créé ✓ Les séances seront planifiées avec la semaine.")
+                requestSync()
+            } else {
+                toast("Maximum ${GoalTemplates.MAX_ACTIVE_GOALS} objectifs actifs — moins mais mieux.")
+            }
+        }
+    }
+
+    fun setGoalActive(goalId: String, active: Boolean) {
+        viewModelScope.launch { repo.setGoalActive(goalId, active); requestSync() }
+    }
+
+    fun deleteGoal(goalId: String) {
+        viewModelScope.launch { repo.deleteGoal(goalId); requestSync() }
+    }
+
+    fun planGoalSessions(weekStart: String) {
+        viewModelScope.launch {
+            val created = repo.planGoalSessions(myId(), weekStart)
+            toast(if (created > 0) "$created séances placées dans la semaine ✓" else "Séances déjà en place ✓")
+            requestSync()
+        }
+    }
+
+    // ----- Rituel du matin -----
+
+    fun ensureRitual() {
+        viewModelScope.launch { repo.ensureRitualSteps(myId()) }
+    }
+
+    fun saveRitualStep(step: RitualStepEntity) {
+        viewModelScope.launch { repo.saveRitualStep(step) }
+    }
+
+    fun completeRitual(minutes: Int) {
+        viewModelScope.launch {
+            repo.completeRitual(myId(), minutes)
+            requestSync()
+            toast("Rituel du matin accompli ✓")
+        }
+    }
+
+    fun setWakeAlarm(time: String) {
+        viewModelScope.launch { repo.settings.setWakeAlarm(time) }
+    }
+
+    // ----- Capture rapide -----
+
+    fun capture(text: String) {
+        viewModelScope.launch {
+            val message = repo.capture(myId(), text)
+            if (message.isNotBlank()) {
+                toast(message)
+                requestSync()
+            }
+        }
+    }
+
+    fun resolveInbox(itemId: String, action: String) {
+        viewModelScope.launch {
+            repo.resolveInbox(itemId, action, com.notresemaine.app.data.Dates.weekStartIso())
+        }
+    }
+
+    // ----- Pacte d'écran -----
+
+    fun savePacte(enabled: Boolean, socialApps: List<String>, limitMinutes: Int) {
+        viewModelScope.launch {
+            repo.settings.setPacte(enabled, socialApps.joinToString(","), limitMinutes)
+            BlockerService.startIfEnabled(getApplication(), enabled)
+            if (enabled) UsageWorker.schedule(getApplication())
+            toast(if (enabled) "Pacte d'écran activé ✓" else "Pacte d'écran désactivé")
+        }
+    }
+
+    fun refreshUsage() {
+        viewModelScope.launch {
+            UsageWorker.collect(getApplication())
+            requestSync()
+        }
+    }
+
+    fun answerGrace(requestId: String, granted: Boolean) {
+        viewModelScope.launch {
+            repo.answerGrace(requestId, granted)
+            requestSync()
+            toast(if (granted) "Pause accordée ✓" else "Demande refusée")
         }
     }
 
