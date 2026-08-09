@@ -105,6 +105,14 @@ fun MenusScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp)
                 )
+            } else {
+                Text(
+                    text = "✨ Un assistant peut composer des menus sur mesure (végétarien, " +
+                        "rapide le soir…). Il s'active dans Réglages, tout en haut.",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 10.dp)
+                )
             }
 
             days.forEach { dayIso ->

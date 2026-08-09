@@ -279,6 +279,14 @@ private fun GoalWizard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp)
                 )
+            } else {
+                Text(
+                    text = "✨ Un assistant peut bâtir le rythme à votre place (séances, durée, " +
+                        "jours, premier pas). Il s'active dans Réglages, tout en haut.",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 10.dp)
+                )
             }
 
             Spacer(Modifier.height(16.dp))

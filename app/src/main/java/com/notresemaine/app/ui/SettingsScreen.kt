@@ -52,6 +52,20 @@ fun SettingsScreen(
         Spacer(Modifier.height(20.dp))
         Text(text = "Réglages", style = MaterialTheme.typography.titleLarge)
 
+        // Permet de vérifier d'un coup d'œil quelle version est réellement installée.
+        val context = androidx.compose.ui.platform.LocalContext.current
+        val appVersion = remember {
+            runCatching {
+                context.packageManager.getPackageInfo(context.packageName, 0).versionName
+            }.getOrNull() ?: "?"
+        }
+        Text(
+            text = "Version $appVersion",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp)
+        )
+
         Spacer(Modifier.height(12.dp))
         TextButton(onClick = onScreenTime, modifier = Modifier.height(48.dp)) {
             Text("📵 Temps d'écran & Pacte →")
@@ -62,6 +76,91 @@ fun SettingsScreen(
         TextButton(onClick = onMethod, modifier = Modifier.height(48.dp)) {
             Text("📖 La méthode (les 6 livres) →")
         }
+
+        HorizontalDivider(Modifier.padding(vertical = 16.dp))
+
+        // ----- Assistant : en tête de page, parce que tant qu'il est éteint,
+        // aucun bouton ✨ n'apparaît ailleurs dans l'application. -----
+        var aiEnabled by remember(settings.aiEnabled) { mutableStateOf(settings.aiEnabled) }
+        var aiKey by remember(settings.aiApiKey) { mutableStateOf(settings.aiApiKey) }
+        SectionLabel(
+            if (settings.aiEnabled && settings.aiApiKey.isNotBlank()) "✨ ASSISTANT — ACTIVÉ"
+            else "✨ ASSISTANT — ÉTEINT"
+        )
+        Text(
+            text = if (settings.aiEnabled && settings.aiApiKey.isNotBlank()) {
+                "Les boutons ✨ sont visibles dans Objectifs, la revue du dimanche, " +
+                    "Préparer demain, le bouton +, Menus, Courses, Temps d'écran et Sommeil."
+            } else {
+                "Tant qu'il est éteint, aucun bouton ✨ n'apparaît dans l'application. " +
+                    "Activez-le ci-dessous et collez votre clé : les boutons apparaîtront alors " +
+                    "dans Objectifs, la revue du dimanche, Préparer demain, le bouton +, " +
+                    "Menus, Courses, Temps d'écran et Sommeil."
+            },
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = "L'application reste complète sans lui : idées de menus, premiers pas, " +
+                "répartition des séances et classement des courses existent déjà hors ligne.",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 6.dp)
+        )
+        Text(
+            text = "⚠️ Ce qui sort du téléphone, et rien d'autre : vos contraintes de menus, " +
+                "l'intitulé d'un objectif, la note que vous venez d'écrire, les titres de vos " +
+                "tâches en attente, vos moyennes d'écran et de sommeil. " +
+                "Jamais un objectif marqué privé, jamais quoi que ce soit du partenaire, " +
+                "jamais le détail jour par jour de votre santé.",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 6.dp)
+        )
+        Text(
+            text = "Deux clés possibles, l'application reconnaît laquelle toute seule : " +
+                "une clé Google (aistudio.google.com) ou une clé Anthropic (sk-ant-…). " +
+                "Chaque appel vous est facturé par le fournisseur choisi.",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 6.dp)
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Activer l'assistant",
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f)
+            )
+            Switch(checked = aiEnabled, onCheckedChange = { aiEnabled = it })
+        }
+        if (aiEnabled) {
+            OutlinedTextField(
+                value = aiKey,
+                onValueChange = { aiKey = it },
+                label = { Text("Clé API (Google ou Anthropic)") },
+                visualTransformation = PasswordVisualTransformation(),
+                textStyle = MaterialTheme.typography.bodyLarge,
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Text(
+                text = "Détecté : ${com.notresemaine.app.ai.Ai.providerLabel(aiKey)}",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.padding(top = 6.dp)
+            )
+        }
+        TextButton(
+            onClick = { vm.saveAiSettings(aiEnabled, aiKey) },
+            enabled = !aiEnabled || aiKey.isNotBlank()
+        ) { Text("Enregistrer l'assistant") }
+
+        HorizontalDivider(Modifier.padding(vertical = 16.dp))
 
         // ----- Profil -----
         Spacer(Modifier.height(20.dp))
@@ -138,73 +237,6 @@ fun SettingsScreen(
                 )
             }
         }
-
-        HorizontalDivider(Modifier.padding(vertical = 16.dp))
-
-        // ----- Assistant (facultatif) -----
-        SectionLabel("ASSISTANT (FACULTATIF)")
-        Text(
-            text = "L'application est complète sans lui : idées de menus, premiers pas, " +
-                "répartition des séances et classement des courses existent déjà hors ligne. " +
-                "L'assistant sert quand on veut du sur-mesure, ou quand on ne sait pas " +
-                "par où commencer.",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        var aiEnabled by remember(settings.aiEnabled) { mutableStateOf(settings.aiEnabled) }
-        var aiKey by remember(settings.aiApiKey) { mutableStateOf(settings.aiApiKey) }
-        Text(
-            text = "⚠️ Ce qui sort du téléphone, et rien d'autre : vos contraintes de menus, " +
-                "l'intitulé d'un objectif, la note que vous venez d'écrire, les titres de vos " +
-                "tâches en attente, vos moyennes d'écran et de sommeil. " +
-                "Jamais un objectif marqué privé, jamais quoi que ce soit du partenaire, " +
-                "jamais le détail jour par jour de votre santé.",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 6.dp)
-        )
-        Text(
-            text = "Deux clés possibles, l'application reconnaît laquelle toute seule : " +
-                "une clé Google (aistudio.google.com) ou une clé Anthropic (sk-ant-…). " +
-                "Chaque appel vous est facturé par le fournisseur choisi.",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 6.dp)
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Activer l'assistant",
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.weight(1f)
-            )
-            Switch(checked = aiEnabled, onCheckedChange = { aiEnabled = it })
-        }
-        if (aiEnabled) {
-            OutlinedTextField(
-                value = aiKey,
-                onValueChange = { aiKey = it },
-                label = { Text("Clé API (Google ou Anthropic)") },
-                visualTransformation = PasswordVisualTransformation(),
-                textStyle = MaterialTheme.typography.bodyLarge,
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Text(
-                text = "Détecté : ${com.notresemaine.app.ai.Ai.providerLabel(aiKey)}",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.padding(top = 6.dp)
-            )
-        }
-        TextButton(
-            onClick = { vm.saveAiSettings(aiEnabled, aiKey) },
-            enabled = !aiEnabled || aiKey.isNotBlank()
-        ) { Text("Enregistrer l'assistant") }
 
         HorizontalDivider(Modifier.padding(vertical = 16.dp))
 
