@@ -54,6 +54,12 @@ data class ProfileEntity(
     @PrimaryKey val id: String,
     val name: String,
     val color: String, // "A" (bleu) ou "B" (orange)
+    // Réglages du Pacte, partagés : chacun voit l'engagement de l'autre.
+    val pacteEnabled: Boolean = false,
+    val dailyLimitMinutes: Int = 45,
+    val curfewEnabled: Boolean = false,
+    val curfewStart: String = "22:30",
+    val curfewEnd: String = "06:30",
     val updatedAt: Long
 )
 
@@ -152,7 +158,7 @@ data class MealEntity(
     @PrimaryKey val id: String, // "$date:$slot"
     val userId: String,         // qui l'a saisi (pour la synchro)
     val date: String,
-    val slot: String,           // midi | soir
+    val slot: String,           // matin | midi | soir
     val title: String,
     val ingredients: String,    // "200 g farine, 3 œufs, 1 L lait"
     val deleted: Boolean = false,

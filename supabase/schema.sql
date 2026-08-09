@@ -161,6 +161,13 @@ create table if not exists health_days (
 -- Mise à jour depuis la V1 (sans effet sur une base neuve)
 alter table tasks add column if not exists goal_id text;
 
+-- Réglages du Pacte, partagés dans le couple (V4)
+alter table profiles add column if not exists pacte_enabled boolean not null default false;
+alter table profiles add column if not exists daily_limit_minutes int not null default 45;
+alter table profiles add column if not exists curfew_enabled boolean not null default false;
+alter table profiles add column if not exists curfew_start text not null default '22:30';
+alter table profiles add column if not exists curfew_end text not null default '06:30';
+
 -- ---------- Fonctions ----------
 
 -- Le couple de la personne connectée (contourne proprement la récursion RLS).

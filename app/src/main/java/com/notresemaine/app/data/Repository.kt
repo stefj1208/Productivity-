@@ -152,8 +152,39 @@ class Repository private constructor(context: Context) {
 
     // ----- Profils -----
 
+    /** Le profil porte aussi l'engagement du Pacte, pour que le partenaire le voie. */
     suspend fun saveMyProfile(userId: String, name: String, color: String) {
-        db.profiles().upsert(ProfileEntity(id = userId, name = name.trim(), color = color, updatedAt = now()))
+        val s = settings.current()
+        db.profiles().upsert(
+            ProfileEntity(
+                id = userId, name = name.trim(), color = color,
+                pacteEnabled = s.pacteEnabled,
+                dailyLimitMinutes = s.dailyLimitMinutes,
+                curfewEnabled = s.curfewEnabled,
+                curfewStart = s.curfewStart,
+                curfewEnd = s.curfewEnd,
+                updatedAt = now()
+            )
+        )
+    }
+
+    /**
+     * Applique un assouplissement mis en attente une fois la date atteinte.
+     * Serrer le pacte est immédiat ; le relâcher attend le lendemain.
+     */
+    suspend fun applyPendingPacteIfDue() {
+        val s = settings.current()
+        if (s.pendingFromDate.isBlank() || s.pendingFromDate > Dates.todayIso()) return
+        settings.setPacte(
+            enabled = s.pacteEnabled,
+            socialApps = s.socialApps,
+            limitMinutes = if (s.pendingLimitMinutes > 0) s.pendingLimitMinutes else s.dailyLimitMinutes
+        )
+        if (s.pendingCurfewStart.isNotBlank() && s.pendingCurfewEnd.isNotBlank()) {
+            settings.setCurfew(s.curfewEnabled, s.pendingCurfewStart, s.pendingCurfewEnd, s.curfewStrict)
+        }
+        settings.clearPending()
+        if (s.myUserId.isNotBlank()) saveMyProfile(s.myUserId, s.myName, s.myColor)
     }
 
     // ----- Encouragements -----
@@ -400,6 +431,46 @@ class Repository private constructor(context: Context) {
                 updatedAt = now()
             )
         )
+    }
+
+    /** Remplit les créneaux vides de la semaine depuis la banque d'idées hors ligne. */
+    suspend fun fillWeekMenusFromBank(userId: String, weekStart: String): Int {
+        val days = Dates.daysOfWeek(weekStart)
+        val existing = db.meals().betweenOnce(days.first(), days.last())
+            .filter { it.title.isNotBlank() && !it.deleted }
+            .map { it.id }
+            .toSet()
+        val seed = java.time.LocalDate.parse(weekStart).dayOfYear
+        var filled = 0
+        MenuIdeas.weekPlan(seed).forEach { (key, idea) ->
+            val (dayIndex, slot) = key
+            val date = days[dayIndex]
+            if ("$date:$slot" in existing) return@forEach
+            saveMeal(userId, date, slot, idea.title, idea.ingredients)
+            filled++
+        }
+        return filled
+    }
+
+    /** Applique des suggestions de l'assistant, sans écraser ce qui est déjà décidé. */
+    suspend fun applyMenuSuggestions(
+        userId: String,
+        weekStart: String,
+        suggestions: List<com.notresemaine.app.ai.Assistant.MealSuggestion>
+    ): Int {
+        val days = Dates.daysOfWeek(weekStart)
+        val existing = db.meals().betweenOnce(days.first(), days.last())
+            .filter { it.title.isNotBlank() && !it.deleted }
+            .map { it.id }
+            .toSet()
+        var applied = 0
+        suggestions.forEach { s ->
+            val date = days.getOrNull(s.dayIndex) ?: return@forEach
+            if ("$date:${s.slot}" in existing) return@forEach
+            saveMeal(userId, date, s.slot, s.title, s.ingredients)
+            applied++
+        }
+        return applied
     }
 
     /**

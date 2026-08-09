@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -40,6 +41,7 @@ fun MenusScreen(
     val days = Dates.daysOfWeek(weekStart)
     val meals by remember(weekStart) { vm.repo.db.meals().between(days.first(), days.last()) }
         .collectAsState(initial = emptyList())
+    val aiBusy by vm.aiBusy.collectAsState()
 
     Column(
         modifier = Modifier
@@ -62,6 +64,51 @@ fun MenusScreen(
             Spacer(Modifier.height(12.dp))
             TipCard(com.notresemaine.app.data.Tips.review(6))
 
+            // Pas d'inspiration ? Deux issues : la banque hors ligne, ou l'assistant.
+            Spacer(Modifier.height(12.dp))
+            SectionLabel("PAS D'INSPIRATION ?")
+            OutlinedButton(
+                onClick = { vm.fillMenusFromBank(weekStart) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+            ) { Text("💡 Proposer une semaine complète") }
+            Text(
+                text = "Remplit uniquement les créneaux vides, avec des recettes simples. " +
+                    "Hors ligne, instantané, rien n'est envoyé nulle part.",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+
+            if (settings.aiEnabled && settings.aiApiKey.isNotBlank()) {
+                Spacer(Modifier.height(10.dp))
+                var constraints by remember { mutableStateOf("") }
+                OutlinedTextField(
+                    value = constraints,
+                    onValueChange = { constraints = it },
+                    placeholder = { Text("Contraintes : végétarien, rapide le soir…") },
+                    textStyle = MaterialTheme.typography.bodyLarge,
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedButton(
+                    onClick = { vm.suggestMenusWithAi(weekStart, constraints) },
+                    enabled = !aiBusy,
+                    modifier = Modifier
+                        .padding(top = 6.dp)
+                        .fillMaxWidth()
+                        .height(48.dp)
+                ) { Text(if (aiBusy) "L'assistant réfléchit…" else "✨ Demander à l'assistant") }
+                Text(
+                    text = "Envoie uniquement vos contraintes à Anthropic. Aucune donnée de " +
+                        "sommeil, d'écran ou de tâches ne quitte le téléphone.",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+
             days.forEach { dayIso ->
                 Spacer(Modifier.height(20.dp))
                 Text(
@@ -70,7 +117,7 @@ fun MenusScreen(
                     color = if (dayIso == Dates.todayIso()) MaterialTheme.colorScheme.primary
                     else MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                listOf("midi" to "Midi", "soir" to "Soir").forEach { (slot, label) ->
+                com.notresemaine.app.data.MenuIdeas.slots.forEach { (slot, label) ->
                     val meal = meals.firstOrNull { it.date == dayIso && it.slot == slot }
                     MealEditor(
                         label = label,

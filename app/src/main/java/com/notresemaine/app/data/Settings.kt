@@ -37,7 +37,20 @@ data class AppSettings(
     val pacteEnabled: Boolean = false,
     val socialApps: String = "",        // noms de paquets séparés par des virgules
     val dailyLimitMinutes: Int = 45,
-    val graceUntil: Long = 0L           // pause accordée par le partenaire (horodatage local)
+    val graceUntil: Long = 0L,          // pause accordée par le partenaire (horodatage local)
+    // Couvre-feu : plus de réseaux (ou plus rien) entre ces deux heures
+    val curfewEnabled: Boolean = false,
+    val curfewStart: String = "22:30",
+    val curfewEnd: String = "06:30",
+    val curfewStrict: Boolean = false,  // strict = toutes les applis, pas seulement les réseaux
+    // Assouplissement différé : un relâchement ne prend effet que le lendemain
+    val pendingLimitMinutes: Int = 0,
+    val pendingCurfewStart: String = "",
+    val pendingCurfewEnd: String = "",
+    val pendingFromDate: String = "",
+    // Assistant Claude (facultatif, clé fournie par l'utilisateur)
+    val aiEnabled: Boolean = false,
+    val aiApiKey: String = ""
 )
 
 class SettingsStore(private val context: Context) {
@@ -65,6 +78,16 @@ class SettingsStore(private val context: Context) {
         val socialApps = stringPreferencesKey("socialApps")
         val dailyLimitMinutes = intPreferencesKey("dailyLimitMinutes")
         val graceUntil = longPreferencesKey("graceUntil")
+        val curfewEnabled = booleanPreferencesKey("curfewEnabled")
+        val curfewStart = stringPreferencesKey("curfewStart")
+        val curfewEnd = stringPreferencesKey("curfewEnd")
+        val curfewStrict = booleanPreferencesKey("curfewStrict")
+        val pendingLimitMinutes = intPreferencesKey("pendingLimitMinutes")
+        val pendingCurfewStart = stringPreferencesKey("pendingCurfewStart")
+        val pendingCurfewEnd = stringPreferencesKey("pendingCurfewEnd")
+        val pendingFromDate = stringPreferencesKey("pendingFromDate")
+        val aiEnabled = booleanPreferencesKey("aiEnabled")
+        val aiApiKey = stringPreferencesKey("aiApiKey")
     }
 
     val flow: Flow<AppSettings> = context.dataStore.data.map { p ->
@@ -90,7 +113,17 @@ class SettingsStore(private val context: Context) {
             pacteEnabled = p[K.pacteEnabled] ?: false,
             socialApps = p[K.socialApps] ?: "",
             dailyLimitMinutes = p[K.dailyLimitMinutes] ?: 45,
-            graceUntil = p[K.graceUntil] ?: 0L
+            graceUntil = p[K.graceUntil] ?: 0L,
+            curfewEnabled = p[K.curfewEnabled] ?: false,
+            curfewStart = p[K.curfewStart] ?: "22:30",
+            curfewEnd = p[K.curfewEnd] ?: "06:30",
+            curfewStrict = p[K.curfewStrict] ?: false,
+            pendingLimitMinutes = p[K.pendingLimitMinutes] ?: 0,
+            pendingCurfewStart = p[K.pendingCurfewStart] ?: "",
+            pendingCurfewEnd = p[K.pendingCurfewEnd] ?: "",
+            pendingFromDate = p[K.pendingFromDate] ?: "",
+            aiEnabled = p[K.aiEnabled] ?: false,
+            aiApiKey = p[K.aiApiKey] ?: ""
         )
     }
 
@@ -177,6 +210,41 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setGraceUntil(ts: Long) {
         context.dataStore.edit { p -> p[K.graceUntil] = ts }
+    }
+
+    suspend fun setCurfew(enabled: Boolean, start: String, end: String, strict: Boolean) {
+        context.dataStore.edit { p ->
+            p[K.curfewEnabled] = enabled
+            p[K.curfewStart] = start
+            p[K.curfewEnd] = end
+            p[K.curfewStrict] = strict
+        }
+    }
+
+    /** Un assouplissement est mis en attente : il ne s'appliquera que demain. */
+    suspend fun setPending(limitMinutes: Int, curfewStart: String, curfewEnd: String, fromDate: String) {
+        context.dataStore.edit { p ->
+            p[K.pendingLimitMinutes] = limitMinutes
+            p[K.pendingCurfewStart] = curfewStart
+            p[K.pendingCurfewEnd] = curfewEnd
+            p[K.pendingFromDate] = fromDate
+        }
+    }
+
+    suspend fun clearPending() {
+        context.dataStore.edit { p ->
+            p[K.pendingLimitMinutes] = 0
+            p[K.pendingCurfewStart] = ""
+            p[K.pendingCurfewEnd] = ""
+            p[K.pendingFromDate] = ""
+        }
+    }
+
+    suspend fun setAi(enabled: Boolean, apiKey: String) {
+        context.dataStore.edit { p ->
+            p[K.aiEnabled] = enabled
+            p[K.aiApiKey] = apiKey.trim()
+        }
     }
 
     suspend fun setSyncMarks(pull: Long, push: Long) {

@@ -141,6 +141,57 @@ fun SettingsScreen(
 
         HorizontalDivider(Modifier.padding(vertical = 16.dp))
 
+        // ----- Assistant Claude (facultatif) -----
+        SectionLabel("ASSISTANT (FACULTATIF)")
+        Text(
+            text = "L'application est complète sans lui : les idées de menus et les premiers pas " +
+                "existent déjà hors ligne. L'assistant sert quand on veut des menus sur mesure " +
+                "ou des premiers pas adaptés à un objectif inhabituel.",
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = "⚠️ Activé, il envoie à Anthropic uniquement : vos contraintes de menus et " +
+                "l'intitulé de l'objectif. Jamais votre sommeil, votre temps d'écran, vos tâches, " +
+                "ni quoi que ce soit du partenaire. Il faut votre propre clé API " +
+                "(console.anthropic.com), et chaque appel vous est facturé par Anthropic.",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 6.dp)
+        )
+        var aiEnabled by remember(settings.aiEnabled) { mutableStateOf(settings.aiEnabled) }
+        var aiKey by remember(settings.aiApiKey) { mutableStateOf(settings.aiApiKey) }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Activer l'assistant",
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f)
+            )
+            Switch(checked = aiEnabled, onCheckedChange = { aiEnabled = it })
+        }
+        if (aiEnabled) {
+            OutlinedTextField(
+                value = aiKey,
+                onValueChange = { aiKey = it },
+                label = { Text("Clé API Anthropic (sk-ant-…)") },
+                visualTransformation = PasswordVisualTransformation(),
+                textStyle = MaterialTheme.typography.bodyLarge,
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+        TextButton(
+            onClick = { vm.saveAiSettings(aiEnabled, aiKey) },
+            enabled = !aiEnabled || aiKey.startsWith("sk-ant-")
+        ) { Text("Enregistrer l'assistant") }
+
+        HorizontalDivider(Modifier.padding(vertical = 16.dp))
+
         // ----- Synchronisation -----
         SectionLabel("SYNCHRONISATION ENTRE VOS DEUX TÉLÉPHONES")
         val status by vm.syncStatus.collectAsState()

@@ -34,6 +34,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     val messages = MutableSharedFlow<String>(extraBufferCapacity = 4)
     val syncStatus = MutableStateFlow("")
+    val aiBusy = MutableStateFlow(false)
+    val aiSteps = MutableStateFlow<List<String>>(emptyList())
 
     private val syncRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
@@ -195,12 +197,45 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ----- Pacte d'écran -----
 
-    fun savePacte(enabled: Boolean, socialApps: List<String>, limitMinutes: Int) {
+    /**
+     * Serrer le pacte s'applique tout de suite ; le relâcher attend demain.
+     * C'est ce délai qui fait de l'app un engagement plutôt qu'un réglage.
+     */
+    fun savePacte(
+        enabled: Boolean,
+        socialApps: List<String>,
+        limitMinutes: Int,
+        curfewEnabled: Boolean,
+        curfewStart: String,
+        curfewEnd: String,
+        curfewStrict: Boolean
+    ) {
         viewModelScope.launch {
-            repo.settings.setPacte(enabled, socialApps.joinToString(","), limitMinutes)
+            val current = repo.settings.current()
+            val loosening = current.pacteEnabled &&
+                com.notresemaine.app.data.Curfew.isLooser(current, limitMinutes, curfewEnabled, curfewStart, curfewEnd)
+
+            if (loosening) {
+                repo.settings.setPending(
+                    limitMinutes, curfewStart, curfewEnd,
+                    com.notresemaine.app.data.Dates.tomorrowIso()
+                )
+                // Le durcissement éventuel (couvre-feu activé, mode strict) s'applique quand même.
+                repo.settings.setCurfew(curfewEnabled, current.curfewStart, current.curfewEnd, curfewStrict)
+                repo.settings.setPacte(enabled, socialApps.joinToString(","), current.dailyLimitMinutes)
+                toast("Assouplissement enregistré — il prendra effet demain.")
+            } else {
+                repo.settings.setPending(0, "", "", "")
+                repo.settings.setCurfew(curfewEnabled, curfewStart, curfewEnd, curfewStrict)
+                repo.settings.setPacte(enabled, socialApps.joinToString(","), limitMinutes)
+                toast(if (enabled) "Pacte enregistré ✓" else "Pacte désactivé")
+            }
+
+            val s = repo.settings.current()
+            repo.saveMyProfile(s.myUserId, s.myName, s.myColor)
             BlockerService.startIfEnabled(getApplication(), enabled)
             if (enabled) UsageWorker.schedule(getApplication())
-            toast(if (enabled) "Pacte d'écran activé ✓" else "Pacte d'écran désactivé")
+            requestSync()
         }
     }
 
@@ -226,6 +261,62 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             repo.saveMeal(myId(), date, slot, title, ingredients)
             requestSync()
             toast("Menu enregistré ✓")
+        }
+    }
+
+    /** Remplit les créneaux vides avec la banque d'idées : hors ligne, instantané. */
+    fun fillMenusFromBank(weekStart: String) {
+        viewModelScope.launch {
+            val filled = repo.fillWeekMenusFromBank(myId(), weekStart)
+            requestSync()
+            toast(if (filled > 0) "$filled repas proposés ✓ Modifie ce qui ne te plaît pas."
+            else "Tous les repas sont déjà décidés ✓")
+        }
+    }
+
+    /** Variante assistée : n'est proposée que si l'assistant Claude est activé. */
+    fun suggestMenusWithAi(weekStart: String, constraints: String) {
+        viewModelScope.launch {
+            val s = repo.settings.current()
+            if (!s.aiEnabled || s.aiApiKey.isBlank()) {
+                toast("Active d'abord l'assistant dans Réglages.")
+                return@launch
+            }
+            aiBusy.value = true
+            runCatching { com.notresemaine.app.ai.Assistant.suggestWeekMenus(s.aiApiKey, constraints) }
+                .onSuccess { suggestions ->
+                    val applied = repo.applyMenuSuggestions(myId(), weekStart, suggestions)
+                    requestSync()
+                    toast(if (applied > 0) "$applied repas proposés ✓" else "Rien à ajouter, la semaine est déjà pleine.")
+                }
+                .onFailure { toast("Assistant indisponible : ${it.message ?: "erreur réseau"}") }
+            aiBusy.value = false
+        }
+    }
+
+    fun suggestFirstStepsWithAi(goalTitle: String) {
+        viewModelScope.launch {
+            val s = repo.settings.current()
+            if (!s.aiEnabled || s.aiApiKey.isBlank()) {
+                toast("Active d'abord l'assistant dans Réglages.")
+                return@launch
+            }
+            aiBusy.value = true
+            runCatching { com.notresemaine.app.ai.Assistant.suggestFirstSteps(s.aiApiKey, goalTitle) }
+                .onSuccess { aiSteps.value = it }
+                .onFailure { toast("Assistant indisponible : ${it.message ?: "erreur réseau"}") }
+            aiBusy.value = false
+        }
+    }
+
+    fun clearAiSteps() {
+        aiSteps.value = emptyList()
+    }
+
+    fun saveAiSettings(enabled: Boolean, apiKey: String) {
+        viewModelScope.launch {
+            repo.settings.setAi(enabled, apiKey)
+            toast(if (enabled) "Assistant activé ✓" else "Assistant désactivé")
         }
     }
 

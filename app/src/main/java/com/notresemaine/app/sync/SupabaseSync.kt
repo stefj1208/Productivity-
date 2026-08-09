@@ -126,6 +126,11 @@ data class ProfileDto(
     val id: String,
     val name: String,
     val color: String,
+    @SerialName("pacte_enabled") val pacteEnabled: Boolean = false,
+    @SerialName("daily_limit_minutes") val dailyLimitMinutes: Int = 45,
+    @SerialName("curfew_enabled") val curfewEnabled: Boolean = false,
+    @SerialName("curfew_start") val curfewStart: String = "22:30",
+    @SerialName("curfew_end") val curfewEnd: String = "06:30",
     @SerialName("updated_at") val updatedAt: Long
 )
 
@@ -423,7 +428,8 @@ class SyncManager(private val repo: Repository) {
 
                 val profiles = db.profiles().modifiedSince(s.lastPushTs).filter { it.id == myId }
                 api.upsert("profiles", token, profiles.map {
-                    ProfileDto(it.id, it.name, it.color, it.updatedAt)
+                    ProfileDto(it.id, it.name, it.color, it.pacteEnabled, it.dailyLimitMinutes,
+                        it.curfewEnabled, it.curfewStart, it.curfewEnd, it.updatedAt)
                 }, ProfileDto.serializer())
 
                 val encouragements = db.encouragements().modifiedSince(s.lastPushTs).filter { it.fromUser == myId }
@@ -518,7 +524,8 @@ class SyncManager(private val repo: Repository) {
                     pullMark = maxOf(pullMark, dto.updatedAt)
                     val local = db.profiles().byId(dto.id)
                     if (local == null || dto.updatedAt > local.updatedAt) {
-                        db.profiles().upsert(ProfileEntity(dto.id, dto.name, dto.color, dto.updatedAt))
+                        db.profiles().upsert(ProfileEntity(dto.id, dto.name, dto.color, dto.pacteEnabled,
+                            dto.dailyLimitMinutes, dto.curfewEnabled, dto.curfewStart, dto.curfewEnd, dto.updatedAt))
                     }
                 }
                 api.select("encouragements", token, s.lastPullTs, EncouragementDto.serializer()).forEach { dto ->

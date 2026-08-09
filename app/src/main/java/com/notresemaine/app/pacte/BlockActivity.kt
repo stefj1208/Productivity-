@@ -34,6 +34,8 @@ class BlockActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val minutes = intent.getIntExtra("minutes", 0)
+        val isCurfew = intent.getBooleanExtra("curfew", false)
+        val curfewLabel = intent.getStringExtra("curfewLabel") ?: ""
         val repo = Repository.get(applicationContext)
         val sync = SyncManager(repo)
 
@@ -46,10 +48,14 @@ class BlockActivity : ComponentActivity() {
                 Surface(color = MaterialTheme.colorScheme.background) {
                     Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
                         Spacer(Modifier.weight(1f))
-                        Text("Pacte d'écran", style = MaterialTheme.typography.titleLarge)
+                        Text(
+                            text = if (isCurfew) "🌙 Couvre-feu" else "Pacte d'écran",
+                            style = MaterialTheme.typography.titleLarge
+                        )
                         Spacer(Modifier.height(12.dp))
                         Text(
-                            text = "Limite atteinte : $minutes min sur les applications choisies aujourd'hui.",
+                            text = if (isCurfew) "C'est l'heure de dormir.\nCouvre-feu $curfewLabel."
+                            else "Limite atteinte : $minutes min sur les applications choisies aujourd'hui.",
                             style = MaterialTheme.typography.displaySmall
                         )
                         Spacer(Modifier.height(16.dp))
@@ -79,7 +85,9 @@ class BlockActivity : ComponentActivity() {
                             )
                             Spacer(Modifier.height(8.dp))
                         }
-                        TextButton(onClick = { goHome() }) { Text("Fermer et poser le téléphone") }
+                        TextButton(onClick = { goHome() }) {
+                            Text(if (isCurfew) "Bonne nuit" else "Fermer et poser le téléphone")
+                        }
                         Spacer(Modifier.height(16.dp))
                     }
                 }

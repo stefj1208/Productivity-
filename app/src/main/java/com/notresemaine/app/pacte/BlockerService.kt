@@ -10,6 +10,7 @@ import android.content.Intent
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.notresemaine.app.MainActivity
+import com.notresemaine.app.data.Curfew
 import com.notresemaine.app.data.Dates
 import com.notresemaine.app.data.Repository
 import com.notresemaine.app.sync.SyncManager
@@ -51,8 +52,9 @@ class BlockerService : Service() {
         var lastSync = 0L
 
         while (scope.isActive) {
+            repo.applyPendingPacteIfDue()
             val s = repo.settings.current()
-            if (!s.pacteEnabled || s.dailyLimitMinutes <= 0 || !Usage.hasPermission(this)) {
+            if (!s.pacteEnabled || !Usage.hasPermission(this)) {
                 stopSelf()
                 return
             }
@@ -68,8 +70,9 @@ class BlockerService : Service() {
                 }
             }
 
-            val overLimit = socialMinutes >= s.dailyLimitMinutes
-            if (overLimit) {
+            val curfewOn = Curfew.isActive(s)
+            val overLimit = s.dailyLimitMinutes > 0 && socialMinutes >= s.dailyLimitMinutes
+            if (overLimit || curfewOn) {
                 // Une pause accordée par le partenaire arrive par la synchronisation.
                 if (now - lastSync > 60_000) {
                     lastSync = now
@@ -83,11 +86,16 @@ class BlockerService : Service() {
                 val graceActive = repo.settings.current().graceUntil > now
                 if (!graceActive) {
                     val foreground = Usage.foregroundPackage(this)
-                    if (foreground != null && foreground in social) {
+                    // Couvre-feu strict : tout est bloqué sauf le strict nécessaire.
+                    val blocked = foreground != null && foreground !in ALWAYS_ALLOWED &&
+                        (foreground in social || (curfewOn && s.curfewStrict))
+                    if (blocked) {
                         startActivity(
                             Intent(this, BlockActivity::class.java)
                                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                 .putExtra("minutes", socialMinutes)
+                                .putExtra("curfew", curfewOn)
+                                .putExtra("curfewLabel", Curfew.label(s))
                         )
                     }
                 }
@@ -117,6 +125,21 @@ class BlockerService : Service() {
     companion object {
         private const val CHANNEL_ID = "pacte"
         private const val NOTIF_ID = 10
+
+        /**
+         * Jamais bloqué, même en couvre-feu strict : téléphone, messages, urgences,
+         * réveil, appareil photo, et l'application elle-même.
+         */
+        private val ALWAYS_ALLOWED = setOf(
+            "com.android.dialer", "com.google.android.dialer", "com.samsung.android.dialer",
+            "com.android.server.telecom", "com.android.incallui",
+            "com.android.messaging", "com.google.android.apps.messaging",
+            "com.samsung.android.messaging", "com.hihonor.message",
+            "com.android.deskclock", "com.google.android.deskclock",
+            "com.sec.android.app.clockpackage", "com.hihonor.deskclock",
+            "com.android.camera", "com.sec.android.app.camera", "com.hihonor.camera",
+            "com.android.settings", "com.notresemaine.app"
+        )
 
         fun startIfEnabled(context: Context, enabled: Boolean) {
             val intent = Intent(context, BlockerService::class.java)

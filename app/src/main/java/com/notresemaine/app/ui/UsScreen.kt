@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.notresemaine.app.data.AppSettings
@@ -44,7 +45,7 @@ fun UsScreen(vm: AppViewModel, settings: AppSettings, onGoToSettings: () -> Unit
         .collectAsState(initial = emptyList())
 
     val me = profiles.firstOrNull { it.id == myId }
-        ?: ProfileEntity(myId, settings.myName, settings.myColor, 0)
+        ?: ProfileEntity(id = myId, name = settings.myName, color = settings.myColor, updatedAt = 0)
     val partner = profiles.firstOrNull { it.id != myId }
 
     Column(
@@ -94,15 +95,18 @@ fun UsScreen(vm: AppViewModel, settings: AppSettings, onGoToSettings: () -> Unit
                     )
                 }
 
-                // ----- Pacte d'écran : demandes de pause à accorder -----
+                // ----- Le Pacte d'écran, visible en permanence par les deux -----
+                Spacer(Modifier.height(28.dp))
+                SectionLabel("NOTRE PACTE D'ÉCRAN")
+
                 val pendingForMe = graces.filter { it.toUser == myId && it.status == "pending" }
                 if (pendingForMe.isNotEmpty()) {
-                    Spacer(Modifier.height(24.dp))
-                    SectionLabel("PACTE D'ÉCRAN — DEMANDE DE PAUSE")
                     pendingForMe.forEach { request ->
                         Text(
-                            text = "${partner.name} a atteint sa limite et demande ${request.minutes} min.",
-                            style = MaterialTheme.typography.bodyLarge
+                            text = "⏸ ${partner.name} demande ${request.minutes} min de pause.",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.padding(top = 6.dp)
                         )
                         Row {
                             androidx.compose.material3.OutlinedButton(
@@ -112,31 +116,25 @@ fun UsScreen(vm: AppViewModel, settings: AppSettings, onGoToSettings: () -> Unit
                             androidx.compose.material3.TextButton(
                                 onClick = { vm.answerGrace(request.id, false) },
                                 modifier = Modifier.padding(top = 8.dp)
-                            ) { Text("Pas aujourd'hui") }
+                            ) { Text("Pas ce soir") }
                         }
                     }
+                    Spacer(Modifier.height(12.dp))
                 }
 
-                val myUsage = usageDays.firstOrNull { it.userId == myId }
-                val partnerUsage = usageDays.firstOrNull { it.userId == partner.id }
-                if (myUsage != null || partnerUsage != null) {
-                    Spacer(Modifier.height(24.dp))
-                    SectionLabel("ÉCRAN AUJOURD'HUI")
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(20.dp)
-                    ) {
-                        listOf(me to myUsage, partner to partnerUsage).forEach { (person, usage) ->
-                            Text(
-                                text = "${person.name.take(1)} · " +
-                                    if (usage != null) "réseaux ${usage.socialMinutes} min" else "—",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
+                listOf(me, partner).forEach { person ->
+                    val usage = usageDays.firstOrNull { it.userId == person.id }
+                    PacteRow(profile = person, socialMinutes = usage?.socialMinutes)
                 }
+
+                Text(
+                    text = "Chacun fixe son engagement dans Réglages ; le durcir prend effet " +
+                        "tout de suite, l'assouplir attend le lendemain. Vous voyez tous les deux " +
+                        "les réglages de l'autre — c'est là qu'est le contrôle mutuel.",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 10.dp)
+                )
             }
             Spacer(Modifier.height(20.dp))
         }
@@ -154,6 +152,55 @@ fun UsScreen(vm: AppViewModel, settings: AppSettings, onGoToSettings: () -> Unit
                 modifier = Modifier.padding(bottom = 16.dp)
             )
         }
+    }
+}
+
+/** L'engagement d'une personne et où elle en est aujourd'hui, en une ligne lisible. */
+@Composable
+private fun PacteRow(profile: ProfileEntity, socialMinutes: Int?) {
+    val accent = accentFor(profile.color)
+    val overLimit = socialMinutes != null && profile.dailyLimitMinutes > 0 &&
+        socialMinutes >= profile.dailyLimitMinutes
+    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = profile.name.take(1).uppercase(),
+                style = MaterialTheme.typography.titleMedium,
+                color = accent
+            )
+            Text(
+                text = " ${profile.name}",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = if (profile.pacteEnabled) "Pacte actif" else "Pacte inactif",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Text(
+            text = if (!profile.pacteEnabled) "Aucun engagement pour l'instant."
+            else buildString {
+                append("Limite ${profile.dailyLimitMinutes} min/jour")
+                if (profile.curfewEnabled) {
+                    append(" · couvre-feu ${profile.curfewStart}–${profile.curfewEnd}")
+                }
+            },
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 2.dp)
+        )
+        Text(
+            text = when {
+                socialMinutes == null -> "Aujourd'hui : pas encore de relevé."
+                overLimit -> "Aujourd'hui : $socialMinutes min — limite atteinte."
+                else -> "Aujourd'hui : $socialMinutes min."
+            },
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (overLimit) NeutralGray else accent,
+            modifier = Modifier.padding(top = 2.dp)
+        )
     }
 }
 

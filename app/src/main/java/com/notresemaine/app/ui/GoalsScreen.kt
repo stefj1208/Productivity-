@@ -1,5 +1,6 @@
 package com.notresemaine.app.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -54,7 +55,11 @@ fun GoalsScreen(vm: AppViewModel, settings: AppSettings) {
         GoalWizard(
             vm = vm,
             template = template,
-            onClose = { wizardTemplate = null }
+            aiAvailable = settings.aiEnabled && settings.aiApiKey.isNotBlank(),
+            onClose = {
+                vm.clearAiSteps()
+                wizardTemplate = null
+            }
         )
         return
     }
@@ -196,7 +201,14 @@ private fun GoalCard(
 
 /** Assistant en 3 questions : quoi, combien, quand. Tout est prérempli par le modèle. */
 @Composable
-private fun GoalWizard(vm: AppViewModel, template: GoalTemplate, onClose: () -> Unit) {
+private fun GoalWizard(
+    vm: AppViewModel,
+    template: GoalTemplate,
+    aiAvailable: Boolean,
+    onClose: () -> Unit
+) {
+    val aiBusy by vm.aiBusy.collectAsState()
+    val aiSteps by vm.aiSteps.collectAsState()
     var title by remember { mutableStateOf(if (template.title == "Objectif libre") "" else template.title) }
     var sessions by remember { mutableStateOf(template.sessionsPerWeek.toString()) }
     var minutes by remember { mutableStateOf(template.minutesPerSession.toString()) }
@@ -279,6 +291,35 @@ private fun GoalWizard(vm: AppViewModel, template: GoalTemplate, onClose: () -> 
                         label = { Text(label, style = MaterialTheme.typography.labelLarge) },
                         modifier = Modifier.size(width = 44.dp, height = 48.dp)
                     )
+                }
+            }
+
+            // Par où commencer quand on n'a aucune idée du premier pas.
+            Spacer(Modifier.height(16.dp))
+            SectionLabel("PAR OÙ COMMENCER")
+            val steps = if (aiSteps.isNotEmpty()) aiSteps else template.firstSteps
+            steps.forEachIndexed { index, step ->
+                Text(
+                    text = "${index + 1}. $step",
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .clickable { nextAction = step }
+                        .padding(vertical = 12.dp)
+                )
+            }
+            Text(
+                text = "Touche un pas pour en faire ta prochaine action.",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (aiAvailable) {
+                TextButton(
+                    onClick = { vm.suggestFirstStepsWithAi(title) },
+                    enabled = !aiBusy && title.isNotBlank()
+                ) {
+                    Text(if (aiBusy) "L'assistant réfléchit…" else "✨ Des pas adaptés à mon objectif")
                 }
             }
 

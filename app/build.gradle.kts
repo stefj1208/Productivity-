@@ -24,8 +24,17 @@ android {
         }
     }
     compileOptions {
+        // Le SDK Anthropic (Java) utilise des API récentes : le « desugaring » les rend
+        // disponibles sur Android.
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+    packaging {
+        resources.excludes += setOf(
+            "META-INF/DEPENDENCIES", "META-INF/LICENSE*", "META-INF/NOTICE*",
+            "META-INF/*.kotlin_module", "META-INF/versions/9/**"
+        )
     }
     kotlinOptions {
         jvmTarget = "17"
@@ -62,4 +71,8 @@ dependencies {
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+
+    // Assistant Claude facultatif (SDK officiel Anthropic)
+    implementation("com.anthropic:anthropic-java:2.34.0")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.3")
 }

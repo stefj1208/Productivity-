@@ -2,6 +2,7 @@ package com.notresemaine.app.ui
 
 import android.content.Intent
 import android.provider.Settings
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -52,6 +53,10 @@ fun ScreenTimeScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit
         )
     }
     var showApps by remember { mutableStateOf(false) }
+    var curfewEnabled by remember(settings.curfewEnabled) { mutableStateOf(settings.curfewEnabled) }
+    var curfewStart by remember(settings.curfewStart) { mutableStateOf(settings.curfewStart) }
+    var curfewEnd by remember(settings.curfewEnd) { mutableStateOf(settings.curfewEnd) }
+    var curfewStrict by remember(settings.curfewStrict) { mutableStateOf(settings.curfewStrict) }
 
     val usageDays by remember { vm.repo.db.usage().since(Dates.previousWeekStartIso()) }
         .collectAsState(initial = emptyList())
@@ -130,14 +135,72 @@ fun ScreenTimeScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit
             )
 
             Spacer(Modifier.height(16.dp))
-            SectionLabel("ÉTAPE 4 · LE PACTE")
+            SectionLabel("ÉTAPE 4 · COUVRE-FEU")
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "Au-delà de la limite, blocage.\nSeule l'autre moitié peut accorder une pause.",
+                    text = "Plus d'écran à partir d'une heure fixe, pour ne pas se coucher trop tard.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.weight(1f)
+                )
+                Switch(checked = curfewEnabled, onCheckedChange = { curfewEnabled = it })
+            }
+            if (curfewEnabled) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.padding(top = 8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = curfewStart, onValueChange = { curfewStart = it },
+                        label = { Text("De") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        textStyle = MaterialTheme.typography.bodyLarge,
+                        singleLine = true, modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = curfewEnd, onValueChange = { curfewEnd = it },
+                        label = { Text("À") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        textStyle = MaterialTheme.typography.bodyLarge,
+                        singleLine = true, modifier = Modifier.weight(1f)
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
+                    Text(
+                        text = "Mode strict : toutes les applications, pas seulement les réseaux. " +
+                            "Téléphone, messages, réveil et appareil photo restent toujours accessibles.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Switch(checked = curfewStrict, onCheckedChange = { curfewStrict = it })
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+            SectionLabel("ÉTAPE 5 · LE PACTE")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Au-delà de la limite ou pendant le couvre-feu, blocage.\n" +
+                        "Seule l'autre moitié peut accorder une pause.",
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.weight(1f)
                 )
                 Switch(checked = enabled, onCheckedChange = { enabled = it })
+            }
+            Text(
+                text = "⏳ Un engagement ne se relâche pas dans l'instant : durcir le pacte prend " +
+                    "effet immédiatement, l'assouplir attend le lendemain. Vos réglages sont " +
+                    "visibles par l'autre dans l'onglet Nous.",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+            if (settings.pendingFromDate.isNotBlank()) {
+                Text(
+                    text = "Assouplissement en attente, effectif le ${Dates.shortLabel(settings.pendingFromDate)}.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.padding(top = 6.dp)
+                )
             }
 
             if (myToday != null) {
@@ -168,9 +231,13 @@ fun ScreenTimeScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit
         TextButton(onClick = onBack) { Text("Retour") }
         BigButton(
             text = "Enregistrer le pacte",
-            enabled = limit.toIntOrNull() != null && (!enabled || hasPermission),
+            enabled = limit.toIntOrNull() != null && (!enabled || hasPermission) &&
+                (!curfewEnabled || (Dates.isValidTime(curfewStart) && Dates.isValidTime(curfewEnd))),
             onClick = {
-                vm.savePacte(enabled, selected.toList(), limit.toIntOrNull() ?: 45)
+                vm.savePacte(
+                    enabled, selected.toList(), limit.toIntOrNull() ?: 45,
+                    curfewEnabled, curfewStart, curfewEnd, curfewStrict
+                )
                 onBack()
             },
             modifier = Modifier.padding(bottom = 16.dp)
