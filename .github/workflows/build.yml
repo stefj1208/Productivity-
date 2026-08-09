@@ -21,7 +21,7 @@ jobs:
       - name: Compiler l'application
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Publier l'APK (à télécharger dans l'onglet Actions)
         uses: actions/upload-artifact@v4
