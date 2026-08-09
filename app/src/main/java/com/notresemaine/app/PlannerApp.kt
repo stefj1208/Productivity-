@@ -17,6 +17,7 @@ class PlannerApp : Application() {
         Reminders.rescheduleAsync(this)
         SyncWorker.schedule(this)
         UsageWorker.schedule(this)
+        com.notresemaine.app.health.HealthWorker.schedule(this)
         CoroutineScope(Dispatchers.Default).launch {
             val s = Repository.get(this@PlannerApp).settings.current()
             BlockerService.startIfEnabled(this@PlannerApp, s.pacteEnabled)

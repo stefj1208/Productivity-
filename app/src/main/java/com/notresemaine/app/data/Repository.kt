@@ -385,6 +385,131 @@ class Repository private constructor(context: Context) {
         db.grace().upsert(r.copy(status = if (granted) "granted" else "denied", updatedAt = now()))
     }
 
+    // ----- Menus & liste de courses -----
+
+    suspend fun saveMeal(userId: String, date: String, slot: String, title: String, ingredients: String) {
+        db.meals().upsert(
+            MealEntity(
+                id = "$date:$slot",
+                userId = userId,
+                date = date,
+                slot = slot,
+                title = title.trim(),
+                ingredients = ingredients.trim(),
+                deleted = title.isBlank() && ingredients.isBlank(),
+                updatedAt = now()
+            )
+        )
+    }
+
+    /**
+     * (Re)génère la liste de courses depuis les menus de la semaine.
+     * Les lignes ajoutées à la main et les cases déjà cochées sont conservées.
+     */
+    suspend fun generateShoppingList(userId: String, weekStart: String): Int {
+        val days = Dates.daysOfWeek(weekStart)
+        val meals = db.meals().betweenOnce(days.first(), days.last())
+        val items = Ingredients.aggregate(meals.map { it.ingredients }.filter { it.isNotBlank() })
+
+        val existing = db.shopping().forWeekOnce(weekStart)
+        val existingById = existing.associateBy { it.id }
+        val generatedIds = mutableSetOf<String>()
+
+        items.forEach { item ->
+            val id = "$weekStart:${item.aisle}:${item.label.lowercase()}"
+            generatedIds += id
+            val previous = existingById[id]
+            db.shopping().upsert(
+                ShoppingItemEntity(
+                    id = id,
+                    userId = userId,
+                    weekStart = weekStart,
+                    label = item.label,
+                    aisle = item.aisle,
+                    checked = previous?.checked ?: false,
+                    manual = false,
+                    updatedAt = now()
+                )
+            )
+        }
+
+        // Retire les lignes générées précédemment qui ne correspondent plus aux menus.
+        existing.filter { !it.manual && it.id !in generatedIds }.forEach {
+            db.shopping().upsert(it.copy(deleted = true, updatedAt = now()))
+        }
+        return items.size
+    }
+
+    suspend fun addShoppingItem(userId: String, weekStart: String, label: String) {
+        if (label.isBlank()) return
+        val aisle = Ingredients.aisleFor(label)
+        db.shopping().upsert(
+            ShoppingItemEntity(
+                id = "$weekStart:$aisle:${label.lowercase().trim()}",
+                userId = userId,
+                weekStart = weekStart,
+                label = label.trim(),
+                aisle = aisle,
+                manual = true,
+                updatedAt = now()
+            )
+        )
+    }
+
+    suspend fun toggleShoppingItem(itemId: String) {
+        val item = db.shopping().byId(itemId) ?: return
+        db.shopping().upsert(item.copy(checked = !item.checked, updatedAt = now()))
+    }
+
+    suspend fun clearCheckedShopping(weekStart: String) {
+        db.shopping().forWeekOnce(weekStart).filter { it.checked }.forEach {
+            db.shopping().upsert(it.copy(deleted = true, updatedAt = now()))
+        }
+    }
+
+    // ----- Sommeil, pas, sport -----
+
+    suspend fun saveHealthDay(
+        userId: String, date: String,
+        sleepMinutes: Int, steps: Int, exerciseMinutes: Int, source: String
+    ) {
+        val id = "$userId:$date"
+        val existing = db.health().byId(id)
+        // Une mesure automatique ne doit jamais écraser une saisie manuelle du même jour.
+        if (existing?.source == "manuel" && source == "health_connect") return
+        db.health().upsert(
+            HealthDayEntity(
+                id = id, userId = userId, date = date,
+                sleepMinutes = sleepMinutes, steps = steps,
+                exerciseMinutes = exerciseMinutes, source = source,
+                updatedAt = now()
+            )
+        )
+    }
+
+    /** Saisie de secours en moins de 10 secondes : heure de coucher + heure de lever. */
+    suspend fun saveSleepManually(userId: String, date: String, bedTime: String, wakeTime: String) {
+        val bed = runCatching { java.time.LocalTime.parse(bedTime) }.getOrNull() ?: return
+        val wake = runCatching { java.time.LocalTime.parse(wakeTime) }.getOrNull() ?: return
+        var minutes = java.time.Duration.between(bed, wake).toMinutes()
+        if (minutes <= 0) minutes += 24 * 60 // le coucher est la veille
+        val existing = db.health().byId("$userId:$date")
+        saveHealthDay(
+            userId, date, minutes.toInt(),
+            existing?.steps ?: 0, existing?.exerciseMinutes ?: 0, "manuel"
+        )
+    }
+
+    /** Bouton « j'ai fait une séance » : ajoute la durée au sport du jour. */
+    suspend fun addExerciseManually(userId: String, date: String, minutes: Int) {
+        val existing = db.health().byId("$userId:$date")
+        saveHealthDay(
+            userId, date,
+            existing?.sleepMinutes ?: 0, existing?.steps ?: 0,
+            (existing?.exerciseMinutes ?: 0) + minutes, "manuel"
+        )
+    }
+
     /** Quand on se connecte à la synchro, l'identifiant local devient l'identifiant du compte. */
     suspend fun migrateUserId(oldId: String, newId: String) {
         if (oldId == newId || oldId.isBlank()) return

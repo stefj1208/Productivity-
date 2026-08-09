@@ -12,6 +12,11 @@
         android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
 
+    <!-- Health Connect : lecture seule du sommeil, des pas et des séances -->
+    <uses-permission android:name="android.permission.health.READ_SLEEP" />
+    <uses-permission android:name="android.permission.health.READ_STEPS" />
+    <uses-permission android:name="android.permission.health.READ_EXERCISE" />
+
     <!-- Pour lister les applications installées dans le choix « réseaux sociaux » -->
     <queries>
         <intent>
@@ -21,6 +26,7 @@
         <intent>
             <action android:name="android.intent.action.SET_ALARM" />
         </intent>
+        <package android:name="com.google.android.apps.healthdata" />
     </queries>
 
     <application
@@ -39,7 +45,23 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Android 14+ : écran expliquant pourquoi l'app lit Health Connect -->
+            <intent-filter>
+                <action android:name="androidx.health.connect.action.SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
         </activity>
+
+        <!-- Android 13 et antérieurs : même écran, via un alias -->
+        <activity-alias
+            android:name="ViewPermissionUsageActivity"
+            android:exported="true"
+            android:targetActivity=".MainActivity"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
 
         <activity
             android:name=".pacte.BlockActivity"

@@ -120,6 +120,44 @@ create table if not exists grace_requests (
   updated_at bigint not null default 0
 );
 
+create table if not exists meals (
+  id text primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  couple_id uuid,
+  date text not null,
+  slot text not null,
+  title text not null default '',
+  ingredients text not null default '',
+  deleted boolean not null default false,
+  updated_at bigint not null default 0
+);
+
+create table if not exists shopping_items (
+  id text primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  couple_id uuid,
+  week_start text not null,
+  label text not null default '',
+  aisle text not null default 'Divers',
+  checked boolean not null default false,
+  manual boolean not null default false,
+  deleted boolean not null default false,
+  updated_at bigint not null default 0
+);
+
+create table if not exists health_days (
+  id text primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  couple_id uuid,
+  date text not null,
+  sleep_minutes int not null default 0,
+  steps int not null default 0,
+  exercise_minutes int not null default 0,
+  source text not null default 'manuel',
+  deleted boolean not null default false,
+  updated_at bigint not null default 0
+);
+
 -- Mise à jour depuis la V1 (sans effet sur une base neuve)
 alter table tasks add column if not exists goal_id text;
 
@@ -159,6 +197,12 @@ create or replace trigger ritual_logs_stamp before insert or update on ritual_lo
 create or replace trigger usage_days_stamp before insert or update on usage_days
   for each row execute function stamp_couple();
 create or replace trigger grace_requests_stamp before insert or update on grace_requests
+  for each row execute function stamp_couple();
+create or replace trigger meals_stamp before insert or update on meals
+  for each row execute function stamp_couple();
+create or replace trigger shopping_items_stamp before insert or update on shopping_items
+  for each row execute function stamp_couple();
+create or replace trigger health_days_stamp before insert or update on health_days
   for each row execute function stamp_couple();
 
 -- Crée l'espace couple et renvoie le code à partager (6 caractères).
@@ -232,6 +276,15 @@ drop policy if exists usage_days_update on usage_days;
 drop policy if exists grace_select on grace_requests;
 drop policy if exists grace_insert on grace_requests;
 drop policy if exists grace_update on grace_requests;
+drop policy if exists meals_select on meals;
+drop policy if exists meals_insert on meals;
+drop policy if exists meals_update on meals;
+drop policy if exists shopping_select on shopping_items;
+drop policy if exists shopping_insert on shopping_items;
+drop policy if exists shopping_update on shopping_items;
+drop policy if exists health_select on health_days;
+drop policy if exists health_insert on health_days;
+drop policy if exists health_update on health_days;
 
 create policy profiles_select on profiles for select
   using (id = auth.uid() or (couple_id is not null and couple_id = my_couple()));
@@ -305,3 +358,30 @@ create policy grace_insert on grace_requests for insert
   with check (from_user = auth.uid());
 create policy grace_update on grace_requests for update
   using (from_user = auth.uid() or to_user = auth.uid());
+
+alter table meals enable row level security;
+alter table shopping_items enable row level security;
+alter table health_days enable row level security;
+
+-- Menus et courses sont communs : les deux peuvent les modifier.
+create policy meals_select on meals for select
+  using (user_id = auth.uid() or (couple_id is not null and couple_id = my_couple()));
+create policy meals_insert on meals for insert
+  with check (user_id = auth.uid());
+create policy meals_update on meals for update
+  using (user_id = auth.uid() or (couple_id is not null and couple_id = my_couple()));
+
+create policy shopping_select on shopping_items for select
+  using (user_id = auth.uid() or (couple_id is not null and couple_id = my_couple()));
+create policy shopping_insert on shopping_items for insert
+  with check (user_id = auth.uid());
+create policy shopping_update on shopping_items for update
+  using (user_id = auth.uid() or (couple_id is not null and couple_id = my_couple()));
+
+-- Les données de santé restent modifiables par leur seul propriétaire.
+create policy health_select on health_days for select
+  using (user_id = auth.uid() or (couple_id is not null and couple_id = my_couple()));
+create policy health_insert on health_days for insert
+  with check (user_id = auth.uid());
+create policy health_update on health_days for update
+  using (user_id = auth.uid());

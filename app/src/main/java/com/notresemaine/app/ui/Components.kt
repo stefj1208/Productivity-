@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.Circle
@@ -96,6 +98,159 @@ fun BigButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, 
             .height(56.dp)
     ) {
         Text(text, style = MaterialTheme.typography.labelLarge)
+    }
+}
+
+/** Conseil d'un livre : gros emoji, une phrase qui claque, la source en petit. */
+@Composable
+fun TipCard(tip: com.notresemaine.app.data.Tips.Tip, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text = tip.emoji, style = MaterialTheme.typography.displaySmall)
+        Column(modifier = Modifier.padding(start = 14.dp)) {
+            Text(
+                text = tip.punch,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = tip.book,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+        }
+    }
+}
+
+/** La boussole : la seule chose à faire maintenant, en très gros. */
+@Composable
+fun CompassCard(
+    step: com.notresemaine.app.data.Compass.Step,
+    accent: Color,
+    onClick: (() -> Unit)?,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp))
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(20.dp)
+    ) {
+        Text(text = step.emoji, style = MaterialTheme.typography.displaySmall)
+        Text(
+            text = step.title,
+            style = MaterialTheme.typography.displaySmall,
+            color = accent,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+        Text(
+            text = step.why,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+    }
+}
+
+/** Flèches ‹ › pour naviguer d'une semaine à l'autre, passé comme futur. */
+@Composable
+fun WeekNavigator(
+    weekStartIso: String,
+    onOffsetChange: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+                .clickable { onOffsetChange(-1) },
+            contentAlignment = Alignment.Center
+        ) {
+            Text("‹", style = MaterialTheme.typography.titleLarge)
+        }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 12.dp)
+        ) {
+            Text(
+                text = com.notresemaine.app.data.Dates.weekRelativeLabel(weekStartIso),
+                style = MaterialTheme.typography.titleLarge
+            )
+            Text(
+                text = com.notresemaine.app.data.Dates.weekRangeLabel(weekStartIso),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+                .clickable { onOffsetChange(1) },
+            contentAlignment = Alignment.Center
+        ) {
+            Text("›", style = MaterialTheme.typography.titleLarge)
+        }
+    }
+}
+
+/** Petit histogramme sur 4 semaines : lisible d'un coup d'œil, sans rouge d'alerte. */
+@Composable
+fun MiniBarChart(
+    values: List<Float>,
+    labels: List<String>,
+    accent: Color,
+    valueLabel: (Float) -> String,
+    modifier: Modifier = Modifier
+) {
+    val maxValue = (values.maxOrNull() ?: 0f).coerceAtLeast(0.001f)
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(110.dp),
+        verticalAlignment = Alignment.Bottom,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        values.forEachIndexed { index, value ->
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = if (value > 0f) valueLabel(value) else "—",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Box(
+                    modifier = Modifier
+                        .padding(top = 4.dp)
+                        .fillMaxWidth()
+                        .height((6 + 62 * (value / maxValue)).dp)
+                        .background(
+                            if (value > 0f) accent else MaterialTheme.colorScheme.surfaceVariant,
+                            RoundedCornerShape(6.dp)
+                        )
+                )
+                Text(
+                    text = labels.getOrElse(index) { "" },
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 6.dp)
+                )
+            }
+        }
     }
 }
 

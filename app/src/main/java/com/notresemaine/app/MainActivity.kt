@@ -44,9 +44,12 @@ import androidx.navigation.compose.rememberNavController
 import com.notresemaine.app.data.AppSettings
 import com.notresemaine.app.ui.AppViewModel
 import com.notresemaine.app.ui.GoalsScreen
+import com.notresemaine.app.ui.HealthScreen
+import com.notresemaine.app.ui.MenusScreen
 import com.notresemaine.app.ui.MethodScreen
 import com.notresemaine.app.ui.OnboardingScreen
 import com.notresemaine.app.ui.PrepareScreen
+import com.notresemaine.app.ui.ShoppingScreen
 import com.notresemaine.app.ui.ReviewScreen
 import com.notresemaine.app.ui.RitualScreen
 import com.notresemaine.app.ui.ScreenTimeScreen
@@ -141,11 +144,18 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings) {
                     vm, settings,
                     onPrepare = { date -> navController.navigate("prepare/$date") },
                     onRitual = { navController.navigate("ritual") },
-                    onSettings = { navController.navigate("settings") }
+                    onSettings = { navController.navigate("settings") },
+                    onGoals = { navController.navigate("goals") },
+                    onReview = { week -> navController.navigate("review/$week") }
                 )
             }
             composable("week") {
-                WeekScreen(vm, settings, onReview = { navController.navigate("review") })
+                WeekScreen(
+                    vm, settings,
+                    onReview = { week -> navController.navigate("review/$week") },
+                    onMenus = { week -> navController.navigate("menus/$week") },
+                    onShopping = { week -> navController.navigate("shopping/$week") }
+                )
             }
             composable("goals") {
                 GoalsScreen(vm, settings)
@@ -157,8 +167,12 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings) {
                 SettingsScreen(
                     vm, settings,
                     onMethod = { navController.navigate("method") },
-                    onScreenTime = { navController.navigate("screentime") }
+                    onScreenTime = { navController.navigate("screentime") },
+                    onHealth = { navController.navigate("health") }
                 )
+            }
+            composable("health") {
+                HealthScreen(vm, settings, onBack = { navController.popBackStack() })
             }
             composable("ritual") {
                 RitualScreen(vm, settings, onDone = { navController.popBackStack() })
@@ -173,8 +187,28 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings) {
                 val date = entry.arguments?.getString("date") ?: com.notresemaine.app.data.Dates.tomorrowIso()
                 PrepareScreen(vm, settings, date, onDone = { navController.popBackStack() })
             }
-            composable("review") {
-                ReviewScreen(vm, settings, onDone = { navController.popBackStack() })
+            composable("review/{weekStart}") { entry ->
+                val week = entry.arguments?.getString("weekStart")
+                    ?: com.notresemaine.app.data.Dates.planningTargetWeekIso()
+                ReviewScreen(
+                    vm, settings, week,
+                    onDone = { navController.popBackStack() },
+                    onMenus = { w -> navController.navigate("menus/$w") }
+                )
+            }
+            composable("menus/{weekStart}") { entry ->
+                val week = entry.arguments?.getString("weekStart")
+                    ?: com.notresemaine.app.data.Dates.weekStartIso()
+                MenusScreen(
+                    vm, settings, week,
+                    onShopping = { navController.navigate("shopping/$week") },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable("shopping/{weekStart}") { entry ->
+                val week = entry.arguments?.getString("weekStart")
+                    ?: com.notresemaine.app.data.Dates.weekStartIso()
+                ShoppingScreen(vm, settings, week, onBack = { navController.popBackStack() })
             }
         }
     }

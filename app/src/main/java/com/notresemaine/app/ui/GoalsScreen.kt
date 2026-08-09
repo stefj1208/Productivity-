@@ -71,13 +71,8 @@ fun GoalsScreen(vm: AppViewModel, settings: AppSettings) {
     ) {
         Spacer(Modifier.height(20.dp))
         Text("Objectifs", style = MaterialTheme.typography.titleLarge)
-        val tip = Tips.goals()
-        Text(
-            text = "📖 ${tip.book} — ${tip.text}",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 6.dp)
-        )
+        Spacer(Modifier.height(12.dp))
+        TipCard(Tips.goals())
 
         if (myGoals.isEmpty()) {
             Spacer(Modifier.height(20.dp))

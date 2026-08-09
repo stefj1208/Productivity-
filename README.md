@@ -2,7 +2,9 @@
 
 Application Android pour deux personnes : planifier la semaine, préparer le lendemain en 2 minutes, suivre UNE priorité par jour et par semaine, et se soutenir mutuellement — sans surcharge, sans gamification.
 
-**Version actuelle : V2** — tout la V1, plus : objectifs « clé en main » générés depuis une bibliothèque (langue, sport, lecture…), rituel du matin S.A.V.E.R.S. avec minuteur et réveil, capture rapide avec analyse du français (« plombier mardi » → tâche datée), conseils des 6 livres au bon moment, mesure du temps d'écran, et le **Pacte d'écran** : au-delà de la limite quotidienne, blocage que seul le partenaire peut lever à distance.
+**Version actuelle : V3** — la V2, plus : navigation libre entre les semaines (planifier la suivante n'importe quand, revoir les précédentes), une **boussole** qui affiche à tout instant la seule chose à faire maintenant, des conseils en cartes visuelles, **Health Connect** (sommeil, pas, séances) avec saisie de secours en 10 secondes, **menus de la semaine + liste de courses** générée et rangée par rayon, et des **graphiques sur 4 semaines** (sommeil, sport, réseaux).
+
+Rappel de la V2 : objectifs « clé en main », rituel du matin S.A.V.E.R.S. avec réveil, capture rapide en français, et le **Pacte d'écran** que seul le partenaire peut lever.
 
 ---
 
@@ -31,11 +33,12 @@ Application Android pour deux personnes : planifier la semaine, préparer le len
 
 | Écran | Rôle |
 |---|---|
-| **Aujourd'hui** | LA priorité du jour en très gros, le rituel du matin, le conseil du jour, 2 tâches secondaires max, bloc de concentration. Bouton « Préparer demain » en bas. |
-| **Semaine** | Les 7 jours, la priorité de la semaine, la répartition des tâches (un tap sur un jour). Bouton « Revue du dimanche » (7 étapes guidées, boîte de réception comprise). |
+| **Aujourd'hui** | **La boussole** : une seule carte, en très gros, qui dit quoi faire maintenant (rituel, priorité, planifier la semaine, vider la boîte…). Puis le détail du jour et un conseil en carte. |
+| **Semaine** | Flèches ‹ › pour aller **d'une semaine à l'autre**, passé comme futur — vous pouvez planifier la semaine prochaine dès le lundi. Les 7 jours, la répartition en un tap, l'accès aux menus et aux courses, et les **graphiques sur 4 semaines**. Bouton « Planifier cette semaine » (8 étapes guidées). |
 | **Objectifs** | La bibliothèque « clé en main » : choisissez « Apprendre une langue » ou « (Re)prendre le sport », répondez à 3 questions, l'app place les séances de la semaine à votre place et suit la progression. |
 | **Nous** | Vos deux semaines côte à côte, bouton « bravo 👏 », temps d'écran de chacun, et les demandes de pause du Pacte à accorder ou non. |
-| **Réglages** | (roue dentée en haut de l'écran Aujourd'hui) Profil, rappels, thème, synchronisation, Temps d'écran & Pacte, « La méthode ». |
+| **Réglages** | (roue dentée en haut de l'écran Aujourd'hui) Profil, rappels, thème, synchronisation, Temps d'écran & Pacte, **Sommeil & sport**, « La méthode ». |
+| **Menus & Courses** | (depuis Semaine) Un plat et ses ingrédients par repas ; la liste de courses est générée, **les quantités additionnées** et **rangée par rayon**, cochable en un tap. |
 
 Ce que l'application applique des 6 livres (détail dans l'écran « La méthode ») :
 - **Une seule priorité** par jour et par semaine (One Thing) ; **3 tâches par jour maximum** et **3 objectifs actifs maximum** (Essentialisme) — l'app refuse le surplus, volontairement.
@@ -68,9 +71,10 @@ Réaliste, pour être honnête :
 
 1. ✅ **V1** — semaine, veille, priorité du jour, espace partagé
 2. ✅ **V2** — objectifs clé en main, rituel du matin + réveil, capture GTD + analyse du français, conseils des 6 livres, temps d'écran + Pacte
-3. ⬜ Health Connect (sommeil, pas, séances) + saisies de secours < 10 s — attention : vide sans montre/bracelet ou appli source (ex. Samsung Health)
-4. ⬜ Menus de la semaine + liste de courses générée
-5. ⬜ Graphiques 4 semaines (sommeil, sport, écran) dans l'onglet Semaine
+3. ✅ **V3** — navigation entre semaines, boussole, conseils visuels, Health Connect + saisies de secours, menus + liste de courses, graphiques 4 semaines
+
+### Sommeil & sport : ce qui marchera vraiment
+Health Connect ne contient **que** ce qu'une montre, un bracelet ou une appli (Samsung Health…) y écrit. Sans source, sommeil et séances resteront à zéro — c'est une limite d'Android, pas de l'application. D'où la saisie de secours dans **Réglages → Sommeil & sport** : deux heures à taper pour la nuit, un bouton `20′ / 30′ / 45′ / 60′` pour une séance. Une mesure automatique n'écrase jamais une saisie manuelle du même jour.
 
 ## 6. Pour les curieux : compiler soi-même
 

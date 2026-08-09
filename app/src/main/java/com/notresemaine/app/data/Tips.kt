@@ -3,45 +3,47 @@ package com.notresemaine.app.data
 import java.time.LocalDate
 
 /**
- * Conseils courts tirés des 6 livres, affichés au bon moment.
- * Ton neutre, jamais culpabilisant.
+ * Conseils des 6 livres, en format « carte » : un emoji, une phrase courte qui claque,
+ * la source en petit. Jamais de pavé, jamais de ton culpabilisant.
  */
 object Tips {
 
-    data class Tip(val book: String, val text: String)
+    data class Tip(val emoji: String, val punch: String, val book: String)
 
     private val morning = listOf(
-        Tip("Miracle Morning", "La première heure donne le ton : rituel d'abord, téléphone ensuite."),
-        Tip("One Thing", "Commence par LA priorité, tant que la volonté est fraîche."),
-        Tip("Deep Work", "Un bloc de concentration le matin vaut trois l'après-midi."),
-        Tip("Miracle Morning", "Pas le temps ? Le rituel en version 6 minutes compte aussi."),
-        Tip("Essentialisme", "Si tout est important, rien ne l'est. Une seule chose d'abord.")
+        Tip("🌅", "La première heure donne le ton.", "Miracle Morning"),
+        Tip("🎯", "Ta priorité d'abord. Le reste ensuite.", "The One Thing"),
+        Tip("🎧", "Un bloc concentré le matin en vaut trois l'après-midi.", "Deep Work"),
+        Tip("⏱️", "Pas le temps ? Six minutes comptent aussi.", "Miracle Morning"),
+        Tip("✂️", "Si tout est important, rien ne l'est.", "L'essentialisme")
     )
 
     private val evening = listOf(
-        Tip("One Thing", "Décider ce soir = ne pas décider demain matin. 2 minutes suffisent."),
-        Tip("GTD", "Note tout ce qui traîne dans la tête avant de dormir : la boîte de réception s'en souviendra."),
-        Tip("Deep Work", "Planifie ton bloc de concentration de demain avant de fermer la journée."),
-        Tip("Semaine de 4 h", "Demain : la tâche qui te rend le plus nerveux, en premier.")
+        Tip("🌙", "Décider ce soir, c'est ne plus décider demain.", "The One Thing"),
+        Tip("🧠", "Vide ta tête avant l'oreiller.", "GTD"),
+        Tip("🛡️", "Protège ton bloc de demain dès ce soir.", "Deep Work"),
+        Tip("🐸", "Demain : la tâche qui t'angoisse, en premier.", "Semaine de 4 h")
     )
 
     private val review = listOf(
-        Tip("Essentialisme", "Dire non à une chose, c'est dire oui à une autre. Choisis laquelle."),
-        Tip("GTD", "La revue hebdomadaire remet le compteur à zéro : rien d'oublié, tête libre."),
-        Tip("One Thing", "Quelle est LA chose qui rend le reste plus simple ou inutile cette semaine ?"),
-        Tip("Semaine de 4 h", "Cherche les 20 % d'actions qui produisent 80 % du résultat."),
-        Tip("Deep Work", "Bloque d'abord les créneaux de concentration, remplis le reste ensuite.")
+        Tip("📊", "Regarde les faits, pas les impressions.", "Semaine de 4 h"),
+        Tip("🧠", "Zéro note en attente = tête libre.", "GTD"),
+        Tip("🙅", "Dire non à ça, c'est dire oui à ce qui compte.", "L'essentialisme"),
+        Tip("🎯", "Une seule chose rend le reste plus simple.", "The One Thing"),
+        Tip("🎧", "Bloque la concentration avant de remplir le reste.", "Deep Work"),
+        Tip("🏃", "Trois séances fixes battent sept intentions.", "Miracle Morning"),
+        Tip("🍽️", "Décider les menus une fois, manger sept fois.", "Semaine de 4 h"),
+        Tip("✅", "Semaine décidée. Plus rien à arbitrer.", "L'essentialisme")
     )
 
     private val goals = listOf(
-        Tip("Essentialisme", "Moins mais mieux : 2 objectifs actifs avancent plus vite que 5."),
-        Tip("One Thing", "La régularité bat le volume : mieux vaut 20 min par jour que 2 h le dimanche."),
-        Tip("GTD", "Un objectif sans prochaine action est un vœu, pas un projet."),
-        Tip("Miracle Morning", "Accroche la nouvelle habitude à une habitude existante : après le café, avant la douche.")
+        Tip("✂️", "Deux objectifs avancent plus vite que cinq.", "L'essentialisme"),
+        Tip("📈", "20 min chaque jour battent 2 h le dimanche.", "The One Thing"),
+        Tip("👉", "Sans prochaine action, c'est un vœu.", "GTD"),
+        Tip("🔗", "Accroche l'habitude à une habitude existante.", "Miracle Morning")
     )
 
-    private fun pick(list: List<Tip>): Tip =
-        list[LocalDate.now().dayOfYear % list.size]
+    private fun pick(list: List<Tip>): Tip = list[LocalDate.now().dayOfYear % list.size]
 
     fun morning(): Tip = pick(morning)
     fun evening(): Tip = pick(evening)

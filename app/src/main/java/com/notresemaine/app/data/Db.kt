@@ -146,6 +146,47 @@ data class GraceRequestEntity(
     val updatedAt: Long
 )
 
+/** Repas du couple : un midi et un soir par jour, partagés. */
+@Entity(tableName = "meals")
+data class MealEntity(
+    @PrimaryKey val id: String, // "$date:$slot"
+    val userId: String,         // qui l'a saisi (pour la synchro)
+    val date: String,
+    val slot: String,           // midi | soir
+    val title: String,
+    val ingredients: String,    // "200 g farine, 3 œufs, 1 L lait"
+    val deleted: Boolean = false,
+    val updatedAt: Long
+)
+
+/** Ligne de la liste de courses, générée depuis les menus puis cochable. */
+@Entity(tableName = "shopping_items")
+data class ShoppingItemEntity(
+    @PrimaryKey val id: String, // "$weekStart:$aisle:$label"
+    val userId: String,
+    val weekStart: String,
+    val label: String,
+    val aisle: String,
+    val checked: Boolean = false,
+    val manual: Boolean = false,
+    val deleted: Boolean = false,
+    val updatedAt: Long
+)
+
+/** Sommeil, pas et sport d'une journée — Health Connect ou saisie manuelle. */
+@Entity(tableName = "health_days")
+data class HealthDayEntity(
+    @PrimaryKey val id: String, // "$userId:$date"
+    val userId: String,
+    val date: String,
+    val sleepMinutes: Int = 0,
+    val steps: Int = 0,
+    val exerciseMinutes: Int = 0,
+    val source: String = "manuel", // health_connect | manuel
+    val deleted: Boolean = false,
+    val updatedAt: Long
+)
+
 @Dao
 interface TaskDao {
     @Query("SELECT * FROM tasks WHERE userId = :userId AND date = :date AND deleted = 0 ORDER BY isPriority DESC, updatedAt")
@@ -359,14 +400,66 @@ interface GraceDao {
     suspend fun upsert(request: GraceRequestEntity)
 }
 
+@Dao
+interface MealDao {
+    @Query("SELECT * FROM meals WHERE date >= :from AND date <= :to AND deleted = 0 ORDER BY date, slot")
+    fun between(from: String, to: String): Flow<List<MealEntity>>
+
+    @Query("SELECT * FROM meals WHERE date >= :from AND date <= :to AND deleted = 0")
+    suspend fun betweenOnce(from: String, to: String): List<MealEntity>
+
+    @Query("SELECT * FROM meals WHERE id = :id")
+    suspend fun byId(id: String): MealEntity?
+
+    @Query("SELECT * FROM meals WHERE updatedAt > :ts")
+    suspend fun modifiedSince(ts: Long): List<MealEntity>
+
+    @Upsert
+    suspend fun upsert(meal: MealEntity)
+}
+
+@Dao
+interface ShoppingDao {
+    @Query("SELECT * FROM shopping_items WHERE weekStart = :weekStart AND deleted = 0 ORDER BY aisle, label")
+    fun forWeek(weekStart: String): Flow<List<ShoppingItemEntity>>
+
+    @Query("SELECT * FROM shopping_items WHERE weekStart = :weekStart AND deleted = 0")
+    suspend fun forWeekOnce(weekStart: String): List<ShoppingItemEntity>
+
+    @Query("SELECT * FROM shopping_items WHERE id = :id")
+    suspend fun byId(id: String): ShoppingItemEntity?
+
+    @Query("SELECT * FROM shopping_items WHERE updatedAt > :ts")
+    suspend fun modifiedSince(ts: Long): List<ShoppingItemEntity>
+
+    @Upsert
+    suspend fun upsert(item: ShoppingItemEntity)
+}
+
+@Dao
+interface HealthDao {
+    @Query("SELECT * FROM health_days WHERE date >= :fromDate AND deleted = 0 ORDER BY date")
+    fun since(fromDate: String): Flow<List<HealthDayEntity>>
+
+    @Query("SELECT * FROM health_days WHERE id = :id")
+    suspend fun byId(id: String): HealthDayEntity?
+
+    @Query("SELECT * FROM health_days WHERE updatedAt > :ts")
+    suspend fun modifiedSince(ts: Long): List<HealthDayEntity>
+
+    @Upsert
+    suspend fun upsert(day: HealthDayEntity)
+}
+
 @Database(
     entities = [
         TaskEntity::class, DayPlanEntity::class, WeekPlanEntity::class,
         ProfileEntity::class, EncouragementEntity::class,
         GoalEntity::class, RitualStepEntity::class, RitualLogEntity::class,
-        InboxItemEntity::class, UsageDayEntity::class, GraceRequestEntity::class
+        InboxItemEntity::class, UsageDayEntity::class, GraceRequestEntity::class,
+        MealEntity::class, ShoppingItemEntity::class, HealthDayEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDb : RoomDatabase() {
@@ -380,6 +473,9 @@ abstract class AppDb : RoomDatabase() {
     abstract fun inbox(): InboxDao
     abstract fun usage(): UsageDao
     abstract fun grace(): GraceDao
+    abstract fun meals(): MealDao
+    abstract fun shopping(): ShoppingDao
+    abstract fun health(): HealthDao
 
     companion object {
         @Volatile private var instance: AppDb? = null

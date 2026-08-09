@@ -4,7 +4,10 @@ import com.notresemaine.app.data.DayPlanEntity
 import com.notresemaine.app.data.EncouragementEntity
 import com.notresemaine.app.data.GoalEntity
 import com.notresemaine.app.data.GraceRequestEntity
+import com.notresemaine.app.data.HealthDayEntity
+import com.notresemaine.app.data.MealEntity
 import com.notresemaine.app.data.ProfileEntity
+import com.notresemaine.app.data.ShoppingItemEntity
 import com.notresemaine.app.data.Repository
 import com.notresemaine.app.data.RitualLogEntity
 import com.notresemaine.app.data.TaskEntity
@@ -133,6 +136,44 @@ data class EncouragementDto(
     @SerialName("to_user") val toUser: String,
     val date: String,
     val message: String,
+    val deleted: Boolean = false,
+    @SerialName("updated_at") val updatedAt: Long
+)
+
+@Serializable
+data class MealDto(
+    val id: String,
+    @SerialName("user_id") val userId: String,
+    val date: String,
+    val slot: String,
+    val title: String,
+    val ingredients: String,
+    val deleted: Boolean = false,
+    @SerialName("updated_at") val updatedAt: Long
+)
+
+@Serializable
+data class ShoppingItemDto(
+    val id: String,
+    @SerialName("user_id") val userId: String,
+    @SerialName("week_start") val weekStart: String,
+    val label: String,
+    val aisle: String,
+    val checked: Boolean = false,
+    val manual: Boolean = false,
+    val deleted: Boolean = false,
+    @SerialName("updated_at") val updatedAt: Long
+)
+
+@Serializable
+data class HealthDayDto(
+    val id: String,
+    @SerialName("user_id") val userId: String,
+    val date: String,
+    @SerialName("sleep_minutes") val sleepMinutes: Int = 0,
+    val steps: Int = 0,
+    @SerialName("exercise_minutes") val exerciseMinutes: Int = 0,
+    val source: String = "manuel",
     val deleted: Boolean = false,
     @SerialName("updated_at") val updatedAt: Long
 )
@@ -354,6 +395,22 @@ class SyncManager(private val repo: Repository) {
                     GraceRequestDto(it.id, it.fromUser, it.toUser, it.date, it.minutes, it.status, it.deleted, it.updatedAt)
                 }, GraceRequestDto.serializer())
 
+                // Menus et courses sont communs au couple : on envoie tout ce qui a changé ici.
+                val meals = db.meals().modifiedSince(s.lastPushTs)
+                api.upsert("meals", token, meals.map {
+                    MealDto(it.id, myId, it.date, it.slot, it.title, it.ingredients, it.deleted, it.updatedAt)
+                }, MealDto.serializer())
+
+                val shopping = db.shopping().modifiedSince(s.lastPushTs)
+                api.upsert("shopping_items", token, shopping.map {
+                    ShoppingItemDto(it.id, myId, it.weekStart, it.label, it.aisle, it.checked, it.manual, it.deleted, it.updatedAt)
+                }, ShoppingItemDto.serializer())
+
+                val healthDays = db.health().modifiedSince(s.lastPushTs).filter { it.userId == myId }
+                api.upsert("health_days", token, healthDays.map {
+                    HealthDayDto(it.id, it.userId, it.date, it.sleepMinutes, it.steps, it.exerciseMinutes, it.source, it.deleted, it.updatedAt)
+                }, HealthDayDto.serializer())
+
                 val dayPlans = db.dayPlans().modifiedSince(s.lastPushTs).filter { it.userId == myId }
                 api.upsert("day_plans", token, dayPlans.map {
                     DayPlanDto(it.id, it.userId, it.date, it.wakeTime, it.focusBlocks, it.deleted, it.updatedAt)
@@ -378,7 +435,9 @@ class SyncManager(private val repo: Repository) {
                         weekPlans.map { it.updatedAt } + profiles.map { it.updatedAt } +
                         encouragements.map { it.updatedAt } + goals.map { it.updatedAt } +
                         ritualLogs.map { it.updatedAt } + usageDays.map { it.updatedAt } +
-                        graces.map { it.updatedAt } + s.lastPushTs).max()
+                        graces.map { it.updatedAt } + meals.map { it.updatedAt } +
+                        shopping.map { it.updatedAt } + healthDays.map { it.updatedAt } +
+                        s.lastPushTs).max()
 
                 // Réception : tout ce qui a changé dans le couple ; la ligne la plus récente gagne.
                 var pullMark = s.lastPullTs
@@ -418,6 +477,27 @@ class SyncManager(private val repo: Repository) {
                     val local = db.grace().byId(dto.id)
                     if (local == null || dto.updatedAt > local.updatedAt) {
                         db.grace().upsert(GraceRequestEntity(dto.id, dto.fromUser, dto.toUser, dto.date, dto.minutes, dto.status, dto.deleted, dto.updatedAt))
+                    }
+                }
+                api.select("meals", token, s.lastPullTs, MealDto.serializer()).forEach { dto ->
+                    pullMark = maxOf(pullMark, dto.updatedAt)
+                    val local = db.meals().byId(dto.id)
+                    if (local == null || dto.updatedAt > local.updatedAt) {
+                        db.meals().upsert(MealEntity(dto.id, dto.userId, dto.date, dto.slot, dto.title, dto.ingredients, dto.deleted, dto.updatedAt))
+                    }
+                }
+                api.select("shopping_items", token, s.lastPullTs, ShoppingItemDto.serializer()).forEach { dto ->
+                    pullMark = maxOf(pullMark, dto.updatedAt)
+                    val local = db.shopping().byId(dto.id)
+                    if (local == null || dto.updatedAt > local.updatedAt) {
+                        db.shopping().upsert(ShoppingItemEntity(dto.id, dto.userId, dto.weekStart, dto.label, dto.aisle, dto.checked, dto.manual, dto.deleted, dto.updatedAt))
+                    }
+                }
+                api.select("health_days", token, s.lastPullTs, HealthDayDto.serializer()).forEach { dto ->
+                    pullMark = maxOf(pullMark, dto.updatedAt)
+                    val local = db.health().byId(dto.id)
+                    if (local == null || dto.updatedAt > local.updatedAt) {
+                        db.health().upsert(HealthDayEntity(dto.id, dto.userId, dto.date, dto.sleepMinutes, dto.steps, dto.exerciseMinutes, dto.source, dto.deleted, dto.updatedAt))
                     }
                 }
                 api.select("day_plans", token, s.lastPullTs, DayPlanDto.serializer()).forEach { dto ->

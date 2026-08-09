@@ -125,13 +125,8 @@ fun RitualScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
         ) {
             Spacer(Modifier.height(20.dp))
             Text("Rituel du matin", style = MaterialTheme.typography.titleLarge)
-            val tip = Tips.morning()
-            Text(
-                text = "📖 ${tip.book} — ${tip.text}",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 6.dp)
-            )
+            Spacer(Modifier.height(12.dp))
+            TipCard(Tips.morning())
             Spacer(Modifier.height(12.dp))
             Text(
                 text = when {

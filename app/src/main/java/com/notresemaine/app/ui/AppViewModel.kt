@@ -219,6 +219,64 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ----- Menus & courses -----
+
+    fun saveMeal(date: String, slot: String, title: String, ingredients: String) {
+        viewModelScope.launch {
+            repo.saveMeal(myId(), date, slot, title, ingredients)
+            requestSync()
+            toast("Menu enregistré ✓")
+        }
+    }
+
+    fun generateShoppingList(weekStart: String) {
+        viewModelScope.launch {
+            val count = repo.generateShoppingList(myId(), weekStart)
+            requestSync()
+            toast(
+                if (count > 0) "$count articles regroupés par rayon ✓"
+                else "Renseigne d'abord les ingrédients des menus."
+            )
+        }
+    }
+
+    fun addShoppingItem(weekStart: String, label: String) {
+        viewModelScope.launch { repo.addShoppingItem(myId(), weekStart, label); requestSync() }
+    }
+
+    fun toggleShoppingItem(itemId: String) {
+        viewModelScope.launch { repo.toggleShoppingItem(itemId); requestSync() }
+    }
+
+    fun clearCheckedShopping(weekStart: String) {
+        viewModelScope.launch { repo.clearCheckedShopping(weekStart); requestSync() }
+    }
+
+    // ----- Sommeil & sport -----
+
+    fun refreshHealth() {
+        viewModelScope.launch {
+            com.notresemaine.app.health.HealthWorker.collect(getApplication())
+            requestSync()
+        }
+    }
+
+    fun saveSleepManually(date: String, bedTime: String, wakeTime: String) {
+        viewModelScope.launch {
+            repo.saveSleepManually(myId(), date, bedTime, wakeTime)
+            requestSync()
+            toast("Nuit enregistrée ✓")
+        }
+    }
+
+    fun addExerciseManually(date: String, minutes: Int) {
+        viewModelScope.launch {
+            repo.addExerciseManually(myId(), date, minutes)
+            requestSync()
+            toast("Séance de $minutes min enregistrée ✓")
+        }
+    }
+
     // ----- Nous -----
 
     fun sendBravo(toUser: String) {

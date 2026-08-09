@@ -22,6 +22,47 @@ object Dates {
 
     fun previousWeekStartIso(): String = weekStart().minusWeeks(1).format(ISO)
 
+    /** Lundi de la semaine décalée de [offset] semaines (négatif = passé). */
+    fun weekStartIsoOffset(offset: Int): String =
+        weekStart().plusWeeks(offset.toLong()).format(ISO)
+
+    /** Lundi de la semaine précédant [weekStartIso]. */
+    fun weekBefore(weekStartIso: String): String =
+        LocalDate.parse(weekStartIso).minusWeeks(1).format(ISO)
+
+    /** Nombre de semaines entre la semaine courante et [weekStartIso]. */
+    fun weekOffsetOf(weekStartIso: String): Int =
+        java.time.temporal.ChronoUnit.WEEKS.between(weekStart(), LocalDate.parse(weekStartIso)).toInt()
+
+    /** "4 – 10 août" */
+    fun weekRangeLabel(weekStartIso: String): String {
+        val start = LocalDate.parse(weekStartIso)
+        val end = start.plusDays(6)
+        val endMonth = end.month.getDisplayName(TextStyle.FULL, FR)
+        return if (start.month == end.month) {
+            "${start.dayOfMonth} – ${end.dayOfMonth} $endMonth"
+        } else {
+            val startMonth = start.month.getDisplayName(TextStyle.FULL, FR)
+            "${start.dayOfMonth} $startMonth – ${end.dayOfMonth} $endMonth"
+        }
+    }
+
+    /** "Cette semaine", "Semaine prochaine", "Il y a 2 semaines"… */
+    fun weekRelativeLabel(weekStartIso: String): String = when (val o = weekOffsetOf(weekStartIso)) {
+        0 -> "Cette semaine"
+        1 -> "Semaine prochaine"
+        -1 -> "Semaine dernière"
+        else -> if (o > 0) "Dans $o semaines" else "Il y a ${-o} semaines"
+    }
+
+    /** Le dimanche approche : à partir du samedi, on prépare la semaine suivante. */
+    fun planningTargetWeekIso(): String =
+        if (today().dayOfWeek == DayOfWeek.SATURDAY || today().dayOfWeek == DayOfWeek.SUNDAY) {
+            weekStartIsoOffset(1)
+        } else {
+            weekStartIsoOffset(0)
+        }
+
     /** "mercredi 6 août" */
     fun longLabel(iso: String): String {
         val d = LocalDate.parse(iso)

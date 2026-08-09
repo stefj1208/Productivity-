@@ -40,7 +40,8 @@ fun SettingsScreen(
     vm: AppViewModel,
     settings: AppSettings,
     onMethod: () -> Unit,
-    onScreenTime: () -> Unit
+    onScreenTime: () -> Unit,
+    onHealth: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -54,6 +55,9 @@ fun SettingsScreen(
         Spacer(Modifier.height(12.dp))
         TextButton(onClick = onScreenTime, modifier = Modifier.height(48.dp)) {
             Text("📵 Temps d'écran & Pacte →")
+        }
+        TextButton(onClick = onHealth, modifier = Modifier.height(48.dp)) {
+            Text("😴 Sommeil & sport →")
         }
         TextButton(onClick = onMethod, modifier = Modifier.height(48.dp)) {
             Text("📖 La méthode (les 6 livres) →")

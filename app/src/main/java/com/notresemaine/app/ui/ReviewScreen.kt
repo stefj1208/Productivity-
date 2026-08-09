@@ -32,41 +32,51 @@ import com.notresemaine.app.data.Tips
 import com.notresemaine.app.ui.theme.accentFor
 
 /**
- * Revue du dimanche, écran par écran :
+ * Revue guidée, écran par écran, pour la semaine [weekStart] :
  * 1 Bilan · 2 Boîte de réception · 3 J'abandonne · 4 LA priorité ·
- * 5 Répartition · 6 Sport · 7 Validation
+ * 5 Répartition · 6 Sport · 7 Menus · 8 Validation
  */
 @Composable
-fun ReviewScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
+fun ReviewScreen(
+    vm: AppViewModel,
+    settings: AppSettings,
+    weekStart: String,
+    onDone: () -> Unit,
+    onMenus: (String) -> Unit
+) {
     val myId = settings.myUserId
     val accent = accentFor(settings.myColor)
-    val weekStart = Dates.weekStartIso()
-    val lastWeekStart = Dates.previousWeekStartIso()
+    val previousWeekStart = Dates.weekBefore(weekStart)
 
     var step by remember { mutableIntStateOf(0) }
     var abandon by remember { mutableStateOf("") }
     var priority by remember { mutableStateOf("") }
     var loadedPlan by remember { mutableStateOf(false) }
 
-    val lastWeekTasks by remember(myId) { vm.repo.db.tasks().byWeek(myId, lastWeekStart) }
+    val previousTasks by remember(myId, previousWeekStart) { vm.repo.db.tasks().byWeek(myId, previousWeekStart) }
         .collectAsState(initial = emptyList())
-    val lastWeekPlan by remember(myId) { vm.repo.db.weekPlans().byWeek(myId, lastWeekStart) }
+    val previousPlan by remember(myId, previousWeekStart) { vm.repo.db.weekPlans().byWeek(myId, previousWeekStart) }
         .collectAsState(initial = null)
-    val thisWeekTasks by remember(myId) { vm.repo.db.tasks().byWeek(myId, weekStart) }
+    val weekTasks by remember(myId, weekStart) { vm.repo.db.tasks().byWeek(myId, weekStart) }
         .collectAsState(initial = emptyList())
-    val thisWeekPlan by remember(myId) { vm.repo.db.weekPlans().byWeek(myId, weekStart) }
+    val weekPlan by remember(myId, weekStart) { vm.repo.db.weekPlans().byWeek(myId, weekStart) }
         .collectAsState(initial = null)
     val inbox by remember(myId) { vm.repo.db.inbox().pending(myId) }
         .collectAsState(initial = emptyList())
     val goals by remember { vm.repo.db.goals().all() }
         .collectAsState(initial = emptyList())
-    val lastWeekUsage by remember { vm.repo.db.usage().since(lastWeekStart) }
+    val previousUsage by remember(previousWeekStart) { vm.repo.db.usage().since(previousWeekStart) }
+        .collectAsState(initial = emptyList())
+    val previousHealth by remember(previousWeekStart) { vm.repo.db.health().since(previousWeekStart) }
+        .collectAsState(initial = emptyList())
+    val days = Dates.daysOfWeek(weekStart)
+    val meals by remember(weekStart) { vm.repo.db.meals().between(days.first(), days.last()) }
         .collectAsState(initial = emptyList())
 
     // Préremplit une seule fois avec ce qui existe déjà pour cette semaine.
-    if (!loadedPlan && thisWeekPlan != null) {
-        priority = thisWeekPlan?.priority ?: ""
-        abandon = thisWeekPlan?.abandon ?: ""
+    if (!loadedPlan && weekPlan != null) {
+        priority = weekPlan?.priority ?: ""
+        abandon = weekPlan?.abandon ?: ""
         loadedPlan = true
     }
 
@@ -77,6 +87,7 @@ fun ReviewScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
         "LA priorité de la semaine",
         "Répartir sur les jours",
         "Les séances de sport",
+        "Les menus",
         "Validation"
     )
     val lastStep = titles.size - 1
@@ -96,35 +107,48 @@ fun ReviewScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
                 text = "${step + 1}/${titles.size} · ${titles[step]}",
                 style = MaterialTheme.typography.titleLarge
             )
-            val tip = Tips.review(step)
             Text(
-                text = "📖 ${tip.book} — ${tip.text}",
-                style = MaterialTheme.typography.labelMedium,
+                text = "${Dates.weekRelativeLabel(weekStart)} · ${Dates.weekRangeLabel(weekStart)}",
+                style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 6.dp)
+                modifier = Modifier.padding(top = 2.dp)
             )
+            Spacer(Modifier.height(14.dp))
+            TipCard(Tips.review(step))
             Spacer(Modifier.height(20.dp))
 
             when (step) {
                 0 -> {
-                    val done = lastWeekTasks.count { it.done }
-                    val total = lastWeekTasks.size
+                    val done = previousTasks.count { it.done }
+                    val total = previousTasks.size
                     Text(
-                        text = if (total == 0) "Aucune tâche n'était planifiée la semaine passée."
+                        text = if (total == 0) "Aucune tâche n'était planifiée la semaine précédente."
                         else "$done tâches faites sur $total planifiées.",
                         style = MaterialTheme.typography.bodyLarge
                     )
-                    val myUsage = lastWeekUsage.filter { it.userId == myId }
+                    val myUsage = previousUsage.filter { it.userId == myId }
                     if (myUsage.isNotEmpty()) {
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            text = "Écran : ${myUsage.sumOf { it.totalMinutes } / 60} h sur la période, " +
-                                "dont ${myUsage.sumOf { it.socialMinutes } / 60} h de réseaux.",
+                            text = "📱 ${myUsage.sumOf { it.socialMinutes } / 60} h de réseaux sociaux, " +
+                                "${myUsage.sumOf { it.unlocks }} déverrouillages.",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    val lp = lastWeekPlan?.priority
+                    val myHealth = previousHealth.filter { it.userId == myId }
+                    val nights = myHealth.filter { it.sleepMinutes > 0 }
+                    if (nights.isNotEmpty()) {
+                        Spacer(Modifier.height(6.dp))
+                        val avg = nights.sumOf { it.sleepMinutes } / nights.size
+                        Text(
+                            text = "😴 ${avg / 60} h ${avg % 60} de sommeil en moyenne · " +
+                                "🏃 ${myHealth.sumOf { it.exerciseMinutes }} min de sport.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    val lp = previousPlan?.priority
                     if (lp != null) {
                         Spacer(Modifier.height(10.dp))
                         Text(
@@ -133,7 +157,7 @@ fun ReviewScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    val unfinished = lastWeekTasks.filter { !it.done }
+                    val unfinished = previousTasks.filter { !it.done }
                     if (unfinished.isNotEmpty()) {
                         Spacer(Modifier.height(20.dp))
                         SectionLabel("PAS TERMINÉ — on en fait quoi ?")
@@ -142,7 +166,7 @@ fun ReviewScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
                                 Text(task.title, style = MaterialTheme.typography.bodyLarge)
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     OutlinedButton(onClick = { vm.moveTaskToWeek(task.id, weekStart) }) {
-                                        Text("Cette semaine")
+                                        Text("Reporter")
                                     }
                                     TextButton(onClick = { vm.deleteTask(task.id) }) {
                                         Text("Laisser tomber")
@@ -256,7 +280,7 @@ fun ReviewScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
                         }) { Text("Ajouter") }
                     }
                     Spacer(Modifier.height(12.dp))
-                    val pool = thisWeekTasks.filter { !it.isSport && !it.isPriority && it.goalId == null }
+                    val pool = weekTasks.filter { !it.isSport && !it.isPriority && it.goalId == null }
                     if (pool.isEmpty()) {
                         Text(
                             text = "Rien à répartir pour l'instant.",
@@ -306,7 +330,7 @@ fun ReviewScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
                         }) { Text("Ajouter") }
                     }
                     Spacer(Modifier.height(12.dp))
-                    thisWeekTasks.filter { it.isSport }.forEach { task ->
+                    weekTasks.filter { it.isSport }.forEach { task ->
                         Column(modifier = Modifier.padding(vertical = 8.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
@@ -326,6 +350,26 @@ fun ReviewScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
                 }
 
                 6 -> {
+                    val filled = meals.count { it.title.isNotBlank() }
+                    Text(
+                        text = "$filled repas sur 14 sont décidés.",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "Décider maintenant, c'est ne plus se demander « on mange quoi ? » " +
+                            "sept soirs de suite. Les ingrédients saisis deviennent la liste de courses.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    OutlinedButton(
+                        onClick = { onMenus(weekStart) },
+                        modifier = Modifier.height(48.dp)
+                    ) { Text("Remplir les menus") }
+                }
+
+                7 -> {
                     Text(
                         text = "Priorité : ${priority.ifBlank { "—" }}",
                         style = MaterialTheme.typography.titleLarge,
@@ -340,11 +384,13 @@ fun ReviewScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
                         )
                     }
                     Spacer(Modifier.height(10.dp))
-                    val planned = thisWeekTasks.count { it.date != null }
-                    val sport = thisWeekTasks.count { it.isSport }
-                    val sessions = thisWeekTasks.count { it.goalId != null }
+                    val planned = weekTasks.count { it.date != null }
+                    val sport = weekTasks.count { it.isSport }
+                    val sessions = weekTasks.count { it.goalId != null }
+                    val filledMeals = meals.count { it.title.isNotBlank() }
                     Text(
-                        text = "$planned tâches réparties, dont $sport séances de sport et $sessions séances d'objectifs.",
+                        text = "$planned tâches réparties, dont $sport séances de sport " +
+                            "et $sessions séances d'objectifs. $filledMeals repas décidés.",
                         style = MaterialTheme.typography.bodyLarge
                     )
                     Spacer(Modifier.height(16.dp))
