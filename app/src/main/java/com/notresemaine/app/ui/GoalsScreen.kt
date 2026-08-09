@@ -338,15 +338,11 @@ private fun GoalWizard(
             Spacer(Modifier.height(16.dp))
             SectionLabel("PAR OÙ COMMENCER")
             val steps = if (aiSteps.isNotEmpty()) aiSteps else template.firstSteps
-            steps.forEachIndexed { index, step ->
-                Text(
-                    text = "${index + 1}. $step",
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                        .clickable { nextAction = step }
-                        .padding(vertical = 12.dp)
+            steps.forEach { step ->
+                ChoiceRow(
+                    text = step,
+                    selected = nextAction == step,
+                    onClick = { nextAction = step }
                 )
             }
             Text(

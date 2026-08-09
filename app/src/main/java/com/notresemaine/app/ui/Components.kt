@@ -362,3 +362,71 @@ fun AiSuggestion(
         }
     }
 }
+
+/**
+ * Une proposition qu'on adopte d'un seul tap.
+ *
+ * Remplace les puces Material pour tout texte un peu long : une puce garde ses
+ * mots sur une seule ligne et coupe le reste, alors qu'une action peut faire
+ * dix mots. Ici le texte passe à la ligne, et la zone tactile grandit avec lui.
+ */
+@Composable
+fun ChoiceRow(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .background(
+                if (selected) MaterialTheme.colorScheme.surfaceVariant
+                else MaterialTheme.colorScheme.surface,
+                RoundedCornerShape(12.dp)
+            )
+            .clickable(onClick = onClick)
+            .defaultMinSize(minHeight = 48.dp)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = if (selected) "✓ $text" else text,
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (selected) MaterialTheme.colorScheme.onSurface
+            else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+/** Grande tuile d'accès à une partie de l'application : visible, pas enterrée dans un menu. */
+@Composable
+fun ShortcutTile(
+    emoji: String,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 5.dp)
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .defaultMinSize(minHeight = 64.dp)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text = emoji, style = MaterialTheme.typography.titleLarge)
+        Column(modifier = Modifier.padding(start = 14.dp)) {
+            Text(text = title, style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}

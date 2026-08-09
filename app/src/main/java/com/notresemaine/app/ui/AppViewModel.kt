@@ -8,7 +8,7 @@ import com.notresemaine.app.data.AppSettings
 import com.notresemaine.app.data.GoalTemplates
 import com.notresemaine.app.data.Repository
 import com.notresemaine.app.data.RitualStepEntity
-import com.notresemaine.app.notif.Reminders
+import com.notresemaine.app.notif.Alarms
 import com.notresemaine.app.pacte.BlockerService
 import com.notresemaine.app.pacte.UsageWorker
 import com.notresemaine.app.sync.SyncManager
@@ -67,7 +67,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val userId = UUID.randomUUID().toString()
             repo.settings.completeOnboarding(userId, name, color)
             repo.saveMyProfile(userId, name, color)
-            Reminders.reschedule(getApplication(), repo.settings.current())
+            Alarms.rescheduleAll(getApplication())
         }
     }
 
@@ -137,6 +137,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val ok = repo.addGoal(myId(), title, domain, sessionsPerWeek, minutesPerSession, preferredTime, preferredDays, nextAction, isPrivate)
             if (ok) {
                 toast("Objectif créé ✓ Les séances seront planifiées avec la semaine.")
+                // Un objectif, ce sont des rendez-vous : ils entrent dans les rappels.
+                Alarms.rescheduleAll(getApplication())
                 requestSync()
             } else {
                 toast("Maximum ${GoalTemplates.MAX_ACTIVE_GOALS} objectifs actifs — moins mais mieux.")
@@ -145,11 +147,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun setGoalActive(goalId: String, active: Boolean) {
-        viewModelScope.launch { repo.setGoalActive(goalId, active); requestSync() }
+        viewModelScope.launch {
+            repo.setGoalActive(goalId, active)
+            Alarms.rescheduleAll(getApplication())
+            requestSync()
+        }
     }
 
     fun deleteGoal(goalId: String) {
-        viewModelScope.launch { repo.deleteGoal(goalId); requestSync() }
+        viewModelScope.launch {
+            repo.deleteGoal(goalId)
+            Alarms.rescheduleAll(getApplication())
+            requestSync()
+        }
     }
 
     fun planGoalSessions(weekStart: String) {
@@ -179,7 +189,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun setWakeAlarm(time: String) {
-        viewModelScope.launch { repo.settings.setWakeAlarm(time) }
+        viewModelScope.launch {
+            repo.settings.setWakeAlarm(time)
+            Alarms.rescheduleAll(getApplication())
+        }
     }
 
     // ----- Capture rapide -----
@@ -238,6 +251,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
             val s = repo.settings.current()
             repo.saveMyProfile(s.myUserId, s.myName, s.myColor)
+            // Le couvre-feu vient de bouger : le rappel « dans 15 minutes » aussi.
+            Alarms.rescheduleAll(getApplication())
             BlockerService.startIfEnabled(getApplication(), enabled)
             if (enabled) UsageWorker.schedule(getApplication())
             requestSync()
@@ -504,8 +519,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun saveReminders(evening: String, eveningOn: Boolean, sunday: String, sundayOn: Boolean) {
         viewModelScope.launch {
             repo.settings.setReminders(evening, eveningOn, sunday, sundayOn)
-            Reminders.reschedule(getApplication(), repo.settings.current())
+            Alarms.rescheduleAll(getApplication())
             toast("Rappels enregistrés ✓")
+        }
+    }
+
+    /** Rappels sonores : alarme plein écran à chaque action, ou notification discrète. */
+    fun saveAlerts(enabled: Boolean, sound: Boolean) {
+        viewModelScope.launch {
+            repo.settings.setAlerts(enabled, sound)
+            Alarms.rescheduleAll(getApplication())
+            toast(if (enabled) "Rappels sonores activés ✓" else "Rappels sonores désactivés")
         }
     }
 

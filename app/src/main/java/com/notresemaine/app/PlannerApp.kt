@@ -14,7 +14,10 @@ class PlannerApp : Application() {
     override fun onCreate() {
         super.onCreate()
         Reminders.createChannel(this)
-        Reminders.rescheduleAsync(this)
+        com.notresemaine.app.notif.Alarms.createChannel(this)
+        // Le planificateur d'alarmes décide lui-même s'il laisse la main
+        // aux notifications classiques : on ne l'appelle qu'une fois.
+        com.notresemaine.app.notif.Alarms.rescheduleAsync(this)
         SyncWorker.schedule(this)
         UsageWorker.schedule(this)
         com.notresemaine.app.health.HealthWorker.schedule(this)

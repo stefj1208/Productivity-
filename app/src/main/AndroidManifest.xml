@@ -8,6 +8,14 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+
+    <!-- Rappels sonores : alarme exacte, réveil de l'écran, plein écran, vibration -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.TURN_SCREEN_ON" />
     <uses-permission
         android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
@@ -78,8 +86,21 @@
                 android:value="Surveillance de la limite de temps d'écran choisie par l'utilisateur" />
         </service>
 
+        <!-- L'écran de rappel : s'affiche par-dessus l'écran de verrouillage -->
+        <activity
+            android:name=".ui.AlertActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:turnScreenOn="true"
+            android:showWhenLocked="true" />
+
         <receiver
             android:name=".notif.ReminderReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".notif.AlarmReceiver"
             android:exported="false" />
 
         <receiver

@@ -28,7 +28,13 @@ import com.notresemaine.app.ui.theme.NeutralGray
 import com.notresemaine.app.ui.theme.accentFor
 
 @Composable
-fun UsScreen(vm: AppViewModel, settings: AppSettings, onGoToSettings: () -> Unit) {
+fun UsScreen(
+    vm: AppViewModel,
+    settings: AppSettings,
+    onGoToSettings: () -> Unit,
+    onScreenTime: () -> Unit,
+    onHealth: () -> Unit
+) {
     val myId = settings.myUserId
     val weekStart = Dates.weekStartIso()
     val today = Dates.todayIso()
@@ -128,14 +134,29 @@ fun UsScreen(vm: AppViewModel, settings: AppSettings, onGoToSettings: () -> Unit
                 }
 
                 Text(
-                    text = "Chacun fixe son engagement dans Réglages ; le durcir prend effet " +
-                        "tout de suite, l'assouplir attend le lendemain. Vous voyez tous les deux " +
-                        "les réglages de l'autre — c'est là qu'est le contrôle mutuel.",
+                    text = "Le durcir prend effet tout de suite, l'assouplir attend le lendemain. " +
+                        "Vous voyez tous les deux les réglages de l'autre — c'est là qu'est le " +
+                        "contrôle mutuel.",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 10.dp)
                 )
             }
+            Spacer(Modifier.height(20.dp))
+            ShortcutTile(
+                emoji = "📵",
+                title = "Mon pacte d'écran",
+                subtitle = if (settings.pacteEnabled) "Limite ${settings.dailyLimitMinutes} min/jour" +
+                    (if (settings.curfewEnabled) " · couvre-feu ${settings.curfewStart}" else "")
+                else "Pas encore d'engagement",
+                onClick = onScreenTime
+            )
+            ShortcutTile(
+                emoji = "😴",
+                title = "Sommeil & sport",
+                subtitle = "Mesures automatiques ou saisie en 10 secondes",
+                onClick = onHealth
+            )
             Spacer(Modifier.height(20.dp))
         }
 

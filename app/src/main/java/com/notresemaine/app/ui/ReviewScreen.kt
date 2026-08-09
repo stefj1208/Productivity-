@@ -271,13 +271,10 @@ fun ReviewScreen(
                         Spacer(Modifier.height(12.dp))
                         SectionLabel("SUGGESTIONS (mes objectifs)")
                         suggestions.forEach { goal ->
-                            FilterChip(
+                            ChoiceRow(
+                                text = goal.nextAction,
                                 selected = priority == goal.nextAction,
-                                onClick = { priority = goal.nextAction },
-                                label = {
-                                    Text(goal.nextAction, style = MaterialTheme.typography.labelLarge)
-                                },
-                                modifier = Modifier.height(48.dp)
+                                onClick = { priority = goal.nextAction }
                             )
                         }
                     }

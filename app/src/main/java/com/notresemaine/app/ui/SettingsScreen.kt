@@ -199,7 +199,62 @@ fun SettingsScreen(
         HorizontalDivider(Modifier.padding(vertical = 16.dp))
 
         // ----- Rappels -----
-        SectionLabel("RAPPELS (jamais plus de 2 par jour)")
+        SectionLabel("RAPPELS")
+        var alertsOn by remember(settings.alertsEnabled) { mutableStateOf(settings.alertsEnabled) }
+        var alertSound by remember(settings.alertSound) { mutableStateOf(settings.alertSound) }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Rappel à chaque action",
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f)
+            )
+            Switch(checked = alertsOn, onCheckedChange = { alertsOn = it })
+        }
+        Text(
+            text = if (alertsOn) {
+                "Un écran plein s'allume au moment d'agir — rituel du matin, séance " +
+                    "d'objectif, préparer demain, revue du dimanche, et 15 minutes avant " +
+                    "le couvre-feu. Deux boutons : c'est parti, ou dans 10 minutes."
+            } else {
+                "Seulement deux notifications discrètes par jour : préparer demain " +
+                    "et la revue du dimanche."
+            },
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp)
+        )
+        if (alertsOn) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Son et vibration",
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.weight(1f)
+                )
+                Switch(checked = alertSound, onCheckedChange = { alertSound = it })
+            }
+            Text(
+                text = "Si le rappel n'apparaît pas par-dessus l'écran verrouillé : " +
+                    "Paramètres Android → Applications → Notre Semaine → « Alarmes et rappels » " +
+                    "et « Notifications plein écran » à autoriser.",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
+        TextButton(onClick = { vm.saveAlerts(alertsOn, alertSound) }) {
+            Text("Enregistrer les rappels sonores")
+        }
+
+        Spacer(Modifier.height(12.dp))
+        SectionLabel("HEURES DES RAPPELS")
         var evening by remember(settings.eveningReminder) { mutableStateOf(settings.eveningReminder) }
         var eveningOn by remember(settings.eveningEnabled) { mutableStateOf(settings.eveningEnabled) }
         var sunday by remember(settings.sundayReminder) { mutableStateOf(settings.sundayReminder) }

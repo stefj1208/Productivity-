@@ -48,9 +48,12 @@ data class AppSettings(
     val pendingCurfewStart: String = "",
     val pendingCurfewEnd: String = "",
     val pendingFromDate: String = "",
-    // Assistant Claude (facultatif, clé fournie par l'utilisateur)
+    // Assistant (facultatif, clé fournie par l'utilisateur)
     val aiEnabled: Boolean = false,
-    val aiApiKey: String = ""
+    val aiApiKey: String = "",
+    // Rappels sonores : une alarme plein écran à chaque action à faire
+    val alertsEnabled: Boolean = true,
+    val alertSound: Boolean = true
 )
 
 class SettingsStore(private val context: Context) {
@@ -88,6 +91,8 @@ class SettingsStore(private val context: Context) {
         val pendingFromDate = stringPreferencesKey("pendingFromDate")
         val aiEnabled = booleanPreferencesKey("aiEnabled")
         val aiApiKey = stringPreferencesKey("aiApiKey")
+        val alertsEnabled = booleanPreferencesKey("alertsEnabled")
+        val alertSound = booleanPreferencesKey("alertSound")
     }
 
     val flow: Flow<AppSettings> = context.dataStore.data.map { p ->
@@ -123,7 +128,9 @@ class SettingsStore(private val context: Context) {
             pendingCurfewEnd = p[K.pendingCurfewEnd] ?: "",
             pendingFromDate = p[K.pendingFromDate] ?: "",
             aiEnabled = p[K.aiEnabled] ?: false,
-            aiApiKey = p[K.aiApiKey] ?: ""
+            aiApiKey = p[K.aiApiKey] ?: "",
+            alertsEnabled = p[K.alertsEnabled] ?: true,
+            alertSound = p[K.alertSound] ?: true
         )
     }
 
@@ -244,6 +251,13 @@ class SettingsStore(private val context: Context) {
         context.dataStore.edit { p ->
             p[K.aiEnabled] = enabled
             p[K.aiApiKey] = apiKey.trim()
+        }
+    }
+
+    suspend fun setAlerts(enabled: Boolean, sound: Boolean) {
+        context.dataStore.edit { p ->
+            p[K.alertsEnabled] = enabled
+            p[K.alertSound] = sound
         }
     }
 

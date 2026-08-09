@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.WbSunny
@@ -54,9 +54,9 @@ import com.notresemaine.app.ui.ReviewScreen
 import com.notresemaine.app.ui.RitualScreen
 import com.notresemaine.app.ui.ScreenTimeScreen
 import com.notresemaine.app.ui.SettingsScreen
-import com.notresemaine.app.ui.TodayScreen
+import com.notresemaine.app.ui.HomeScreen
 import com.notresemaine.app.ui.UsScreen
-import com.notresemaine.app.ui.WeekScreen
+import com.notresemaine.app.ui.HouseScreen
 import com.notresemaine.app.ui.theme.AppTheme
 
 class MainActivity : ComponentActivity() {
@@ -89,10 +89,13 @@ class MainActivity : ComponentActivity() {
 
 private data class Tab(val route: String, val label: String, val icon: ImageVector)
 
+// Quatre onglets, et chacun répond à une question différente :
+// que fait-on maintenant, où va-t-on, qu'est-ce qu'on mange, où en est-on à deux.
+// « Jour » et « Semaine » n'en font qu'un : c'est la même question à deux échelles.
 private val tabs = listOf(
     Tab("today", "Aujourd'hui", Icons.Filled.WbSunny),
-    Tab("week", "Semaine", Icons.Filled.DateRange),
     Tab("goals", "Objectifs", Icons.Filled.Flag),
+    Tab("house", "Maison", Icons.Filled.Home),
     Tab("us", "Nous", Icons.Filled.Favorite)
 )
 
@@ -140,7 +143,7 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings) {
             modifier = Modifier.padding(padding)
         ) {
             composable("today") {
-                TodayScreen(
+                HomeScreen(
                     vm, settings,
                     onPrepare = { date -> navController.navigate("prepare/$date") },
                     onRitual = { navController.navigate("ritual") },
@@ -149,19 +152,23 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings) {
                     onReview = { week -> navController.navigate("review/$week") }
                 )
             }
-            composable("week") {
-                WeekScreen(
+            composable("goals") {
+                GoalsScreen(vm, settings)
+            }
+            composable("house") {
+                HouseScreen(
                     vm, settings,
-                    onReview = { week -> navController.navigate("review/$week") },
                     onMenus = { week -> navController.navigate("menus/$week") },
                     onShopping = { week -> navController.navigate("shopping/$week") }
                 )
             }
-            composable("goals") {
-                GoalsScreen(vm, settings)
-            }
             composable("us") {
-                UsScreen(vm, settings, onGoToSettings = { navController.navigate("settings") })
+                UsScreen(
+                    vm, settings,
+                    onGoToSettings = { navController.navigate("settings") },
+                    onScreenTime = { navController.navigate("screentime") },
+                    onHealth = { navController.navigate("health") }
+                )
             }
             composable("settings") {
                 SettingsScreen(
