@@ -16,7 +16,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.notresemaine.app.data.AppSettings
@@ -102,16 +105,12 @@ private fun MealEditor(
     ingredients: String,
     onSave: (String, String) -> Unit
 ) {
-    var titleText by androidx.compose.runtime.remember(title) {
-        androidx.compose.runtime.mutableStateOf(title)
-    }
-    var ingredientsText by androidx.compose.runtime.remember(ingredients) {
-        androidx.compose.runtime.mutableStateOf(ingredients)
-    }
+    var titleText by remember(title) { mutableStateOf(title) }
+    var ingredientsText by remember(ingredients) { mutableStateOf(ingredients) }
     val dirty = titleText != title || ingredientsText != ingredients
 
     Column(modifier = Modifier.padding(top = 10.dp)) {
-        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = label,
                 style = MaterialTheme.typography.bodyLarge,
