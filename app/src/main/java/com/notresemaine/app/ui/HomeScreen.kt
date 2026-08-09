@@ -14,13 +14,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -60,7 +58,6 @@ fun HomeScreen(
     settings: AppSettings,
     onPrepare: (String) -> Unit,
     onRitual: () -> Unit,
-    onSettings: () -> Unit,
     onGoals: () -> Unit,
     onReview: (String) -> Unit
 ) {
@@ -129,22 +126,7 @@ fun HomeScreen(
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
         ) {
-            Spacer(Modifier.height(16.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = Dates.longLabel(today),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f)
-                )
-                IconButton(onClick = onSettings) {
-                    Icon(
-                        imageVector = Icons.Filled.Settings,
-                        contentDescription = "Réglages",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+            ScreenHeader(title = "Aujourd'hui", subtitle = Dates.longLabel(today))
 
             if (bravos.isNotEmpty()) {
                 val fromName = profiles.firstOrNull { it.id == bravos.first().fromUser }?.name ?: "Ton binôme"
@@ -196,6 +178,17 @@ fun HomeScreen(
                         modifier = Modifier.padding(start = 14.dp)
                     )
                 }
+            }
+
+            if (priority == null && others.isEmpty()) {
+                Spacer(Modifier.height(20.dp))
+                EmptyState(
+                    emoji = "🌤️",
+                    text = "Rien de prévu aujourd'hui. Une seule décision suffit : " +
+                        "quelle est la chose qui compte le plus ?",
+                    actionLabel = "Choisir ma priorité",
+                    onAction = { onPrepare(today) }
+                )
             }
 
             if (others.isNotEmpty()) {

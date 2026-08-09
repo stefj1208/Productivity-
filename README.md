@@ -2,9 +2,9 @@
 
 Application Android pour deux personnes : planifier la semaine, préparer le lendemain en 2 minutes, suivre UNE priorité par jour et par semaine, et se soutenir mutuellement — sans surcharge, sans gamification.
 
-**Version actuelle : V6.** Quatre onglets seulement, chacun répondant à une question : *que fait-on maintenant* (Aujourd'hui, qui contient aussi la semaine), *où va-t-on* (Objectifs), *qu'est-ce qu'on mange* (Maison), *où en est-on à deux* (Nous). Le Pacte d'écran et les menus ne sont plus enterrés dans des sous-menus. Les rappels peuvent s'afficher en **alarme plein écran**, même téléphone verrouillé.
+**Version actuelle : V7.** Cinq destinations, une question chacune : *que fait-on maintenant* (Aujourd'hui, qui contient aussi la semaine), *où va-t-on* (Objectifs), *qu'est-ce qu'on mange* (Maison), *où en est-on à deux* (Nous), *qu'est-ce qui me concerne* (Moi). **La roue dentée a disparu** : tout ce qui était enterré dans les réglages a sa tuile dans « Moi », et chaque tuile affiche son état. Les rappels s'affichent en **alarme plein écran**, même téléphone verrouillé.
 
-Le numéro de version est affiché en haut des Réglages : c'est le moyen de vérifier ce qui est réellement installé.
+Le numéro de version est affiché dans **Moi → Profil & apparence** : c'est le moyen de vérifier ce qui est réellement installé.
 
 ---
 
@@ -25,7 +25,7 @@ Le numéro de version est affiché en haut des Réglages : c'est le moyen de vé
 3. Touchez **Installer**. L'icône « Notre Semaine » apparaît.
 4. Au premier lancement : chacun saisit son prénom et choisit sa couleur (bleu ou orange — prenez chacun une couleur différente).
 
-> L'application fonctionne immédiatement, entièrement hors ligne. La synchronisation entre vos deux téléphones est **facultative** et s'active plus tard dans Réglages (voir `SETUP-SUPABASE.md`).
+> L'application fonctionne immédiatement, entièrement hors ligne. La synchronisation entre vos deux téléphones est **facultative** et s'active plus tard dans **Moi → Synchronisation** (voir `SETUP-SUPABASE.md`).
 
 ---
 
@@ -37,7 +37,7 @@ Le numéro de version est affiché en haut des Réglages : c'est le moyen de vé
 | **Objectifs** | La bibliothèque « clé en main » : choisissez « Apprendre une langue » ou « (Re)prendre le sport », répondez à 3 questions, l'app place les séances de la semaine à votre place et suit la progression. |
 | **Maison** | Ce qu'on mange aujourd'hui (matin, midi, soir), l'accès aux **menus de la semaine** et à la **liste de courses** rangée par rayon. |
 | **Nous** | Vos deux semaines côte à côte, le **Pacte d'écran des deux** visible en permanence, les demandes de pause à accorder, l'accès direct à votre pacte et à Sommeil & sport, et le bouton « bravo 👏 ». |
-| **Réglages** | (roue dentée en haut d'Aujourd'hui) Version installée, assistant, profil, rappels, thème, synchronisation, Temps d'écran & Pacte, Sommeil & sport, « La méthode ». |
+| **Moi** | Tout ce qui me concerne, en tuiles qui affichent leur état : rituel du matin (série en cours), pacte d'écran (limite et minutes du jour), sommeil & sport (moyenne de la semaine), assistant (fournisseur détecté), rappels, synchronisation, la méthode, profil & apparence. Chaque tuile ouvre un écran dédié. |
 
 Ce que l'application applique des 6 livres (détail dans l'écran « La méthode ») :
 - **Une seule priorité** par jour et par semaine (One Thing) ; **3 tâches par jour maximum** et **3 objectifs actifs maximum** (Essentialisme) — l'app refuse le surplus, volontairement.
@@ -46,7 +46,7 @@ Ce que l'application applique des 6 livres (détail dans l'écran « La méthode
 - **Blocs de concentration** décidés la veille, séances d'objectifs protégées (Deep Work).
 - **Pacte d'écran** : limite quotidienne sur les applis choisies, déblocage uniquement par le partenaire (élimination des distractions, Semaine de 4 heures).
 - **Aucune culpabilisation** : gris neutre pour un objectif manqué, aucun badge.
-- **Rappels au moment d'agir** : rituel du matin, séance d'objectif, préparer demain, revue du dimanche, et 15 minutes avant le couvre-feu. En alarme plein écran (son + vibration, par-dessus l'écran verrouillé) ou en simples notifications — au choix, dans Réglages.
+- **Rappels au moment d'agir** : rituel du matin, séance d'objectif, préparer demain, revue du dimanche, et 15 minutes avant le couvre-feu. En alarme plein écran (son + vibration, par-dessus l'écran verrouillé) ou en simples notifications — au choix, dans **Moi → Rappels**.
 
 ## 3. Architecture en langage simple
 
@@ -58,7 +58,7 @@ Ce que l'application applique des 6 livres (détail dans l'écran « La méthode
 ## 4. Permissions à accorder (une fois, guidées dans l'app)
 
 Pour le temps d'écran et le Pacte, Android exige une permission spéciale hors de l'application :
-Réglages (roue dentée) → **Temps d'écran & Pacte** → suivre les 4 étapes affichées (l'app ouvre le bon écran Android toute seule).
+**Moi → Mon pacte d'écran** → suivre les étapes affichées (l'app ouvre le bon écran Android toute seule).
 
 **Important sur le Honor 400 Pro (MagicOS)** : Paramètres → Batterie → Lancement d'applications → Notre Semaine → désactiver « Gestion automatique » et tout autoriser en manuel. Sans cela, MagicOS tue la surveillance en arrière-plan. Sur le S23 : Paramètres → Batterie → « Non restreinte ».
 
@@ -71,7 +71,7 @@ Réaliste, pour être honnête :
 
 Tout ce que l'assistant fait a un équivalent **hors ligne, instantané et gratuit** : banque de menus, premiers pas par objectif, répartition des séances, classement des courses par rayon. L'assistant sert au sur-mesure et aux moments de panne d'inspiration.
 
-Il se branche dans Réglages avec **votre propre clé** : une clé Google (aistudio.google.com) ou une clé Anthropic (`sk-ant-…`). L'application reconnaît laquelle toute seule. Désactivé par défaut ; rien ne part du téléphone tant qu'il ne l'est pas.
+Il se branche dans **Moi → Assistant** avec **votre propre clé** : une clé Google (aistudio.google.com) ou une clé Anthropic (`sk-ant-…`). L'application reconnaît laquelle toute seule. Désactivé par défaut ; rien ne part du téléphone tant qu'il ne l'est pas.
 
 Où il intervient :
 
@@ -99,6 +99,7 @@ Chaque proposition **remplit les champs** — rien n'est enregistré tant que vo
 4. ✅ **V4** — Pacte visible en permanence des deux côtés, couvre-feu, petit-déjeuner dans les menus
 5. ✅ **V5** — assistant facultatif (Google ou Anthropic) branché sur neuf écrans, chaque fois doublé d'une voie hors ligne
 6. ✅ **V6** — refonte de la navigation (4 onglets, plus de séparation jour/semaine), Maison en onglet, rappels en alarme plein écran
+7. ✅ **V7** — refonte UX : onglet « Moi » à la place de la roue dentée, réglages éclatés en écrans dédiés, en-têtes et états vides cohérents partout
 
 ### Sommeil & sport : ce qui marchera vraiment
 Health Connect ne contient **que** ce qu'une montre, un bracelet ou une appli (Samsung Health…) y écrit. Sans source, sommeil et séances resteront à zéro — c'est une limite d'Android, pas de l'application. D'où la saisie de secours dans **Réglages → Sommeil & sport** : deux heures à taper pour la nuit, un bouton `20′ / 30′ / 45′ / 60′` pour une séance. Une mesure automatique n'écrase jamais une saisie manuelle du même jour.

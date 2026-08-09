@@ -64,22 +64,20 @@ fun UsScreen(
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
         ) {
-            Spacer(Modifier.height(20.dp))
-            Text(text = "Nous deux", style = MaterialTheme.typography.titleLarge)
-            Text(
-                text = "Semaine du ${Dates.shortLabel(weekStart)}",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp)
+            ScreenHeader(
+                title = "Nous deux",
+                subtitle = "Semaine du ${Dates.shortLabel(weekStart)}"
             )
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(16.dp))
 
             if (partner == null) {
-                Text(
-                    text = "L'autre moitié n'est pas encore connectée.\n\n" +
-                        "Activez la synchronisation dans Réglages, créez votre espace couple " +
-                        "et partagez le code : sa semaine apparaîtra ici, à côté de la vôtre.",
-                    style = MaterialTheme.typography.bodyLarge
+                EmptyState(
+                    emoji = "💞",
+                    text = "L'autre moitié n'est pas encore connectée. Reliez vos deux " +
+                        "téléphones : sa semaine apparaîtra ici, à côté de la vôtre, et vous " +
+                        "verrez chacun le pacte d'écran de l'autre.",
+                    actionLabel = "Relier nos téléphones",
+                    onAction = onGoToSettings
                 )
                 Spacer(Modifier.height(24.dp))
             } else {

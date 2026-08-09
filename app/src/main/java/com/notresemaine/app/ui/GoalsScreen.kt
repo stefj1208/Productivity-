@@ -75,17 +75,20 @@ fun GoalsScreen(vm: AppViewModel, settings: AppSettings) {
             .padding(horizontal = 24.dp)
             .verticalScroll(rememberScrollState())
     ) {
-        Spacer(Modifier.height(20.dp))
-        Text("Objectifs", style = MaterialTheme.typography.titleLarge)
+        ScreenHeader(
+            title = "Objectifs",
+            subtitle = "${myGoals.count { it.active }} actif(s) sur ${GoalTemplates.MAX_ACTIVE_GOALS} — moins mais mieux"
+        )
         Spacer(Modifier.height(12.dp))
         TipCard(Tips.goals())
 
         if (myGoals.isEmpty()) {
             Spacer(Modifier.height(20.dp))
-            Text(
-                text = "Choisis un objectif ci-dessous : l'application génère les séances " +
-                    "de la semaine à ta place, aux bons moments.",
-                style = MaterialTheme.typography.bodyLarge
+            EmptyState(
+                emoji = "🎯",
+                text = "Aucun objectif pour l'instant. Choisissez-en un dans la bibliothèque " +
+                    "ci-dessous : l'application place les séances de la semaine à votre place, " +
+                    "aux bons moments."
             )
         } else {
             Spacer(Modifier.height(16.dp))

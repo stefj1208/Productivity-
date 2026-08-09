@@ -57,14 +57,7 @@ fun HouseScreen(
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
         ) {
-            Spacer(Modifier.height(20.dp))
-            Text("Maison", style = MaterialTheme.typography.titleLarge)
-            Text(
-                text = Dates.longLabel(today),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp)
-            )
+            ScreenHeader(title = "Maison", subtitle = Dates.longLabel(today))
 
             Spacer(Modifier.height(24.dp))
             SectionLabel("AU MENU AUJOURD'HUI")

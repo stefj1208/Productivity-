@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.WbSunny
@@ -53,7 +54,11 @@ import com.notresemaine.app.ui.ShoppingScreen
 import com.notresemaine.app.ui.ReviewScreen
 import com.notresemaine.app.ui.RitualScreen
 import com.notresemaine.app.ui.ScreenTimeScreen
-import com.notresemaine.app.ui.SettingsScreen
+import com.notresemaine.app.ui.AssistantScreen
+import com.notresemaine.app.ui.MeScreen
+import com.notresemaine.app.ui.ProfileScreen
+import com.notresemaine.app.ui.RemindersScreen
+import com.notresemaine.app.ui.SyncScreen
 import com.notresemaine.app.ui.HomeScreen
 import com.notresemaine.app.ui.UsScreen
 import com.notresemaine.app.ui.HouseScreen
@@ -89,14 +94,16 @@ class MainActivity : ComponentActivity() {
 
 private data class Tab(val route: String, val label: String, val icon: ImageVector)
 
-// Quatre onglets, et chacun répond à une question différente :
-// que fait-on maintenant, où va-t-on, qu'est-ce qu'on mange, où en est-on à deux.
+// Cinq destinations, une question chacune : que fait-on maintenant, où va-t-on,
+// qu'est-ce qu'on mange, où en est-on à deux, et qu'est-ce qui me concerne.
 // « Jour » et « Semaine » n'en font qu'un : c'est la même question à deux échelles.
+// « Moi » remplace la roue dentée : une fonction cachée est une fonction morte.
 private val tabs = listOf(
     Tab("today", "Aujourd'hui", Icons.Filled.WbSunny),
     Tab("goals", "Objectifs", Icons.Filled.Flag),
     Tab("house", "Maison", Icons.Filled.Home),
-    Tab("us", "Nous", Icons.Filled.Favorite)
+    Tab("us", "Nous", Icons.Filled.Favorite),
+    Tab("me", "Moi", Icons.Filled.Person)
 )
 
 @Composable
@@ -147,7 +154,6 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings) {
                     vm, settings,
                     onPrepare = { date -> navController.navigate("prepare/$date") },
                     onRitual = { navController.navigate("ritual") },
-                    onSettings = { navController.navigate("settings") },
                     onGoals = { navController.navigate("goals") },
                     onReview = { week -> navController.navigate("review/$week") }
                 )
@@ -165,18 +171,35 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings) {
             composable("us") {
                 UsScreen(
                     vm, settings,
-                    onGoToSettings = { navController.navigate("settings") },
+                    onGoToSettings = { navController.navigate("sync") },
                     onScreenTime = { navController.navigate("screentime") },
                     onHealth = { navController.navigate("health") }
                 )
             }
-            composable("settings") {
-                SettingsScreen(
+            composable("me") {
+                MeScreen(
                     vm, settings,
-                    onMethod = { navController.navigate("method") },
+                    onRitual = { navController.navigate("ritual") },
                     onScreenTime = { navController.navigate("screentime") },
-                    onHealth = { navController.navigate("health") }
+                    onHealth = { navController.navigate("health") },
+                    onAssistant = { navController.navigate("assistant") },
+                    onReminders = { navController.navigate("reminders") },
+                    onMethod = { navController.navigate("method") },
+                    onSync = { navController.navigate("sync") },
+                    onProfile = { navController.navigate("profile") }
                 )
+            }
+            composable("assistant") {
+                AssistantScreen(vm, settings, onBack = { navController.popBackStack() })
+            }
+            composable("reminders") {
+                RemindersScreen(vm, settings, onBack = { navController.popBackStack() })
+            }
+            composable("sync") {
+                SyncScreen(vm, settings, onBack = { navController.popBackStack() })
+            }
+            composable("profile") {
+                ProfileScreen(vm, settings, onBack = { navController.popBackStack() })
             }
             composable("health") {
                 HealthScreen(vm, settings, onBack = { navController.popBackStack() })

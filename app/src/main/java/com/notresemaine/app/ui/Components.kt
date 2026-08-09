@@ -400,14 +400,21 @@ fun ChoiceRow(
     }
 }
 
-/** Grande tuile d'accès à une partie de l'application : visible, pas enterrée dans un menu. */
+/**
+ * Tuile d'accès à une partie de l'application.
+ *
+ * Elle dit toujours deux choses : où elle mène, et où on en est de ce côté-là.
+ * Un réglage dont on ne voit pas l'état est un réglage qu'on n'ouvre jamais —
+ * d'où le sous-titre vivant plutôt qu'une simple étiquette.
+ */
 @Composable
 fun ShortcutTile(
     emoji: String,
     title: String,
     subtitle: String,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    highlight: Boolean = false
 ) {
     Row(
         modifier = modifier
@@ -420,13 +427,103 @@ fun ShortcutTile(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(text = emoji, style = MaterialTheme.typography.titleLarge)
-        Column(modifier = Modifier.padding(start = 14.dp)) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 14.dp)
+        ) {
             Text(text = title, style = MaterialTheme.typography.titleMedium)
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = if (highlight) MaterialTheme.colorScheme.secondary
+                else MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+        Text(
+            text = "›",
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+/**
+ * L'en-tête d'un écran : où je suis, et comment je reviens.
+ * Le même partout, pour qu'on n'ait jamais à chercher le chemin du retour.
+ */
+@Composable
+fun ScreenHeader(
+    title: String,
+    subtitle: String? = null,
+    onBack: (() -> Unit)? = null,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = 16.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (onBack != null) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+                    .clickable(onClick = onBack),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("‹", style = MaterialTheme.typography.titleLarge)
+            }
+        }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = if (onBack != null) 14.dp else 0.dp)
+        ) {
+            Text(text = title, style = MaterialTheme.typography.titleLarge)
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Un écran vide ne doit jamais être un cul-de-sac : il explique et il propose.
+ */
+@Composable
+fun EmptyState(
+    emoji: String,
+    text: String,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+            .padding(20.dp)
+    ) {
+        Text(text = emoji, style = MaterialTheme.typography.displaySmall)
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 10.dp)
+        )
+        if (actionLabel != null && onAction != null) {
+            androidx.compose.material3.OutlinedButton(
+                onClick = onAction,
+                modifier = Modifier
+                    .padding(top = 14.dp)
+                    .defaultMinSize(minHeight = 48.dp)
+            ) { Text(actionLabel) }
         }
     }
 }
