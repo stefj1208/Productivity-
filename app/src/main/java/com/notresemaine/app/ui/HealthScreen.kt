@@ -150,6 +150,28 @@ fun HealthScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
                 style = MaterialTheme.typography.bodyLarge
             )
 
+            if (settings.aiEnabled && settings.aiApiKey.isNotBlank()) {
+                val aiBusy by vm.aiBusy.collectAsState()
+                val aiRead by vm.aiHealthRead.collectAsState()
+                AiButton(
+                    text = "Lire ma semaine",
+                    busy = aiBusy,
+                    onClick = { vm.readHealthWithAi(Dates.weekStartIso()) },
+                    modifier = Modifier.padding(top = 14.dp)
+                )
+                Text(
+                    text = aiRead.ifBlank {
+                        "Une phrase sur votre semaine, et un seul levier à essayer. " +
+                            "Envoie uniquement vos moyennes — jamais celles de l'autre."
+                    },
+                    style = if (aiRead.isBlank()) MaterialTheme.typography.labelMedium
+                    else MaterialTheme.typography.bodyLarge,
+                    color = if (aiRead.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant
+                    else MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.padding(top = 6.dp)
+                )
+            }
+
             Spacer(Modifier.height(24.dp))
             SectionLabel("SAISIE RAPIDE — SOMMEIL")
             Row(

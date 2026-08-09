@@ -62,6 +62,21 @@ fun ScreenTimeScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit
         .collectAsState(initial = emptyList())
     val myToday = usageDays.firstOrNull { it.userId == settings.myUserId && it.date == Dates.todayIso() }
 
+    val aiBusy by vm.aiBusy.collectAsState()
+    val aiPacte by vm.aiPacte.collectAsState()
+    var aiWhy by remember { mutableStateOf("") }
+
+    // La proposition remplit les réglages ci-dessus ; elle ne s'applique qu'à l'enregistrement.
+    androidx.compose.runtime.LaunchedEffect(aiPacte) {
+        val advice = aiPacte ?: return@LaunchedEffect
+        limit = advice.limitMinutes.toString()
+        curfewEnabled = true
+        curfewStart = advice.curfewStart
+        curfewEnd = advice.curfewEnd
+        aiWhy = advice.why
+        vm.clearAiPacte()
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -173,6 +188,25 @@ fun ScreenTimeScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit
                     )
                     Switch(checked = curfewStrict, onCheckedChange = { curfewStrict = it })
                 }
+            }
+
+            if (settings.aiEnabled && settings.aiApiKey.isNotBlank()) {
+                AiButton(
+                    text = "Proposer un pacte réaliste",
+                    busy = aiBusy,
+                    onClick = { vm.suggestPacteWithAi() },
+                    modifier = Modifier.padding(top = 16.dp)
+                )
+                Text(
+                    text = aiWhy.ifBlank {
+                        "Part de votre usage réellement mesuré ces 7 derniers jours et propose " +
+                            "une marche tenable, pas un sevrage. Envoie uniquement vos moyennes."
+                    },
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (aiWhy.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant
+                    else MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
             }
 
             Spacer(Modifier.height(16.dp))

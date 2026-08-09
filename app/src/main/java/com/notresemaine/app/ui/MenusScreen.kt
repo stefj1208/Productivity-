@@ -92,16 +92,14 @@ fun MenusScreen(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                OutlinedButton(
+                AiButton(
+                    text = "Demander à l'assistant",
+                    busy = aiBusy,
                     onClick = { vm.suggestMenusWithAi(weekStart, constraints) },
-                    enabled = !aiBusy,
-                    modifier = Modifier
-                        .padding(top = 6.dp)
-                        .fillMaxWidth()
-                        .height(48.dp)
-                ) { Text(if (aiBusy) "L'assistant réfléchit…" else "✨ Demander à l'assistant") }
+                    modifier = Modifier.padding(top = 6.dp)
+                )
                 Text(
-                    text = "Envoie uniquement vos contraintes à Anthropic. Aucune donnée de " +
+                    text = "Envoie uniquement vos contraintes. Aucune donnée de " +
                         "sommeil, d'écran ou de tâches ne quitte le téléphone.",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

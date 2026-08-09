@@ -73,11 +73,22 @@ fun ReviewScreen(
     val meals by remember(weekStart) { vm.repo.db.meals().between(days.first(), days.last()) }
         .collectAsState(initial = emptyList())
 
+    val aiBusy by vm.aiBusy.collectAsState()
+    val aiWeek by vm.aiWeekAdvice.collectAsState()
+
     // Préremplit une seule fois avec ce qui existe déjà pour cette semaine.
     if (!loadedPlan && weekPlan != null) {
         priority = weekPlan?.priority ?: ""
         abandon = weekPlan?.abandon ?: ""
         loadedPlan = true
+    }
+
+    // Une proposition de l'assistant remplit les champs ; elle reste modifiable.
+    androidx.compose.runtime.LaunchedEffect(aiWeek) {
+        val advice = aiWeek ?: return@LaunchedEffect
+        priority = advice.priority
+        if (advice.abandon.isNotBlank()) abandon = advice.abandon
+        vm.clearAiWeekAdvice()
     }
 
     val titles = listOf(
@@ -238,6 +249,22 @@ fun ReviewScreen(
                         textStyle = MaterialTheme.typography.bodyLarge,
                         modifier = Modifier.fillMaxWidth()
                     )
+                    if (settings.aiEnabled && settings.aiApiKey.isNotBlank()) {
+                        AiButton(
+                            text = "Trancher à ma place",
+                            busy = aiBusy,
+                            onClick = { vm.suggestWeekPriorityWithAi(weekStart) },
+                            modifier = Modifier.padding(top = 10.dp)
+                        )
+                        Text(
+                            text = "Propose une priorité et une chose à laisser tomber, à partir " +
+                                "de vos objectifs et de vos notes en attente. Les objectifs privés " +
+                                "ne sont jamais envoyés.",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
                     val suggestions = goals
                         .filter { it.userId == myId && it.active && it.nextAction.isNotBlank() }
                     if (suggestions.isNotEmpty()) {

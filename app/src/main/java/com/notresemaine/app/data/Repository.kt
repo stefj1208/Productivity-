@@ -581,6 +581,129 @@ class Repository private constructor(context: Context) {
         )
     }
 
+    // ----- Ce que l'assistant a le droit de voir -----
+    //
+    // Ces méthodes sont le seul chemin par lequel des données partent vers l'assistant.
+    // Elles filtrent ici, dans le code, ce que la page des réglages promet en français :
+    // jamais un objectif privé, jamais les données de l'autre.
+
+    /** Objectifs actifs, les privés exclus : ils ne quittent pas le téléphone. */
+    suspend fun goalTitlesForAi(userId: String): List<String> =
+        db.goals().activeOnce(userId).filter { !it.isPrivate }.map { it.title }
+
+    suspend fun inboxTextsForAi(userId: String): List<String> =
+        db.inbox().pendingOnce(userId).map { it.text }
+
+    /** Tâches de la semaine qui n'ont pas encore de jour. */
+    suspend fun backlogTitlesForAi(userId: String, weekStart: String): List<String> =
+        db.tasks().byWeekOnce(userId, weekStart)
+            .filter { it.date == null && !it.done && it.goalId == null }
+            .map { it.title }
+
+    suspend fun weekPriorityOf(userId: String, weekStart: String): String =
+        db.weekPlans().byWeekOnce(userId, weekStart)?.priority.orEmpty()
+
+    data class UsageAverages(val socialMinutes: Int, val unlocks: Int, val days: Int)
+
+    /** Moyennes des 7 derniers jours, pour proposer un pacte fondé sur le réel. */
+    suspend fun usageAverages(userId: String): UsageAverages {
+        val days = db.usage().sinceOnce(userId, Dates.daysAgoIso(7))
+        if (days.isEmpty()) return UsageAverages(0, 0, 0)
+        return UsageAverages(
+            socialMinutes = days.sumOf { it.socialMinutes } / days.size,
+            unlocks = days.sumOf { it.unlocks } / days.size,
+            days = days.size
+        )
+    }
+
+    data class HealthAverages(
+        val sleepMinutes: Int,
+        val steps: Int,
+        val exerciseMinutes: Int,
+        val days: Int
+    )
+
+    /** Moyennes de la semaine, uniquement les vôtres. */
+    suspend fun healthAverages(userId: String, weekStart: String): HealthAverages {
+        val days = Dates.daysOfWeek(weekStart)
+        val rows = db.health().betweenOnce(userId, days.first(), days.last())
+        val withSleep = rows.filter { it.sleepMinutes > 0 }
+        val withSteps = rows.filter { it.steps > 0 }
+        return HealthAverages(
+            sleepMinutes = if (withSleep.isEmpty()) 0 else withSleep.sumOf { it.sleepMinutes } / withSleep.size,
+            steps = if (withSteps.isEmpty()) 0 else withSteps.sumOf { it.steps } / withSteps.size,
+            exerciseMinutes = rows.sumOf { it.exerciseMinutes },
+            days = rows.size
+        )
+    }
+
+    // ----- Appliquer ce que l'assistant propose -----
+
+    /** Range une note clarifiée à l'endroit proposé ; jamais au-delà de 3 tâches par jour. */
+    suspend fun applyClarifiedCapture(userId: String, action: String, whenLabel: String): String {
+        val title = action.trim()
+        if (title.isBlank()) return ""
+        val date = when (whenLabel) {
+            "aujourdhui" -> Dates.todayIso()
+            "demain" -> Dates.tomorrowIso()
+            else -> null
+        }
+        if (date != null && db.tasks().countForDay(userId, date) < MAX_TASKS_PER_DAY) {
+            db.tasks().upsert(
+                TaskEntity(
+                    id = UUID.randomUUID().toString(),
+                    userId = userId,
+                    title = title,
+                    date = date,
+                    weekStart = Dates.weekStartIso(java.time.LocalDate.parse(date)),
+                    updatedAt = now()
+                )
+            )
+            return "Noté pour ${Dates.shortLabel(date)} ✓"
+        }
+        if (whenLabel != "inbox") {
+            // Journée pleine, ou action prévue « dans la semaine » : elle attend un jour libre.
+            db.tasks().upsert(
+                TaskEntity(
+                    id = UUID.randomUUID().toString(),
+                    userId = userId,
+                    title = title,
+                    date = null,
+                    weekStart = Dates.weekStartIso(),
+                    updatedAt = now()
+                )
+            )
+            return "Ajouté à la semaine ✓"
+        }
+        db.inbox().upsert(
+            InboxItemEntity(
+                id = UUID.randomUUID().toString(),
+                userId = userId,
+                text = title,
+                updatedAt = now()
+            )
+        )
+        return "Dans la boîte de réception ✓"
+    }
+
+    /** Articles que le classement hors ligne n'a pas su ranger. */
+    suspend fun unsortedShoppingLabels(weekStart: String): List<String> =
+        db.shopping().forWeekOnce(weekStart).filter { it.aisle == "Divers" }.map { it.label }
+
+    /** Applique les rayons proposés ; ne touche qu'aux articles restés dans « Divers ». */
+    suspend fun applyAisles(weekStart: String, aisles: Map<String, String>): Int {
+        if (aisles.isEmpty()) return 0
+        val byLabel = aisles.mapKeys { it.key.trim().lowercase() }
+        var changed = 0
+        db.shopping().forWeekOnce(weekStart).filter { it.aisle == "Divers" }.forEach { item ->
+            val aisle = byLabel[item.label.trim().lowercase()] ?: return@forEach
+            if (aisle == item.aisle) return@forEach
+            db.shopping().upsert(item.copy(aisle = aisle, updatedAt = now()))
+            changed++
+        }
+        return changed
+    }
+
     /** Quand on se connecte à la synchro, l'identifiant local devient l'identifiant du compte. */
     suspend fun migrateUserId(oldId: String, newId: String) {
         if (oldId == newId || oldId.isBlank()) return

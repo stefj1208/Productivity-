@@ -219,14 +219,35 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings) {
             onDismissRequest = { capturing = false },
             title = { Text("Vider sa tête") },
             text = {
-                OutlinedTextField(
-                    value = text,
-                    onValueChange = { text = it },
-                    placeholder = { Text("Ex. : rappeler le plombier mardi") },
-                    textStyle = MaterialTheme.typography.bodyLarge,
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                androidx.compose.foundation.layout.Column {
+                    OutlinedTextField(
+                        value = text,
+                        onValueChange = { text = it },
+                        placeholder = { Text("Ex. : rappeler le plombier mardi") },
+                        textStyle = MaterialTheme.typography.bodyLarge,
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (settings.aiEnabled && settings.aiApiKey.isNotBlank()) {
+                        val aiBusy by vm.aiBusy.collectAsState()
+                        com.notresemaine.app.ui.AiButton(
+                            text = "Clarifier et ranger",
+                            busy = aiBusy,
+                            enabled = text.isNotBlank(),
+                            onClick = {
+                                vm.captureWithAi(text)
+                                capturing = false
+                            },
+                            modifier = Modifier.padding(top = 10.dp)
+                        )
+                        Text(
+                            text = "Transforme la note en action concrète et choisit le bon jour.",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                }
             },
             confirmButton = {
                 TextButton(onClick = {

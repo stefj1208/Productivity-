@@ -141,26 +141,36 @@ fun SettingsScreen(
 
         HorizontalDivider(Modifier.padding(vertical = 16.dp))
 
-        // ----- Assistant Claude (facultatif) -----
+        // ----- Assistant (facultatif) -----
         SectionLabel("ASSISTANT (FACULTATIF)")
         Text(
-            text = "L'application est complète sans lui : les idées de menus et les premiers pas " +
-                "existent déjà hors ligne. L'assistant sert quand on veut des menus sur mesure " +
-                "ou des premiers pas adaptés à un objectif inhabituel.",
+            text = "L'application est complète sans lui : idées de menus, premiers pas, " +
+                "répartition des séances et classement des courses existent déjà hors ligne. " +
+                "L'assistant sert quand on veut du sur-mesure, ou quand on ne sait pas " +
+                "par où commencer.",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        var aiEnabled by remember(settings.aiEnabled) { mutableStateOf(settings.aiEnabled) }
+        var aiKey by remember(settings.aiApiKey) { mutableStateOf(settings.aiApiKey) }
         Text(
-            text = "⚠️ Activé, il envoie à Anthropic uniquement : vos contraintes de menus et " +
-                "l'intitulé de l'objectif. Jamais votre sommeil, votre temps d'écran, vos tâches, " +
-                "ni quoi que ce soit du partenaire. Il faut votre propre clé API " +
-                "(console.anthropic.com), et chaque appel vous est facturé par Anthropic.",
+            text = "⚠️ Ce qui sort du téléphone, et rien d'autre : vos contraintes de menus, " +
+                "l'intitulé d'un objectif, la note que vous venez d'écrire, les titres de vos " +
+                "tâches en attente, vos moyennes d'écran et de sommeil. " +
+                "Jamais un objectif marqué privé, jamais quoi que ce soit du partenaire, " +
+                "jamais le détail jour par jour de votre santé.",
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 6.dp)
         )
-        var aiEnabled by remember(settings.aiEnabled) { mutableStateOf(settings.aiEnabled) }
-        var aiKey by remember(settings.aiApiKey) { mutableStateOf(settings.aiApiKey) }
+        Text(
+            text = "Deux clés possibles, l'application reconnaît laquelle toute seule : " +
+                "une clé Google (aistudio.google.com) ou une clé Anthropic (sk-ant-…). " +
+                "Chaque appel vous est facturé par le fournisseur choisi.",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 6.dp)
+        )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -178,16 +188,22 @@ fun SettingsScreen(
             OutlinedTextField(
                 value = aiKey,
                 onValueChange = { aiKey = it },
-                label = { Text("Clé API Anthropic (sk-ant-…)") },
+                label = { Text("Clé API (Google ou Anthropic)") },
                 visualTransformation = PasswordVisualTransformation(),
                 textStyle = MaterialTheme.typography.bodyLarge,
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
+            Text(
+                text = "Détecté : ${com.notresemaine.app.ai.Ai.providerLabel(aiKey)}",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.padding(top = 6.dp)
+            )
         }
         TextButton(
             onClick = { vm.saveAiSettings(aiEnabled, aiKey) },
-            enabled = !aiEnabled || aiKey.startsWith("sk-ant-")
+            enabled = !aiEnabled || aiKey.isNotBlank()
         ) { Text("Enregistrer l'assistant") }
 
         HorizontalDivider(Modifier.padding(vertical = 16.dp))

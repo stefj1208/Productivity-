@@ -58,6 +58,7 @@ fun GoalsScreen(vm: AppViewModel, settings: AppSettings) {
             aiAvailable = settings.aiEnabled && settings.aiApiKey.isNotBlank(),
             onClose = {
                 vm.clearAiSteps()
+                vm.clearAiGoalPlan()
                 wizardTemplate = null
             }
         )
@@ -209,6 +210,7 @@ private fun GoalWizard(
 ) {
     val aiBusy by vm.aiBusy.collectAsState()
     val aiSteps by vm.aiSteps.collectAsState()
+    val aiPlan by vm.aiGoalPlan.collectAsState()
     var title by remember { mutableStateOf(if (template.title == "Objectif libre") "" else template.title) }
     var sessions by remember { mutableStateOf(template.sessionsPerWeek.toString()) }
     var minutes by remember { mutableStateOf(template.minutesPerSession.toString()) }
@@ -218,6 +220,18 @@ private fun GoalWizard(
     var isPrivate by remember { mutableStateOf(false) }
 
     val dayLabels = listOf(1 to "L", 2 to "M", 3 to "M", 4 to "J", 5 to "V", 6 to "S", 7 to "D")
+
+    // Quand l'assistant renvoie un rythme, il remplit les questions 2 et 3 à votre place.
+    // Rien n'est créé pour autant : tout reste modifiable avant de valider.
+    androidx.compose.runtime.LaunchedEffect(aiPlan) {
+        val plan = aiPlan ?: return@LaunchedEffect
+        sessions = plan.sessionsPerWeek.toString()
+        minutes = plan.minutesPerSession.toString()
+        time = plan.preferredTime
+        days = plan.preferredDays.toSet()
+        if (plan.nextAction.isNotBlank()) nextAction = plan.nextAction
+        vm.clearAiGoalPlan()
+    }
 
     Column(
         modifier = Modifier
@@ -248,6 +262,24 @@ private fun GoalWizard(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
+
+            if (aiAvailable) {
+                AiButton(
+                    text = "Bâtir le rythme à ma place",
+                    busy = aiBusy,
+                    enabled = title.isNotBlank(),
+                    onClick = { vm.suggestGoalPlanWithAi(title, template.domain) },
+                    modifier = Modifier.padding(top = 10.dp)
+                )
+                Text(
+                    text = "Remplit les questions 2 et 3 ci-dessous : combien de séances, " +
+                        "de quelle durée, quels jours, et par quoi commencer. " +
+                        "Envoie uniquement l'intitulé de l'objectif.",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
 
             Spacer(Modifier.height(16.dp))
             SectionLabel("2 · COMBIEN ?")
@@ -315,12 +347,13 @@ private fun GoalWizard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             if (aiAvailable) {
-                TextButton(
+                AiButton(
+                    text = "Des pas adaptés à mon objectif",
+                    busy = aiBusy,
+                    enabled = title.isNotBlank(),
                     onClick = { vm.suggestFirstStepsWithAi(title) },
-                    enabled = !aiBusy && title.isNotBlank()
-                ) {
-                    Text(if (aiBusy) "L'assistant réfléchit…" else "✨ Des pas adaptés à mon objectif")
-                }
+                    modifier = Modifier.padding(top = 8.dp)
+                )
             }
 
             Spacer(Modifier.height(16.dp))

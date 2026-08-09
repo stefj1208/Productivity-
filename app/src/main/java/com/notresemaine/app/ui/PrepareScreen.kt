@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,6 +54,18 @@ fun PrepareScreen(vm: AppViewModel, settings: AppSettings, dateIso: String, onDo
 
     val isToday = dateIso == Dates.todayIso()
     val wakeOk = wake.isBlank() || Dates.isValidTime(wake)
+    val aiBusy by vm.aiBusy.collectAsState()
+    val aiDay by vm.aiDayAdvice.collectAsState()
+    val aiAvailable = settings.aiEnabled && settings.aiApiKey.isNotBlank()
+
+    // La proposition remplit les champs ; rien n'est enregistré tant que vous n'avez pas validé.
+    LaunchedEffect(aiDay) {
+        val advice = aiDay ?: return@LaunchedEffect
+        priority = advice.priority
+        task1 = advice.secondary.getOrNull(0) ?: task1
+        task2 = advice.secondary.getOrNull(1) ?: task2
+        vm.clearAiDayAdvice()
+    }
 
     Column(
         modifier = Modifier
@@ -87,6 +100,23 @@ fun PrepareScreen(vm: AppViewModel, settings: AppSettings, dateIso: String, onDo
                 singleLine = true,
                 enabled = loaded
             )
+
+            if (aiAvailable) {
+                AiButton(
+                    text = "Choisir la priorité à ma place",
+                    busy = aiBusy,
+                    enabled = loaded,
+                    onClick = { vm.suggestDayWithAi(dateIso) },
+                    modifier = Modifier.padding(top = 10.dp)
+                )
+                Text(
+                    text = "Décide à partir de la priorité de votre semaine, de vos objectifs " +
+                        "et des tâches en attente. Rien n'est enregistré avant « C'est prêt ».",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
 
             Spacer(Modifier.height(16.dp))
             SectionLabel("ENSUITE (2 maximum)")

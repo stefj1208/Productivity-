@@ -69,6 +69,18 @@ fun ShoppingScreen(
                 modifier = Modifier.padding(top = 4.dp)
             )
 
+            // Les articles que l'application ne reconnaît pas atterrissent dans « Divers ».
+            val unsorted = items.count { it.aisle == "Divers" }
+            if (settings.aiEnabled && settings.aiApiKey.isNotBlank() && unsorted > 0) {
+                val aiBusy by vm.aiBusy.collectAsState()
+                AiButton(
+                    text = "Ranger les $unsorted articles de « Divers »",
+                    busy = aiBusy,
+                    onClick = { vm.sortShoppingWithAi(weekStart) },
+                    modifier = Modifier.padding(top = 12.dp)
+                )
+            }
+
             Spacer(Modifier.height(16.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(

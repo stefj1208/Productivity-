@@ -65,13 +65,39 @@ Réglages (roue dentée) → **Temps d'écran & Pacte** → suivre les 4 étapes
 Réaliste, pour être honnête :
 - Le blocage repose sur la détection de l'appli au premier plan : il s'affiche en général en 2 à 5 secondes. Ce n'est pas un verrou inviolable (désinstaller l'app le contourne) — c'est un **pacte**, tenu à deux.
 - La demande de pause part instantanément ; le partenaire la voit à l'ouverture de son application (pas de notification poussée en V2).
-- **IA locale : abandonnée d'un commun accord.** L'analyse de texte intégrée (dates et mots-clés français) couvre la capture. Si un jour vous voulez des résumés rédigés, l'option serait l'API Claude — mais vos données partiraient dans le cloud, à décider ensemble.
+- **IA locale : abandonnée d'un commun accord.** L'analyse de texte intégrée (dates et mots-clés français) couvre la capture sans réseau.
+
+## 4 bis. L'assistant (facultatif)
+
+Tout ce que l'assistant fait a un équivalent **hors ligne, instantané et gratuit** : banque de menus, premiers pas par objectif, répartition des séances, classement des courses par rayon. L'assistant sert au sur-mesure et aux moments de panne d'inspiration.
+
+Il se branche dans Réglages avec **votre propre clé** : une clé Google (aistudio.google.com) ou une clé Anthropic (`sk-ant-…`). L'application reconnaît laquelle toute seule. Désactivé par défaut ; rien ne part du téléphone tant qu'il ne l'est pas.
+
+Où il intervient :
+
+| Écran | Ce qu'il fait | Ce qui sort du téléphone |
+|---|---|---|
+| Objectifs | Bâtit le rythme : séances, durée, moment, jours, première action | L'intitulé de l'objectif |
+| Objectifs | Trois premiers pas concrets | L'intitulé de l'objectif |
+| Revue du dimanche | Propose LA priorité et ce qu'on laisse tomber | Objectifs non privés, notes en attente |
+| Préparer demain | Choisit la priorité du jour et deux tâches | Priorité de la semaine, objectifs non privés, tâches en attente |
+| Capture « + » | Transforme la note en action et choisit le jour | La note seule |
+| Menus | Une semaine sur mesure | Vos contraintes de repas |
+| Courses | Range les articles restés dans « Divers » | Ces articles seuls |
+| Temps d'écran | Propose un pacte tenable d'après l'usage mesuré | Vos moyennes d'écran et l'heure de lever |
+| Santé | Une phrase sur la semaine, un levier à essayer | Vos moyennes de la semaine |
+
+Ce qui ne sort **jamais** : un objectif marqué privé, quoi que ce soit du partenaire, le détail jour par jour de la santé, les identifiants de synchronisation.
+
+Chaque proposition **remplit les champs** — rien n'est enregistré tant que vous n'avez pas validé. Si la clé est refusée, le quota atteint ou le réseau absent, l'application le dit en une phrase et la voie hors ligne reste disponible.
 
 ## 5. Feuille de route
 
 1. ✅ **V1** — semaine, veille, priorité du jour, espace partagé
 2. ✅ **V2** — objectifs clé en main, rituel du matin + réveil, capture GTD + analyse du français, conseils des 6 livres, temps d'écran + Pacte
 3. ✅ **V3** — navigation entre semaines, boussole, conseils visuels, Health Connect + saisies de secours, menus + liste de courses, graphiques 4 semaines
+4. ✅ **V4** — Pacte visible en permanence des deux côtés, couvre-feu, petit-déjeuner dans les menus
+5. ✅ **V5** — assistant facultatif (Google ou Anthropic) branché sur neuf écrans, chaque fois doublé d'une voie hors ligne
 
 ### Sommeil & sport : ce qui marchera vraiment
 Health Connect ne contient **que** ce qu'une montre, un bracelet ou une appli (Samsung Health…) y écrit. Sans source, sommeil et séances resteront à zéro — c'est une limite d'Android, pas de l'application. D'où la saisie de secours dans **Réglages → Sommeil & sport** : deux heures à taper pour la nuit, un bouton `20′ / 30′ / 45′ / 60′` pour une séance. Une mesure automatique n'écrase jamais une saisie manuelle du même jour.

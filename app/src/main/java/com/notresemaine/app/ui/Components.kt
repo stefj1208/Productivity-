@@ -297,3 +297,68 @@ fun DayChips(
         }
     }
 }
+
+/**
+ * Le bouton de l'assistant, identique partout dans l'application : on le reconnaît
+ * du premier coup d'œil, et il dit lui-même quand il travaille.
+ * Un seul geste, une seule touche — pas de menu caché.
+ */
+@Composable
+fun AiButton(
+    text: String,
+    busy: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
+) {
+    androidx.compose.material3.OutlinedButton(
+        onClick = onClick,
+        enabled = enabled && !busy,
+        modifier = modifier
+            .fillMaxWidth()
+            .height(48.dp)
+    ) {
+        Text(if (busy) "L'assistant réfléchit…" else "✨ $text")
+    }
+}
+
+/** Une proposition de l'assistant : on la lit, puis on l'accepte ou on l'ignore. */
+@Composable
+fun AiSuggestion(
+    lines: List<String>,
+    acceptLabel: String,
+    onAccept: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (lines.isEmpty()) return
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = 10.dp)
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+            .padding(horizontal = 16.dp, vertical = 14.dp)
+    ) {
+        lines.forEach { line ->
+            Text(
+                text = line,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(bottom = 4.dp)
+            )
+        }
+        Row(modifier = Modifier.padding(top = 6.dp)) {
+            androidx.compose.material3.OutlinedButton(
+                onClick = onAccept,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp)
+            ) { Text(acceptLabel) }
+            androidx.compose.material3.TextButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .padding(start = 12.dp)
+                    .height(48.dp)
+            ) { Text("Ignorer") }
+        }
+    }
+}

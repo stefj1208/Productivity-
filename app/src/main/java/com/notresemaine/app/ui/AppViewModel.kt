@@ -36,6 +36,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val syncStatus = MutableStateFlow("")
     val aiBusy = MutableStateFlow(false)
     val aiSteps = MutableStateFlow<List<String>>(emptyList())
+    val aiGoalPlan = MutableStateFlow<com.notresemaine.app.ai.Assistant.GoalPlan?>(null)
+    val aiWeekAdvice = MutableStateFlow<com.notresemaine.app.ai.Assistant.WeekAdvice?>(null)
+    val aiDayAdvice = MutableStateFlow<com.notresemaine.app.ai.Assistant.DayAdvice?>(null)
+    val aiPacte = MutableStateFlow<com.notresemaine.app.ai.Assistant.PacteAdvice?>(null)
+    val aiHealthRead = MutableStateFlow("")
 
     private val syncRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
@@ -274,8 +279,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Variante assistée : n'est proposée que si l'assistant Claude est activé. */
-    fun suggestMenusWithAi(weekStart: String, constraints: String) {
+    // ----- L'assistant -----
+    //
+    // Une seule enveloppe pour tous les boutons « ✨ » de l'application : elle vérifie
+    // que l'assistant est prêt, montre l'attente, et transforme une panne en phrase
+    // lisible au lieu d'un plantage. Chaque fonction hors ligne reste disponible à côté.
+
+    private fun runAi(block: suspend (String) -> Unit) {
         viewModelScope.launch {
             val s = repo.settings.current()
             if (!s.aiEnabled || s.aiApiKey.isBlank()) {
@@ -283,34 +293,136 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 return@launch
             }
             aiBusy.value = true
-            runCatching { com.notresemaine.app.ai.Assistant.suggestWeekMenus(s.aiApiKey, constraints) }
-                .onSuccess { suggestions ->
-                    val applied = repo.applyMenuSuggestions(myId(), weekStart, suggestions)
-                    requestSync()
-                    toast(if (applied > 0) "$applied repas proposés ✓" else "Rien à ajouter, la semaine est déjà pleine.")
-                }
-                .onFailure { toast("Assistant indisponible : ${it.message ?: "erreur réseau"}") }
+            runCatching { block(s.aiApiKey) }.onFailure { e ->
+                toast(
+                    if (e is com.notresemaine.app.ai.Ai.AiException) e.message ?: "Assistant indisponible."
+                    else "Assistant indisponible : ${e.message ?: "erreur inconnue"}"
+                )
+            }
             aiBusy.value = false
         }
     }
 
-    fun suggestFirstStepsWithAi(goalTitle: String) {
-        viewModelScope.launch {
-            val s = repo.settings.current()
-            if (!s.aiEnabled || s.aiApiKey.isBlank()) {
-                toast("Active d'abord l'assistant dans Réglages.")
-                return@launch
-            }
-            aiBusy.value = true
-            runCatching { com.notresemaine.app.ai.Assistant.suggestFirstSteps(s.aiApiKey, goalTitle) }
-                .onSuccess { aiSteps.value = it }
-                .onFailure { toast("Assistant indisponible : ${it.message ?: "erreur réseau"}") }
-            aiBusy.value = false
-        }
+    /** Menus sur mesure. Envoie : uniquement vos contraintes de repas. */
+    fun suggestMenusWithAi(weekStart: String, constraints: String) = runAi { key ->
+        val suggestions = com.notresemaine.app.ai.Assistant.suggestWeekMenus(key, constraints)
+        val applied = repo.applyMenuSuggestions(myId(), weekStart, suggestions)
+        requestSync()
+        toast(if (applied > 0) "$applied repas proposés ✓" else "Rien à ajouter, la semaine est déjà pleine.")
+    }
+
+    /** Trois premières actions. Envoie : uniquement l'intitulé de l'objectif. */
+    fun suggestFirstStepsWithAi(goalTitle: String) = runAi { key ->
+        aiSteps.value = com.notresemaine.app.ai.Assistant.suggestFirstSteps(key, goalTitle)
     }
 
     fun clearAiSteps() {
         aiSteps.value = emptyList()
+    }
+
+    /** Rythme complet d'un objectif : séances, durée, moment, jours, première action. */
+    fun suggestGoalPlanWithAi(goalTitle: String, domain: String) = runAi { key ->
+        val plan = com.notresemaine.app.ai.Assistant.suggestGoalPlan(key, goalTitle, domain)
+        if (plan == null) toast("L'assistant n'a pas su proposer de rythme. Réessaie.")
+        aiGoalPlan.value = plan
+    }
+
+    fun clearAiGoalPlan() {
+        aiGoalPlan.value = null
+    }
+
+    /** Priorité de la semaine. Envoie : vos objectifs non privés et vos notes en attente. */
+    fun suggestWeekPriorityWithAi(weekStart: String) = runAi { key ->
+        val advice = com.notresemaine.app.ai.Assistant.suggestWeekPriority(
+            key,
+            goals = repo.goalTitlesForAi(myId()),
+            inbox = repo.inboxTextsForAi(myId())
+        )
+        if (advice == null) toast("L'assistant n'a rien su proposer. Réessaie.")
+        aiWeekAdvice.value = advice
+    }
+
+    fun clearAiWeekAdvice() {
+        aiWeekAdvice.value = null
+    }
+
+    /** Priorité du jour. Envoie : priorité de la semaine, objectifs non privés, tâches en attente. */
+    fun suggestDayWithAi(date: String) = runAi { key ->
+        val weekStart = com.notresemaine.app.data.Dates.weekStartIso(java.time.LocalDate.parse(date))
+        val advice = com.notresemaine.app.ai.Assistant.suggestTomorrow(
+            key,
+            weekPriority = repo.weekPriorityOf(myId(), weekStart),
+            goals = repo.goalTitlesForAi(myId()),
+            backlog = repo.backlogTitlesForAi(myId(), weekStart)
+        )
+        if (advice == null) toast("L'assistant n'a rien su proposer. Réessaie.")
+        aiDayAdvice.value = advice
+    }
+
+    fun clearAiDayAdvice() {
+        aiDayAdvice.value = null
+    }
+
+    /** Capture clarifiée. Envoie : uniquement la note que vous venez d'écrire. */
+    fun captureWithAi(text: String) = runAi { key ->
+        val clarified = com.notresemaine.app.ai.Assistant.clarifyCapture(key, text)
+        if (clarified == null) {
+            // L'assistant n'a pas compris : la capture hors ligne prend le relais.
+            val message = repo.capture(myId(), text)
+            if (message.isNotBlank()) toast(message)
+        } else {
+            val message = repo.applyClarifiedCapture(myId(), clarified.action, clarified.whenLabel)
+            if (message.isNotBlank()) toast("« ${clarified.action} » · $message")
+        }
+        requestSync()
+    }
+
+    /** Rangement des articles restés dans « Divers ». Envoie : uniquement ces articles. */
+    fun sortShoppingWithAi(weekStart: String) = runAi { key ->
+        val labels = repo.unsortedShoppingLabels(weekStart)
+        if (labels.isEmpty()) {
+            toast("Tout est déjà rangé ✓")
+        } else {
+            val aisles = com.notresemaine.app.ai.Assistant.classifyAisles(key, labels)
+            val changed = repo.applyAisles(weekStart, aisles)
+            requestSync()
+            toast(if (changed > 0) "$changed articles rangés ✓" else "Aucun rayon reconnu.")
+        }
+    }
+
+    /** Pacte réaliste. Envoie : uniquement vos moyennes d'écran et votre heure de lever. */
+    fun suggestPacteWithAi() = runAi { key ->
+        val averages = repo.usageAverages(myId())
+        if (averages.days == 0) {
+            toast("Pas encore de relevé : touche « Relever maintenant » d'abord.")
+        } else {
+            val settings = repo.settings.current()
+            val advice = com.notresemaine.app.ai.Assistant.suggestPacte(
+                key, averages.socialMinutes, averages.unlocks, settings.wakeAlarm
+            )
+            if (advice == null) toast("L'assistant n'a rien su proposer. Réessaie.")
+            aiPacte.value = advice
+        }
+    }
+
+    fun clearAiPacte() {
+        aiPacte.value = null
+    }
+
+    /** Lecture de la semaine. Envoie : uniquement vos moyennes, jamais celles de l'autre. */
+    fun readHealthWithAi(weekStart: String) = runAi { key ->
+        val averages = repo.healthAverages(myId(), weekStart)
+        if (averages.days == 0) {
+            toast("Aucune donnée cette semaine.")
+        } else {
+            aiHealthRead.value = com.notresemaine.app.ai.Assistant.readWeek(
+                key, averages.sleepMinutes, averages.steps, averages.exerciseMinutes
+            )
+        }
+    }
+
+    fun clearAiHealthRead() {
+        aiHealthRead.value = ""
     }
 
     fun saveAiSettings(enabled: Boolean, apiKey: String) {

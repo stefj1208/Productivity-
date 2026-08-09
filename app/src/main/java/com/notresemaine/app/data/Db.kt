@@ -363,6 +363,9 @@ interface InboxDao {
     @Query("SELECT * FROM inbox_items WHERE userId = :userId AND processed = 0 AND deleted = 0 ORDER BY updatedAt")
     fun pending(userId: String): Flow<List<InboxItemEntity>>
 
+    @Query("SELECT * FROM inbox_items WHERE userId = :userId AND processed = 0 AND deleted = 0 ORDER BY updatedAt")
+    suspend fun pendingOnce(userId: String): List<InboxItemEntity>
+
     @Query("SELECT COUNT(*) FROM inbox_items WHERE userId = :userId AND processed = 0 AND deleted = 0")
     fun pendingCount(userId: String): Flow<Int>
 
@@ -377,6 +380,9 @@ interface InboxDao {
 interface UsageDao {
     @Query("SELECT * FROM usage_days WHERE date >= :fromDate AND deleted = 0 ORDER BY date")
     fun since(fromDate: String): Flow<List<UsageDayEntity>>
+
+    @Query("SELECT * FROM usage_days WHERE userId = :userId AND date >= :fromDate AND deleted = 0 ORDER BY date")
+    suspend fun sinceOnce(userId: String, fromDate: String): List<UsageDayEntity>
 
     @Query("SELECT * FROM usage_days WHERE id = :id")
     suspend fun byId(id: String): UsageDayEntity?
@@ -446,6 +452,9 @@ interface ShoppingDao {
 interface HealthDao {
     @Query("SELECT * FROM health_days WHERE date >= :fromDate AND deleted = 0 ORDER BY date")
     fun since(fromDate: String): Flow<List<HealthDayEntity>>
+
+    @Query("SELECT * FROM health_days WHERE userId = :userId AND date >= :fromDate AND date <= :toDate AND deleted = 0 ORDER BY date")
+    suspend fun betweenOnce(userId: String, fromDate: String, toDate: String): List<HealthDayEntity>
 
     @Query("SELECT * FROM health_days WHERE id = :id")
     suspend fun byId(id: String): HealthDayEntity?

@@ -14,6 +14,9 @@ object Dates {
     fun todayIso(): String = today().format(ISO)
     fun tomorrowIso(): String = today().plusDays(1).format(ISO)
 
+    /** Date d'il y a [days] jours, pour calculer des moyennes récentes. */
+    fun daysAgoIso(days: Long): String = today().minusDays(days).format(ISO)
+
     /** Lundi de la semaine contenant [date]. */
     fun weekStart(date: LocalDate = today()): LocalDate =
         date.with(DayOfWeek.MONDAY)
