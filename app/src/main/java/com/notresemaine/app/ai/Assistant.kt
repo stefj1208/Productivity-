@@ -25,8 +25,9 @@ object Assistant {
     private fun client(apiKey: String): AnthropicClient =
         AnthropicOkHttpClient.builder().apiKey(apiKey).build()
 
-    private fun ask(apiKey: String, system: String, prompt: String): String =
-        client(apiKey).use { client ->
+    private fun ask(apiKey: String, system: String, prompt: String): String {
+        val client = client(apiKey)
+        try {
             val params = MessageCreateParams.builder()
                 .model(MODEL)
                 .maxTokens(16000L)
@@ -40,11 +41,19 @@ object Assistant {
             if (response.stopReason().map { it.toString() }.orElse("") == "refusal") {
                 throw AiException("Demande refusée par le modèle. Reformulez ou passez par les idées hors ligne.")
             }
-            response.content()
-                .mapNotNull { block -> block.text().orElse(null)?.text() }
-                .joinToString("\n")
-                .trim()
+            val out = StringBuilder()
+            for (block in response.content()) {
+                val text = block.text()
+                if (text.isPresent) {
+                    if (out.isNotEmpty()) out.append('\n')
+                    out.append(text.get().text())
+                }
+            }
+            return out.toString().trim()
+        } finally {
+            client.close()
         }
+    }
 
     // ----- Menus -----
 
