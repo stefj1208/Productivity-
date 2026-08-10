@@ -38,18 +38,26 @@ Ces deux informations ne sont **pas** des secrets dangereux : la clé « anon »
 
 ## Étape 5 — Dans l'application, sur CHAQUE téléphone
 
-1. Onglet **Réglages** → section **Synchronisation**.
-2. Collez l'adresse du projet et la clé « anon public » → **Enregistrer la configuration**.
-3. Créez chacun **votre propre compte** : votre e-mail + un mot de passe (8 caractères minimum) → **Créer le compte**.
+1. Onglet **Moi** (dernier onglet, en bas à droite) → tuile **☁️ Synchronisation**.
+2. L'écran affiche « Étape 1 sur 3 ». Collez l'adresse du projet et la clé « anon public » → **Enregistrer la configuration**.
+3. L'écran passe à « Étape 2 sur 3 ». Créez chacun **votre propre compte** : votre e-mail + un mot de passe (8 caractères minimum) → **Créer le compte**.
+
+> Chacun crée un compte **différent**, sur son propre téléphone. Ce ne sont pas des comptes partagés.
 
 ## Étape 6 — Relier les deux comptes
 
+L'écran affiche maintenant « Étape 3 sur 3 ».
+
 1. Sur le **premier** téléphone : **Créer notre espace couple** → un code à 6 caractères s'affiche.
 2. Sur le **second** téléphone : saisissez ce code → **Rejoindre**.
-3. Touchez **Synchroniser maintenant** sur les deux téléphones. L'onglet **Nous** affiche désormais vos deux semaines.
+3. Touchez **Synchroniser maintenant** sur les deux téléphones.
+
+C'est terminé quand la tuile **☁️ Synchronisation** de l'onglet **Moi** affiche « Reliée ✓ » avec votre e-mail. L'onglet **Nous** montre alors vos deux semaines côte à côte.
 
 ## En cas de problème
 
 - « Vérifiez que la confirmation d'e-mail est désactivée » → refaites l'étape 3, puis réessayez **Se connecter**.
+- **Rien n'apparaît dans l'onglet Nous** → les deux téléphones doivent avoir le **même code d'espace couple**. Comparez-le sur les deux : onglet **Moi** → **Synchronisation**.
+- **Vous avez déjà installé une version précédente de l'application** → rejouez `supabase/schema.sql` en entier après chaque mise à jour qui le mentionne. Le script est fait pour être relancé sans risque : il ne détruit aucune donnée.
 - « Code inconnu » → le code a 6 caractères, sans espaces ; recréez-en un au besoin sur le premier téléphone.
 - La synchronisation se fait automatiquement à l'ouverture de l'application, quelques secondes après chaque modification, et environ une fois par heure en arrière-plan. Hors connexion, tout est conservé sur le téléphone et envoyé au retour du réseau.
