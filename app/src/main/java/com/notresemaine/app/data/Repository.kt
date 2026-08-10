@@ -85,6 +85,51 @@ class Repository private constructor(context: Context) {
         )
     }
 
+    /** Réserve un créneau : une tâche sans heure reste une intention, pas un rendez-vous. */
+    suspend fun setTaskSlot(taskId: String, startTime: String, durationMinutes: Int) {
+        val t = db.tasks().byId(taskId) ?: return
+        val clean = if (Dates.isValidTime(startTime)) startTime else ""
+        db.tasks().upsert(
+            t.copy(
+                startTime = clean,
+                durationMinutes = if (clean.isBlank()) 0 else durationMinutes.coerceIn(5, 480),
+                updatedAt = now()
+            )
+        )
+    }
+
+    // ----- Finance et enfants : ce qui se gère à deux -----
+
+    suspend fun saveHouseItem(
+        id: String?, section: String, title: String,
+        detail: String, amount: Double, dueDate: String?
+    ) {
+        if (title.isBlank()) return
+        val existing = id?.let { db.houseItems().byId(it) }
+        db.houseItems().upsert(
+            HouseItemEntity(
+                id = existing?.id ?: UUID.randomUUID().toString(),
+                section = section,
+                title = title.trim(),
+                detail = detail.trim(),
+                amount = amount,
+                dueDate = dueDate?.ifBlank { null },
+                done = existing?.done ?: false,
+                updatedAt = now()
+            )
+        )
+    }
+
+    suspend fun toggleHouseItem(id: String) {
+        val item = db.houseItems().byId(id) ?: return
+        db.houseItems().upsert(item.copy(done = !item.done, updatedAt = now()))
+    }
+
+    suspend fun deleteHouseItem(id: String) {
+        val item = db.houseItems().byId(id) ?: return
+        db.houseItems().upsert(item.copy(deleted = true, updatedAt = now()))
+    }
+
     suspend fun assignTaskToDay(taskId: String, date: String?) {
         val t = db.tasks().byId(taskId) ?: return
         if (date != null && !t.isSport && db.tasks().countForDay(t.userId, date) >= MAX_TASKS_PER_DAY) return

@@ -10,6 +10,7 @@ import com.notresemaine.app.data.ProfileEntity
 import com.notresemaine.app.data.ShoppingItemEntity
 import com.notresemaine.app.data.Repository
 import com.notresemaine.app.data.RitualLogEntity
+import com.notresemaine.app.data.HouseItemEntity
 import com.notresemaine.app.data.TaskEntity
 import com.notresemaine.app.data.UsageDayEntity
 import com.notresemaine.app.data.WeekPlanEntity
@@ -40,6 +41,8 @@ data class TaskDto(
     val date: String? = null,
     @SerialName("week_start") val weekStart: String? = null,
     @SerialName("assigned_by") val assignedBy: String = "",
+    @SerialName("start_time") val startTime: String = "",
+    @SerialName("duration_minutes") val durationMinutes: Int = 0,
     @SerialName("is_priority") val isPriority: Boolean = false,
     @SerialName("is_sport") val isSport: Boolean = false,
     @SerialName("goal_id") val goalId: String? = null,
@@ -61,6 +64,19 @@ data class GoalDto(
     @SerialName("next_action") val nextAction: String,
     @SerialName("is_private") val isPrivate: Boolean = false,
     val active: Boolean = true,
+    val deleted: Boolean = false,
+    @SerialName("updated_at") val updatedAt: Long
+)
+
+@Serializable
+data class HouseItemDto(
+    val id: String,
+    val section: String,
+    val title: String,
+    val detail: String = "",
+    val amount: Double = 0.0,
+    @SerialName("due_date") val dueDate: String? = null,
+    val done: Boolean = false,
     val deleted: Boolean = false,
     @SerialName("updated_at") val updatedAt: Long
 )
@@ -377,7 +393,7 @@ class SyncManager(private val repo: Repository) {
                 // Envoi : uniquement mes lignes modifiées depuis le dernier envoi.
                 val tasks = db.tasks().modifiedSince(s.lastPushTs).filter { it.userId == myId }
                 api.upsert("tasks", token, tasks.map {
-                    TaskDto(it.id, it.userId, it.title, it.date, it.weekStart, it.assignedBy, it.isPriority, it.isSport, it.goalId, it.done, it.deleted, it.updatedAt)
+                    TaskDto(it.id, it.userId, it.title, it.date, it.weekStart, it.assignedBy, it.startTime, it.durationMinutes, it.isPriority, it.isSport, it.goalId, it.done, it.deleted, it.updatedAt)
                 }, TaskDto.serializer())
 
                 val goals = db.goals().modifiedSince(s.lastPushTs).filter { it.userId == myId }
@@ -402,6 +418,11 @@ class SyncManager(private val repo: Repository) {
                 }, GraceRequestDto.serializer())
 
                 // Menus et courses sont communs au couple : on envoie tout ce qui a changé ici.
+                val houseItems = db.houseItems().modifiedSince(s.lastPushTs)
+                api.upsert("house_items", token, houseItems.map {
+                    HouseItemDto(it.id, it.section, it.title, it.detail, it.amount, it.dueDate, it.done, it.deleted, it.updatedAt)
+                }, HouseItemDto.serializer())
+
                 val meals = db.meals().modifiedSince(s.lastPushTs)
                 api.upsert("meals", token, meals.map {
                     MealDto(it.id, myId, it.date, it.slot, it.title, it.ingredients, it.deleted, it.updatedAt)
@@ -444,6 +465,7 @@ class SyncManager(private val repo: Repository) {
                         ritualLogs.map { it.updatedAt } + usageDays.map { it.updatedAt } +
                         graces.map { it.updatedAt } + meals.map { it.updatedAt } +
                         shopping.map { it.updatedAt } + healthDays.map { it.updatedAt } +
+                        houseItems.map { it.updatedAt } +
                         s.lastPushTs).max()
 
                 // Réception : tout ce qui a changé dans le couple ; la ligne la plus récente gagne.
@@ -453,7 +475,7 @@ class SyncManager(private val repo: Repository) {
                     pullMark = maxOf(pullMark, dto.updatedAt)
                     val local = db.tasks().byId(dto.id)
                     if (local == null || dto.updatedAt > local.updatedAt) {
-                        db.tasks().upsert(TaskEntity(dto.id, dto.userId, dto.title, dto.date, dto.weekStart, dto.isPriority, dto.isSport, dto.goalId, dto.done, dto.assignedBy, dto.deleted, dto.updatedAt))
+                        db.tasks().upsert(TaskEntity(dto.id, dto.userId, dto.title, dto.date, dto.weekStart, dto.isPriority, dto.isSport, dto.goalId, dto.done, dto.assignedBy, dto.startTime, dto.durationMinutes, dto.deleted, dto.updatedAt))
                     }
                 }
                 api.select("goals", token, s.lastPullTs, GoalDto.serializer()).forEach { dto ->
@@ -484,6 +506,14 @@ class SyncManager(private val repo: Repository) {
                     val local = db.grace().byId(dto.id)
                     if (local == null || dto.updatedAt > local.updatedAt) {
                         db.grace().upsert(GraceRequestEntity(dto.id, dto.fromUser, dto.toUser, dto.date, dto.minutes, dto.status, dto.deleted, dto.updatedAt))
+                    }
+                }
+                api.select("house_items", token, s.lastPullTs, HouseItemDto.serializer()).forEach { dto ->
+                    pullMark = maxOf(pullMark, dto.updatedAt)
+                    val local = db.houseItems().byId(dto.id)
+                    if (local == null || dto.updatedAt > local.updatedAt) {
+                        db.houseItems().upsert(HouseItemEntity(dto.id, dto.section, dto.title, dto.detail,
+                            dto.amount, dto.dueDate, dto.done, dto.deleted, dto.updatedAt))
                     }
                 }
                 api.select("meals", token, s.lastPullTs, MealDto.serializer()).forEach { dto ->

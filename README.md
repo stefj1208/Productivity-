@@ -103,6 +103,7 @@ Chaque proposition **remplit les champs** — rien n'est enregistré tant que vo
 8. ✅ **V7.1** — passage « Don't Make Me Think » : retour en haut à gauche sur tous les écrans, moitié des mots supprimée, champs de saisie qui vont à la ligne
 9. ✅ **V8** — « Aujourd'hui » devient **Planning** (récap jour + semaine + raccourcis + bouton Planifier la semaine) ; **modifier et supprimer** ajoutés sur les tâches, les objectifs, les repas et les courses
 10. ✅ **V8.1** — **confier une tâche à l'autre**, écran **Mes performances** (KPI + graphiques), grille de 8 raccourcis en symboles, « Préparer demain » accessible à tout moment, adresse Supabase corrigeable et nettoyée automatiquement
+11. ✅ **V9** — **créneaux horaires** sur les tâches (avec rappel à l'heure dite), **vue de la journée heure par heure**, onglets **Finance** et **Enfants** dans Maison, tâches confiées visibles dans Maison
 
 ### Sommeil & sport : ce qui marchera vraiment
 Health Connect ne contient **que** ce qu'une montre, un bracelet ou une appli (Samsung Health…) y écrit. Sans source, sommeil et séances resteront à zéro — c'est une limite d'Android, pas de l'application. D'où la saisie de secours dans **Réglages → Sommeil & sport** : deux heures à taper pour la nuit, un bouton `20′ / 30′ / 45′ / 60′` pour une séance. Une mesure automatique n'écrase jamais une saisie manuelle du même jour.

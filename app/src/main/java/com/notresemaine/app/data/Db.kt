@@ -23,6 +23,26 @@ data class TaskEntity(
     val goalId: String? = null, // séance générée par un objectif
     val done: Boolean = false,
     val assignedBy: String = "", // identifiant de celui qui a confié la tâche, sinon vide
+    val startTime: String = "",  // HH:MM ; vide = pas de créneau réservé
+    val durationMinutes: Int = 0,
+    val deleted: Boolean = false,
+    val updatedAt: Long
+)
+
+/**
+ * Ce qui se gère à deux, hors repas : l'argent et les enfants.
+ * Une seule table, une colonne [section], parce que ce sont les mêmes gestes —
+ * noter, dater, cocher — appliqués à deux sujets différents.
+ */
+@Entity(tableName = "house_items")
+data class HouseItemEntity(
+    @PrimaryKey val id: String,
+    val section: String,          // finance | enfants
+    val title: String,
+    val detail: String = "",
+    val amount: Double = 0.0,     // montant pour la finance ; 0 = sans montant
+    val dueDate: String? = null,  // yyyy-MM-dd
+    val done: Boolean = false,
     val deleted: Boolean = false,
     val updatedAt: Long
 )
@@ -450,6 +470,21 @@ interface ShoppingDao {
 }
 
 @Dao
+interface HouseItemDao {
+    @Query("SELECT * FROM house_items WHERE section = :section AND deleted = 0 ORDER BY done, dueDate, updatedAt DESC")
+    fun bySection(section: String): Flow<List<HouseItemEntity>>
+
+    @Query("SELECT * FROM house_items WHERE id = :id")
+    suspend fun byId(id: String): HouseItemEntity?
+
+    @Query("SELECT * FROM house_items WHERE updatedAt > :ts")
+    suspend fun modifiedSince(ts: Long): List<HouseItemEntity>
+
+    @Upsert
+    suspend fun upsert(item: HouseItemEntity)
+}
+
+@Dao
 interface HealthDao {
     @Query("SELECT * FROM health_days WHERE date >= :fromDate AND deleted = 0 ORDER BY date")
     fun since(fromDate: String): Flow<List<HealthDayEntity>>
@@ -473,9 +508,10 @@ interface HealthDao {
         ProfileEntity::class, EncouragementEntity::class,
         GoalEntity::class, RitualStepEntity::class, RitualLogEntity::class,
         InboxItemEntity::class, UsageDayEntity::class, GraceRequestEntity::class,
-        MealEntity::class, ShoppingItemEntity::class, HealthDayEntity::class
+        MealEntity::class, ShoppingItemEntity::class, HealthDayEntity::class,
+        HouseItemEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class AppDb : RoomDatabase() {
@@ -492,6 +528,7 @@ abstract class AppDb : RoomDatabase() {
     abstract fun meals(): MealDao
     abstract fun shopping(): ShoppingDao
     abstract fun health(): HealthDao
+    abstract fun houseItems(): HouseItemDao
 
     companion object {
         @Volatile private var instance: AppDb? = null

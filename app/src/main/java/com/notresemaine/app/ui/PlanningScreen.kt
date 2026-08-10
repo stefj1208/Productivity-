@@ -53,6 +53,7 @@ fun PlanningScreen(
     vm: AppViewModel,
     settings: AppSettings,
     onPrepare: (String) -> Unit,
+    onDay: (String) -> Unit,
     onRitual: () -> Unit,
     onGoals: () -> Unit,
     onReview: (String) -> Unit,
@@ -103,10 +104,17 @@ fun PlanningScreen(
     val partner = profiles.firstOrNull { it.id != myId }
     val partnerName = partner?.name
 
-    fun noteFor(task: TaskEntity): String? =
-        if (task.assignedBy.isNotBlank() && task.assignedBy != myId)
-            "↗ confiée par ${partnerName ?: "l'autre"}"
-        else null
+    fun noteFor(task: TaskEntity): String? {
+        val parts = buildList {
+            if (task.startTime.isNotBlank()) {
+                add("🕐 ${task.startTime}" + if (task.durationMinutes > 0) " · ${task.durationMinutes} min" else "")
+            }
+            if (task.assignedBy.isNotBlank() && task.assignedBy != myId) {
+                add("↗ confiée par ${partnerName ?: "l'autre"}")
+            }
+        }
+        return parts.joinToString(" · ").ifBlank { null }
+    }
 
     val priority = tasks.firstOrNull { it.isPriority }
     val others = tasks.filter { !it.isPriority }
@@ -258,14 +266,27 @@ fun PlanningScreen(
                     val dayTasks = weekTasks.filter { it.date == day }
                     dayTasks.count { it.done } to dayTasks.size
                 },
-                onDay = { day -> onPrepare(day) }
+                onDay = { day -> onDay(day) }
             )
-            Text(
-                text = "Touchez un jour pour l'ouvrir.",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 6.dp)
-            )
+            Row(
+                modifier = Modifier.padding(top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Touchez un jour pour voir son déroulé.",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(
+                    onClick = {
+                        // La semaine affichée n'est pas toujours la semaine en cours.
+                        val target = if (Dates.daysOfWeek(weekStart).contains(today)) today
+                        else Dates.daysOfWeek(weekStart).first()
+                        onPrepare(target)
+                    }
+                ) { Text("✏️ Modifier") }
+            }
 
             val unassigned = weekTasks.filter { it.date == null }
             if (unassigned.isNotEmpty()) {

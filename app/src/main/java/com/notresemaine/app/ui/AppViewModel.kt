@@ -108,6 +108,31 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Réserve un créneau et reprogramme les rappels : la tâche devient un rendez-vous. */
+    fun setTaskSlot(taskId: String, startTime: String, durationMinutes: Int) {
+        viewModelScope.launch {
+            repo.setTaskSlot(taskId, startTime, durationMinutes)
+            Alarms.rescheduleAll(getApplication())
+            requestSync()
+        }
+    }
+
+    fun saveHouseItem(id: String?, section: String, title: String, detail: String, amount: Double, dueDate: String?) {
+        viewModelScope.launch {
+            repo.saveHouseItem(id, section, title, detail, amount, dueDate)
+            requestSync()
+            toast("Enregistré ✓")
+        }
+    }
+
+    fun toggleHouseItem(id: String) {
+        viewModelScope.launch { repo.toggleHouseItem(id); requestSync() }
+    }
+
+    fun deleteHouseItem(id: String) {
+        viewModelScope.launch { repo.deleteHouseItem(id); requestSync() }
+    }
+
     fun assignTaskToDay(taskId: String, date: String?) {
         viewModelScope.launch { repo.assignTaskToDay(taskId, date); requestSync() }
     }

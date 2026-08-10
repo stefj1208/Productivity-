@@ -163,6 +163,22 @@ alter table tasks add column if not exists goal_id text;
 
 -- Réglages du Pacte, partagés dans le couple (V4)
 alter table tasks add column if not exists assigned_by text not null default '';
+alter table tasks add column if not exists start_time text not null default '';
+alter table tasks add column if not exists duration_minutes int not null default 0;
+
+-- Finance et enfants : ce qui se gère à deux, hors repas.
+create table if not exists house_items (
+  id text primary key,
+  couple_id uuid references couples(id) on delete cascade,
+  section text not null,
+  title text not null,
+  detail text not null default '',
+  amount double precision not null default 0,
+  due_date text,
+  done boolean not null default false,
+  deleted boolean not null default false,
+  updated_at bigint not null
+);
 alter table profiles add column if not exists pacte_enabled boolean not null default false;
 alter table profiles add column if not exists daily_limit_minutes int not null default 45;
 alter table profiles add column if not exists curfew_enabled boolean not null default false;
@@ -284,6 +300,22 @@ drop policy if exists usage_days_update on usage_days;
 drop policy if exists grace_select on grace_requests;
 drop policy if exists grace_insert on grace_requests;
 drop policy if exists grace_update on grace_requests;
+alter table house_items enable row level security;
+
+drop trigger if exists house_items_couple on house_items;
+create trigger house_items_couple before insert or update on house_items
+  for each row execute function stamp_couple();
+
+drop policy if exists house_items_select on house_items;
+create policy house_items_select on house_items for select
+  using (couple_id = my_couple());
+drop policy if exists house_items_insert on house_items;
+create policy house_items_insert on house_items for insert
+  with check (true);
+drop policy if exists house_items_update on house_items;
+create policy house_items_update on house_items for update
+  using (couple_id = my_couple());
+
 drop policy if exists meals_select on meals;
 drop policy if exists meals_insert on meals;
 drop policy if exists meals_update on meals;

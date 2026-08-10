@@ -93,7 +93,21 @@ object Alarms {
         val hasRitual = settings.myUserId.isNotBlank() &&
             repo.db.ritual().stepsOnce(settings.myUserId).any { it.enabled }
 
-        val alerts = upcoming(settings, goals.map { it.title to (it.preferredTime to it.preferredDays) }, hasRitual)
+        // Les tâches à créneau : un rendez-vous qu'on s'est fixé mérite le même
+        // rappel qu'une séance d'objectif.
+        val slots = if (settings.myUserId.isBlank()) emptyList()
+        else listOf(Dates.todayIso(), Dates.tomorrowIso()).flatMap { date ->
+            repo.db.tasks().byDateOnce(settings.myUserId, date)
+                .filter { it.startTime.isNotBlank() && !it.done }
+                .map { Triple(date, it.startTime, it.title) }
+        }
+
+        val alerts = upcoming(
+            settings,
+            goals.map { it.title to (it.preferredTime to it.preferredDays) },
+            hasRitual,
+            taskSlots = slots
+        )
         alerts.take(MAX_SCHEDULED).forEachIndexed { index, alert ->
             scheduleOne(context, FIRST_REQUEST_CODE + index, alert, settings.alertSound)
         }
@@ -107,6 +121,7 @@ object Alarms {
         settings: AppSettings,
         goals: List<Pair<String, Pair<String, String>>>,
         hasRitual: Boolean,
+        taskSlots: List<Triple<String, String, String>> = emptyList(), // date, HH:MM, intitulé
         now: LocalDateTime = LocalDateTime.now()
     ): List<Alert> {
         val alerts = mutableListOf<Alert>()
@@ -155,6 +170,11 @@ object Alarms {
                     )
                 }
             }
+        }
+        // Les tâches portent leur propre date : on les ajoute telles quelles.
+        taskSlots.forEach { (date, time, title) ->
+            val day = runCatching { LocalDate.parse(date) }.getOrNull() ?: return@forEach
+            add(day, parseTime(time), "✅", title, "C'est le créneau que tu t'es réservé.")
         }
         return alerts.sortedBy { it.at }
     }

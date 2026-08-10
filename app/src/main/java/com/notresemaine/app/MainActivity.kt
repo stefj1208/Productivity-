@@ -59,6 +59,7 @@ import com.notresemaine.app.ui.MeScreen
 import com.notresemaine.app.ui.ProfileScreen
 import com.notresemaine.app.ui.RemindersScreen
 import com.notresemaine.app.ui.SyncScreen
+import com.notresemaine.app.ui.DayScreen
 import com.notresemaine.app.ui.PerformanceScreen
 import com.notresemaine.app.ui.PlanningScreen
 import com.notresemaine.app.ui.UsScreen
@@ -155,6 +156,7 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings) {
                 PlanningScreen(
                     vm, settings,
                     onPrepare = { date -> navController.navigate("prepare/$date") },
+                    onDay = { date -> navController.navigate("day/$date") },
                     onRitual = { navController.navigate("ritual") },
                     onGoals = { navController.navigate("goals") },
                     onReview = { week -> navController.navigate("review/$week") },
@@ -196,6 +198,14 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings) {
                     onMethod = { navController.navigate("method") },
                     onSync = { navController.navigate("sync") },
                     onProfile = { navController.navigate("profile") }
+                )
+            }
+            composable("day/{date}") { entry ->
+                val date = entry.arguments?.getString("date") ?: com.notresemaine.app.data.Dates.todayIso()
+                DayScreen(
+                    vm, settings, date,
+                    onPrepare = { d -> navController.navigate("prepare/$d") },
+                    onBack = { navController.popBackStack() }
                 )
             }
             composable("performance") {
