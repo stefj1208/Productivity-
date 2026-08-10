@@ -56,6 +56,13 @@ class Repository private constructor(context: Context) {
         db.tasks().upsert(t.copy(done = !t.done, updatedAt = now()))
     }
 
+    /** Renomme une tâche existante sans en créer une nouvelle. */
+    suspend fun renameTask(taskId: String, title: String) {
+        val t = db.tasks().byId(taskId) ?: return
+        if (title.isBlank()) return
+        db.tasks().upsert(t.copy(title = title.trim(), updatedAt = now()))
+    }
+
     suspend fun deleteTask(taskId: String) {
         val t = db.tasks().byId(taskId) ?: return
         db.tasks().upsert(t.copy(deleted = true, updatedAt = now()))
@@ -228,6 +235,26 @@ class Repository private constructor(context: Context) {
             )
         )
         return true
+    }
+
+    /** Modifie un objectif existant : le rythme change, l'historique reste. */
+    suspend fun updateGoal(
+        goalId: String, title: String, sessionsPerWeek: Int, minutesPerSession: Int,
+        preferredTime: String, preferredDays: List<Int>, nextAction: String, isPrivate: Boolean
+    ) {
+        val g = db.goals().byId(goalId) ?: return
+        db.goals().upsert(
+            g.copy(
+                title = title.trim(),
+                sessionsPerWeek = sessionsPerWeek.coerceIn(1, 7),
+                minutesPerSession = minutesPerSession.coerceIn(5, 180),
+                preferredTime = preferredTime,
+                preferredDays = preferredDays.joinToString(","),
+                nextAction = nextAction.trim(),
+                isPrivate = isPrivate,
+                updatedAt = now()
+            )
+        )
     }
 
     suspend fun setGoalActive(goalId: String, active: Boolean) {
@@ -525,6 +552,11 @@ class Repository private constructor(context: Context) {
                 updatedAt = now()
             )
         )
+    }
+
+    suspend fun deleteShoppingItem(itemId: String) {
+        val item = db.shopping().byId(itemId) ?: return
+        db.shopping().upsert(item.copy(deleted = true, updatedAt = now()))
     }
 
     suspend fun toggleShoppingItem(itemId: String) {

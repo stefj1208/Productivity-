@@ -150,6 +150,14 @@ private fun MealEditor(
             if (dirty) {
                 TextButton(onClick = { onSave(titleText, ingredientsText) }) { Text("Enregistrer") }
             }
+            if (title.isNotBlank() && !dirty) {
+                TextButton(onClick = { onSave("", "") }) {
+                    Text(
+                        text = "🗑",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
         OutlinedTextField(
             value = titleText,

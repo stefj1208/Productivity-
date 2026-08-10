@@ -49,17 +49,26 @@ fun GoalsScreen(vm: AppViewModel, settings: AppSettings) {
     val profiles by remember { vm.repo.db.profiles().all() }.collectAsState(initial = emptyList())
 
     var wizardTemplate by remember { mutableStateOf<GoalTemplate?>(null) }
+    var editingGoal by remember { mutableStateOf<GoalEntity?>(null) }
 
+    val goalToEdit = editingGoal
     val template = wizardTemplate
-    if (template != null) {
+    if (template != null || goalToEdit != null) {
+        // En modification, on reprend le gabarit du domaine pour ses conseils,
+        // mais toutes les valeurs affichées viennent de l'objectif existant.
+        val base = template
+            ?: GoalTemplates.all.firstOrNull { it.domain == goalToEdit?.domain }
+            ?: GoalTemplates.all.last()
         GoalWizard(
             vm = vm,
-            template = template,
+            template = base,
+            existing = goalToEdit,
             aiAvailable = settings.aiEnabled && settings.aiApiKey.isNotBlank(),
             onClose = {
                 vm.clearAiSteps()
                 vm.clearAiGoalPlan()
                 wizardTemplate = null
+                editingGoal = null
             }
         )
         return
@@ -98,6 +107,7 @@ fun GoalsScreen(vm: AppViewModel, settings: AppSettings) {
                     doneThisWeek = weekTasks.count { it.goalId == goal.id && it.done },
                     accentRole = settings.myColor,
                     onToggle = { vm.setGoalActive(goal.id, !goal.active) },
+                    onEdit = { editingGoal = goal },
                     onDelete = { vm.deleteGoal(goal.id) }
                 )
             }
@@ -115,6 +125,7 @@ fun GoalsScreen(vm: AppViewModel, settings: AppSettings) {
                     doneThisWeek = weekTasks.count { it.goalId == goal.id && it.done },
                     accentRole = if (settings.myColor == "A") "B" else "A",
                     onToggle = null,
+                    onEdit = null,
                     onDelete = null
                 )
             }
@@ -150,8 +161,10 @@ private fun GoalCard(
     doneThisWeek: Int,
     accentRole: String,
     onToggle: (() -> Unit)?,
+    onEdit: (() -> Unit)?,
     onDelete: (() -> Unit)?
 ) {
+    var confirmDelete by remember { mutableStateOf(false) }
     val accent = accentFor(accentRole)
     Column(modifier = Modifier.padding(vertical = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -196,8 +209,22 @@ private fun GoalCard(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp)
         )
-        if (onDelete != null) {
-            TextButton(onClick = onDelete) { Text("Retirer cet objectif") }
+        // Modifier et supprimer, visibles : rien ne se cache derrière un appui long.
+        Row {
+            if (onEdit != null) {
+                TextButton(onClick = onEdit) { Text("✏️ Modifier") }
+            }
+            if (onDelete != null) {
+                TextButton(
+                    onClick = { if (confirmDelete) onDelete() else confirmDelete = true }
+                ) {
+                    Text(
+                        text = if (confirmDelete) "Confirmer" else "🗑 Supprimer",
+                        color = if (confirmDelete) MaterialTheme.colorScheme.secondary
+                        else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
     }
 }
@@ -207,19 +234,38 @@ private fun GoalCard(
 private fun GoalWizard(
     vm: AppViewModel,
     template: GoalTemplate,
+    existing: GoalEntity?,
     aiAvailable: Boolean,
     onClose: () -> Unit
 ) {
     val aiBusy by vm.aiBusy.collectAsState()
     val aiSteps by vm.aiSteps.collectAsState()
     val aiPlan by vm.aiGoalPlan.collectAsState()
-    var title by remember { mutableStateOf(if (template.title == "Objectif libre") "" else template.title) }
-    var sessions by remember { mutableStateOf(template.sessionsPerWeek.toString()) }
-    var minutes by remember { mutableStateOf(template.minutesPerSession.toString()) }
-    var time by remember { mutableStateOf(template.preferredTime) }
-    var days by remember { mutableStateOf(template.preferredDays.toSet()) }
-    var nextAction by remember { mutableStateOf(template.nextActionSuggestion) }
-    var isPrivate by remember { mutableStateOf(false) }
+    var title by remember {
+        mutableStateOf(
+            existing?.title
+                ?: if (template.title == "Objectif libre") "" else template.title
+        )
+    }
+    var sessions by remember {
+        mutableStateOf((existing?.sessionsPerWeek ?: template.sessionsPerWeek).toString())
+    }
+    var minutes by remember {
+        mutableStateOf((existing?.minutesPerSession ?: template.minutesPerSession).toString())
+    }
+    var time by remember { mutableStateOf(existing?.preferredTime ?: template.preferredTime) }
+    var days by remember {
+        mutableStateOf(
+            existing?.preferredDays
+                ?.split(",")?.mapNotNull { it.trim().toIntOrNull() }?.toSet()
+                ?.ifEmpty { template.preferredDays.toSet() }
+                ?: template.preferredDays.toSet()
+        )
+    }
+    var nextAction by remember {
+        mutableStateOf(existing?.nextAction ?: template.nextActionSuggestion)
+    }
+    var isPrivate by remember { mutableStateOf(existing?.isPrivate ?: false) }
 
     val dayLabels = listOf(1 to "L", 2 to "M", 3 to "M", 4 to "J", 5 to "V", 6 to "S", 7 to "D")
 
@@ -246,12 +292,11 @@ private fun GoalWizard(
                 .verticalScroll(rememberScrollState())
         ) {
             Spacer(Modifier.height(20.dp))
-            Text("${template.emoji} Nouvel objectif", style = MaterialTheme.typography.titleLarge)
-            Text(
-                text = template.why,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 6.dp)
+            ScreenHeader(
+                title = "${template.emoji} " +
+                    if (existing != null) "Modifier l'objectif" else "Nouvel objectif",
+                subtitle = template.why,
+                onBack = onClose
             )
 
             Spacer(Modifier.height(16.dp))
@@ -377,22 +422,34 @@ private fun GoalWizard(
             Spacer(Modifier.height(16.dp))
         }
 
-        TextButton(onClick = onClose) { Text("Annuler") }
         BigButton(
-            text = "Créer l'objectif",
+            text = if (existing != null) "Enregistrer" else "Créer l'objectif",
             enabled = title.isNotBlank() && days.isNotEmpty()
                 && sessions.toIntOrNull() != null && minutes.toIntOrNull() != null,
             onClick = {
-                vm.addGoal(
-                    title = title,
-                    domain = template.domain,
-                    sessionsPerWeek = sessions.toIntOrNull() ?: 3,
-                    minutesPerSession = minutes.toIntOrNull() ?: 30,
-                    preferredTime = time,
-                    preferredDays = days.sorted(),
-                    nextAction = nextAction,
-                    isPrivate = isPrivate
-                )
+                if (existing != null) {
+                    vm.updateGoal(
+                        goalId = existing.id,
+                        title = title,
+                        sessionsPerWeek = sessions.toIntOrNull() ?: 3,
+                        minutesPerSession = minutes.toIntOrNull() ?: 30,
+                        preferredTime = time,
+                        preferredDays = days.sorted(),
+                        nextAction = nextAction,
+                        isPrivate = isPrivate
+                    )
+                } else {
+                    vm.addGoal(
+                        title = title,
+                        domain = template.domain,
+                        sessionsPerWeek = sessions.toIntOrNull() ?: 3,
+                        minutesPerSession = minutes.toIntOrNull() ?: 30,
+                        preferredTime = time,
+                        preferredDays = days.sorted(),
+                        nextAction = nextAction,
+                        isPrivate = isPrivate
+                    )
+                }
                 onClose()
             },
             modifier = Modifier.padding(bottom = 16.dp)

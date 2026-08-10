@@ -109,24 +109,43 @@ fun ShoppingScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .defaultMinSize(minHeight = 48.dp)
-                            .clickable { vm.toggleShoppingItem(item.id) }
-                            .padding(vertical = 6.dp),
+                            .defaultMinSize(minHeight = 48.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = if (item.checked) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
-                            contentDescription = if (item.checked) "Pris" else "À prendre",
-                            tint = if (item.checked) NeutralGray else accent,
-                            modifier = Modifier.size(26.dp)
-                        )
-                        Text(
-                            text = item.label,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = if (item.checked) NeutralGray else MaterialTheme.colorScheme.onBackground,
-                            textDecoration = if (item.checked) TextDecoration.LineThrough else null,
-                            modifier = Modifier.padding(start = 12.dp)
-                        )
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { vm.toggleShoppingItem(item.id) }
+                                .padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = if (item.checked) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
+                                contentDescription = if (item.checked) "Pris" else "À prendre",
+                                tint = if (item.checked) NeutralGray else accent,
+                                modifier = Modifier.size(26.dp)
+                            )
+                            Text(
+                                text = item.label,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = if (item.checked) NeutralGray else MaterialTheme.colorScheme.onBackground,
+                                textDecoration = if (item.checked) TextDecoration.LineThrough else null,
+                                modifier = Modifier.padding(start = 12.dp)
+                            )
+                        }
+                        // Retirer un article de la liste, sans avoir à le cocher d'abord.
+                        androidx.compose.foundation.layout.Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clickable { vm.deleteShoppingItem(item.id) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "✕",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }

@@ -59,7 +59,7 @@ import com.notresemaine.app.ui.MeScreen
 import com.notresemaine.app.ui.ProfileScreen
 import com.notresemaine.app.ui.RemindersScreen
 import com.notresemaine.app.ui.SyncScreen
-import com.notresemaine.app.ui.HomeScreen
+import com.notresemaine.app.ui.PlanningScreen
 import com.notresemaine.app.ui.UsScreen
 import com.notresemaine.app.ui.HouseScreen
 import com.notresemaine.app.ui.theme.AppTheme
@@ -94,12 +94,13 @@ class MainActivity : ComponentActivity() {
 
 private data class Tab(val route: String, val label: String, val icon: ImageVector)
 
-// Cinq destinations, une question chacune : que fait-on maintenant, où va-t-on,
-// qu'est-ce qu'on mange, où en est-on à deux, et qu'est-ce qui me concerne.
-// « Jour » et « Semaine » n'en font qu'un : c'est la même question à deux échelles.
-// « Moi » remplace la roue dentée : une fonction cachée est une fonction morte.
+// Cinq destinations, une question chacune : qu'est-ce que je fais et quand
+// (Planning), où je vais (Objectifs), qu'est-ce qu'on mange (Maison),
+// où on en est à deux (Nous), et ce qui me concerne (Moi).
+// « Planning » récapitule le jour ET la semaine : c'est la même question à deux
+// échelles. « Moi » remplace la roue dentée : une fonction cachée est morte.
 private val tabs = listOf(
-    Tab("today", "Aujourd'hui", Icons.Filled.WbSunny),
+    Tab("planning", "Planning", Icons.Filled.WbSunny),
     Tab("goals", "Objectifs", Icons.Filled.Flag),
     Tab("house", "Maison", Icons.Filled.Home),
     Tab("us", "Nous", Icons.Filled.Favorite),
@@ -146,16 +147,18 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings) {
     ) { padding ->
         NavHost(
             navController = navController,
-            startDestination = "today",
+            startDestination = "planning",
             modifier = Modifier.padding(padding)
         ) {
-            composable("today") {
-                HomeScreen(
+            composable("planning") {
+                PlanningScreen(
                     vm, settings,
                     onPrepare = { date -> navController.navigate("prepare/$date") },
                     onRitual = { navController.navigate("ritual") },
                     onGoals = { navController.navigate("goals") },
-                    onReview = { week -> navController.navigate("review/$week") }
+                    onReview = { week -> navController.navigate("review/$week") },
+                    onMenus = { week -> navController.navigate("menus/$week") },
+                    onShopping = { week -> navController.navigate("shopping/$week") }
                 )
             }
             composable("goals") {

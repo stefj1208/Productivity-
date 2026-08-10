@@ -63,7 +63,9 @@ fun HealthScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
         if (granted) vm.refreshHealth()
     }
 
-    val healthDays by remember { vm.repo.db.health().since(Dates.weekStartIsoOffset(-1)) }
+    val healthDays by remember { vm.repo.db.health().since(Dates.weekStartIsoOffset(-3)) }
+        .collectAsState(initial = emptyList())
+    val usageDays by remember { vm.repo.db.usage().since(Dates.weekStartIsoOffset(-3)) }
         .collectAsState(initial = emptyList())
     val todayHealth = healthDays.firstOrNull { it.userId == myId && it.date == today }
 
@@ -215,6 +217,55 @@ fun HealthScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
                 text = "Un tap = séance ajoutée à la journée.",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 6.dp)
+            )
+
+            // Les courbes ont leur place ici, pas sur l'écran d'accueil :
+            // on les consulte quand on se pose la question, pas dix fois par jour.
+            Spacer(Modifier.height(28.dp))
+            SectionLabel("4 DERNIÈRES SEMAINES")
+            val accent = com.notresemaine.app.ui.theme.accentFor(settings.myColor)
+            val weekKeys = (-3..0).map { Dates.weekStartIsoOffset(it) }
+            val weekLabels = weekKeys.map { key ->
+                if (Dates.weekOffsetOf(key) == 0) "cette sem."
+                else "S${java.time.LocalDate.parse(key).dayOfMonth}"
+            }
+            val myHealth = healthDays.filter { it.userId == myId }
+            val myUsage = usageDays.filter { it.userId == myId }
+
+            fun weekOf(dateIso: String) = Dates.weekStartIso(java.time.LocalDate.parse(dateIso))
+
+            val sleepPerWeek = weekKeys.map { key ->
+                val nights = myHealth.filter { weekOf(it.date) == key && it.sleepMinutes > 0 }
+                if (nights.isEmpty()) 0f else nights.sumOf { it.sleepMinutes }.toFloat() / nights.size / 60f
+            }
+            val sportPerWeek = weekKeys.map { key ->
+                myHealth.filter { weekOf(it.date) == key }.sumOf { it.exerciseMinutes }.toFloat()
+            }
+            val screenPerWeek = weekKeys.map { key ->
+                val days = myUsage.filter { weekOf(it.date) == key }
+                if (days.isEmpty()) 0f else days.sumOf { it.socialMinutes }.toFloat() / days.size
+            }
+
+            Spacer(Modifier.height(8.dp))
+            Text("😴 Sommeil — moyenne par nuit", style = MaterialTheme.typography.bodyLarge)
+            MiniBarChart(
+                values = sleepPerWeek, labels = weekLabels, accent = accent,
+                valueLabel = { "%.1f h".format(it) },
+                modifier = Modifier.padding(top = 6.dp)
+            )
+            Spacer(Modifier.height(20.dp))
+            Text("🏃 Sport — total de la semaine", style = MaterialTheme.typography.bodyLarge)
+            MiniBarChart(
+                values = sportPerWeek, labels = weekLabels, accent = accent,
+                valueLabel = { "${it.toInt()} min" },
+                modifier = Modifier.padding(top = 6.dp)
+            )
+            Spacer(Modifier.height(20.dp))
+            Text("📱 Réseaux — moyenne par jour", style = MaterialTheme.typography.bodyLarge)
+            MiniBarChart(
+                values = screenPerWeek, labels = weekLabels, accent = accent,
+                valueLabel = { "${it.toInt()} min" },
                 modifier = Modifier.padding(top = 6.dp)
             )
             Spacer(Modifier.height(20.dp))

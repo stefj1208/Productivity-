@@ -55,36 +55,114 @@ fun PersonBadge(name: String, colorRole: String, modifier: Modifier = Modifier) 
     }
 }
 
-/** Ligne de tâche : un seul tap n'importe où pour cocher. Hauteur minimum 56 dp. */
+/**
+ * Ligne de tâche : un tap sur la ligne coche, un tap sur le crayon modifie.
+ * Deux zones tactiles distinctes, chacune d'au moins 48 dp — jamais d'appui long
+ * ni de balayage, qui ne s'apprennent qu'en les découvrant par hasard.
+ */
 @Composable
 fun TaskRow(
     task: TaskEntity,
     accent: Color,
     onToggle: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onEdit: (() -> Unit)? = null
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = 56.dp)
-            .clickable(onClick = onToggle)
-            .padding(horizontal = 4.dp, vertical = 8.dp),
+            .defaultMinSize(minHeight = 56.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = if (task.done) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
-            contentDescription = if (task.done) "Fait" else "À faire",
-            tint = if (task.done) NeutralGray else accent,
-            modifier = Modifier.size(28.dp)
-        )
-        Text(
-            text = (if (task.isSport) "🏃 " else "") + task.title,
-            style = MaterialTheme.typography.bodyLarge,
-            color = if (task.done) NeutralGray else MaterialTheme.colorScheme.onBackground,
-            textDecoration = if (task.done) TextDecoration.LineThrough else null,
-            modifier = Modifier.padding(start = 14.dp)
-        )
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .clickable(onClick = onToggle)
+                .padding(horizontal = 4.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (task.done) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
+                contentDescription = if (task.done) "Fait" else "À faire",
+                tint = if (task.done) NeutralGray else accent,
+                modifier = Modifier.size(28.dp)
+            )
+            Text(
+                text = (if (task.isSport) "🏃 " else "") + task.title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (task.done) NeutralGray else MaterialTheme.colorScheme.onBackground,
+                textDecoration = if (task.done) TextDecoration.LineThrough else null,
+                modifier = Modifier.padding(start = 14.dp)
+            )
+        }
+        if (onEdit != null) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clickable(onClick = onEdit),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "✏️",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            }
+        }
     }
+}
+
+/**
+ * Modifier ou supprimer, sans avoir à deviner un geste caché.
+ * Le bouton de suppression demande confirmation en se transformant :
+ * on ne perd jamais quelque chose d'un seul tap distrait.
+ */
+@Composable
+fun EditDeleteDialog(
+    title: String,
+    initialText: String,
+    label: String = "Intitulé",
+    onSave: (String) -> Unit,
+    onDelete: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    var text by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(initialText) }
+    var confirmDelete by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column {
+                androidx.compose.material3.OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    label = { Text(label) },
+                    textStyle = MaterialTheme.typography.bodyLarge,
+                    maxLines = 3,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                androidx.compose.material3.TextButton(
+                    onClick = { if (confirmDelete) onDelete() else confirmDelete = true },
+                    modifier = Modifier.padding(top = 8.dp)
+                ) {
+                    Text(
+                        text = if (confirmDelete) "Confirmer la suppression" else "🗑 Supprimer",
+                        color = if (confirmDelete) MaterialTheme.colorScheme.secondary
+                        else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(
+                onClick = { onSave(text) },
+                enabled = text.isNotBlank()
+            ) { Text("Enregistrer") }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Annuler") }
+        }
+    )
 }
 
 /** Bouton principal : pleine largeur, 56 dp, placé en bas d'écran (zone du pouce). */

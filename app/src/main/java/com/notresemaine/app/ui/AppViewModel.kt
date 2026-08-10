@@ -87,6 +87,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { repo.toggleDone(taskId); requestSync() }
     }
 
+    fun renameTask(taskId: String, title: String) {
+        viewModelScope.launch { repo.renameTask(taskId, title); requestSync() }
+    }
+
     fun deleteTask(taskId: String) {
         viewModelScope.launch { repo.deleteTask(taskId); requestSync() }
     }
@@ -143,6 +147,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             } else {
                 toast("Maximum ${GoalTemplates.MAX_ACTIVE_GOALS} objectifs actifs — moins mais mieux.")
             }
+        }
+    }
+
+    fun updateGoal(
+        goalId: String, title: String, sessionsPerWeek: Int, minutesPerSession: Int,
+        preferredTime: String, preferredDays: List<Int>, nextAction: String, isPrivate: Boolean
+    ) {
+        viewModelScope.launch {
+            repo.updateGoal(goalId, title, sessionsPerWeek, minutesPerSession,
+                preferredTime, preferredDays, nextAction, isPrivate)
+            Alarms.rescheduleAll(getApplication())
+            requestSync()
+            toast("Objectif modifié ✓")
         }
     }
 
@@ -460,6 +477,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun addShoppingItem(weekStart: String, label: String) {
         viewModelScope.launch { repo.addShoppingItem(myId(), weekStart, label); requestSync() }
+    }
+
+    fun deleteShoppingItem(itemId: String) {
+        viewModelScope.launch { repo.deleteShoppingItem(itemId); requestSync() }
     }
 
     fun toggleShoppingItem(itemId: String) {

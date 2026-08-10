@@ -33,7 +33,7 @@ Le numéro de version est affiché dans **Moi → Profil & apparence** : c'est l
 
 | Écran | Rôle |
 |---|---|
-| **Aujourd'hui** | **La boussole** en haut : une carte, en très gros, qui dit quoi faire maintenant. Puis la priorité du jour, les tâches, et — dans le même défilement — **la semaine entière** : navigation ‹ ›, priorité de la semaine, les 7 jours, et les graphiques sur 4 semaines. |
+| **Planning** | **La boussole** en haut : une carte qui dit quoi faire maintenant. Puis le **récap du jour** (priorité, tâches, « 2/3 fait »), le **récap de la semaine** (priorité, bande des 7 jours avec l'avancement de chacun), les **raccourcis** (Menus, Courses, Rituel, Objectifs), et deux boutons : **Planifier la semaine** et Préparer demain. |
 | **Objectifs** | La bibliothèque « clé en main » : choisissez « Apprendre une langue » ou « (Re)prendre le sport », répondez à 3 questions, l'app place les séances de la semaine à votre place et suit la progression. |
 | **Maison** | Ce qu'on mange aujourd'hui (matin, midi, soir), l'accès aux **menus de la semaine** et à la **liste de courses** rangée par rayon. |
 | **Nous** | Vos deux semaines côte à côte, le **Pacte d'écran des deux** visible en permanence, les demandes de pause à accorder, l'accès direct à votre pacte et à Sommeil & sport, et le bouton « bravo 👏 ». |
@@ -101,6 +101,7 @@ Chaque proposition **remplit les champs** — rien n'est enregistré tant que vo
 6. ✅ **V6** — refonte de la navigation (4 onglets, plus de séparation jour/semaine), Maison en onglet, rappels en alarme plein écran
 7. ✅ **V7** — refonte UX : onglet « Moi » à la place de la roue dentée, réglages éclatés en écrans dédiés, en-têtes et états vides cohérents partout
 8. ✅ **V7.1** — passage « Don't Make Me Think » : retour en haut à gauche sur tous les écrans, moitié des mots supprimée, champs de saisie qui vont à la ligne
+9. ✅ **V8** — « Aujourd'hui » devient **Planning** (récap jour + semaine + raccourcis + bouton Planifier la semaine) ; **modifier et supprimer** ajoutés sur les tâches, les objectifs, les repas et les courses ; graphiques déplacés dans Sommeil & sport
 
 ### Sommeil & sport : ce qui marchera vraiment
 Health Connect ne contient **que** ce qu'une montre, un bracelet ou une appli (Samsung Health…) y écrit. Sans source, sommeil et séances resteront à zéro — c'est une limite d'Android, pas de l'application. D'où la saisie de secours dans **Réglages → Sommeil & sport** : deux heures à taper pour la nuit, un bouton `20′ / 30′ / 45′ / 60′` pour une séance. Une mesure automatique n'écrase jamais une saisie manuelle du même jour.
