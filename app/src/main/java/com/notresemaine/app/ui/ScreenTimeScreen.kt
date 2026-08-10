@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -31,9 +32,30 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.notresemaine.app.data.AppSettings
 import com.notresemaine.app.data.Dates
+import com.notresemaine.app.pacte.BlockerService
 import com.notresemaine.app.pacte.Usage
+
+/** Une ligne de diagnostic : ce qui va, ce qui manque — sans jargon. */
+@Composable
+private fun CheckLine(ok: Boolean, label: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+    ) {
+        Text(if (ok) "✅" else "⚠️", style = MaterialTheme.typography.bodyLarge)
+        Spacer(Modifier.width(10.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (ok) MaterialTheme.colorScheme.onSurface
+            else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
 
 /**
  * Temps d'écran & Pacte : permission, choix des applications « réseaux sociaux »,
@@ -42,7 +64,16 @@ import com.notresemaine.app.pacte.Usage
 @Composable
 fun ScreenTimeScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
     val context = LocalContext.current
-    val hasPermission = Usage.hasPermission(context)
+    // Les autorisations se donnent hors de l'application : on les relit à
+    // chaque retour sur cet écran, sinon l'affichage ment.
+    var checks by remember { mutableStateOf(0) }
+    LifecycleResumeEffect(Unit) {
+        checks++
+        onPauseOrDispose { }
+    }
+    val hasPermission = remember(checks) { Usage.hasPermission(context) }
+    val canOverlay = remember(checks) { Usage.canOverlay(context) }
+    val watching = remember(checks) { BlockerService.running }
 
     var enabled by remember(settings.pacteEnabled) { mutableStateOf(settings.pacteEnabled) }
     var limit by remember(settings.dailyLimitMinutes) { mutableStateOf(settings.dailyLimitMinutes.toString()) }
@@ -95,18 +126,32 @@ fun ScreenTimeScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit
             )
 
             Spacer(Modifier.height(16.dp))
-            SectionLabel("1 · PERMISSION")
-            if (hasPermission) {
-                Text("Accès aux données d'utilisation : accordé ✓", style = MaterialTheme.typography.bodyLarge)
-            } else {
+            SectionLabel("1 · DEUX AUTORISATIONS ANDROID")
+            CheckLine(hasPermission, "Lire le temps d'écran")
+            if (!hasPermission) {
                 Text(
-                    text = "Android exige une autorisation, hors de l'app. " +
-                        "Cherchez « Notre Semaine » dans la liste qui s'ouvre.",
-                    style = MaterialTheme.typography.bodyLarge
+                    text = "Cherchez « Notre Semaine » dans la liste qui s'ouvre.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton(
                     onClick = { context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) },
+                    modifier = Modifier.height(48.dp)
+                ) { Text("Ouvrir les réglages Android") }
+                Spacer(Modifier.height(8.dp))
+            }
+            CheckLine(canOverlay, "Afficher par-dessus les autres applications")
+            if (!canOverlay) {
+                Text(
+                    text = "Sans elle, Android empêche l'écran de blocage de s'ouvrir : " +
+                        "la limite serait comptée mais rien ne se passerait.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { context.startActivity(Usage.overlaySettingsIntent(context)) },
                     modifier = Modifier.height(48.dp)
                 ) { Text("Ouvrir les réglages Android") }
             }
@@ -245,6 +290,41 @@ fun ScreenTimeScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit
             TextButton(onClick = { vm.refreshUsage() }, enabled = hasPermission) {
                 Text("Relever maintenant")
             }
+
+            // ----- Vérification : quel maillon manque -----
+            Spacer(Modifier.height(16.dp))
+            SectionLabel("6 · LE BLOCAGE MARCHE-T-IL ?")
+            CheckLine(hasPermission, "Lire le temps d'écran")
+            CheckLine(canOverlay, "Afficher par-dessus les autres applications")
+            CheckLine(watching, "Surveillance en marche")
+            if (!watching && settings.pacteEnabled) {
+                OutlinedButton(
+                    onClick = {
+                        BlockerService.startIfEnabled(context, true)
+                        checks++
+                    },
+                    modifier = Modifier.height(48.dp)
+                ) { Text("Relancer la surveillance") }
+            }
+            CheckLine(selected.isNotEmpty(), "${selected.size} applications suivies")
+            val minutesToday = myToday?.socialMinutes ?: 0
+            val cap = limit.toIntOrNull() ?: 0
+            CheckLine(
+                cap > 0 && minutesToday < cap,
+                "$minutesToday min aujourd'hui sur $cap min autorisées"
+            )
+
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = {
+                    context.startActivity(
+                        com.notresemaine.app.pacte.BlockActivity.intent(
+                            context, minutesToday, false, ""
+                        )
+                    )
+                },
+                modifier = Modifier.height(48.dp)
+            ) { Text("Voir l'écran de blocage") }
 
             Spacer(Modifier.height(12.dp))
             Text(

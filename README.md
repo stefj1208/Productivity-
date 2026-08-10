@@ -57,8 +57,13 @@ Ce que l'application applique des 6 livres (détail dans l'écran « La méthode
 
 ## 4. Permissions à accorder (une fois, guidées dans l'app)
 
-Pour le temps d'écran et le Pacte, Android exige une permission spéciale hors de l'application :
-**Moi → Mon pacte d'écran** → suivre les étapes affichées (l'app ouvre le bon écran Android toute seule).
+Pour le temps d'écran et le Pacte, Android exige **deux** autorisations spéciales, hors de l'application :
+**Moi → Mon pacte d'écran → étape 1** ouvre le bon écran Android pour chacune.
+
+1. **Accès aux données d'utilisation** — pour compter les minutes.
+2. **Afficher par-dessus les autres applications** — pour ouvrir l'écran de blocage. Sans elle, Android interdit à l'application d'afficher quoi que ce soit par-dessus Instagram : les minutes sont comptées, la limite est franchie, et **rien ne se passe**. C'est la cause n°1 d'un pacte qui ne bloque pas.
+
+L'écran du Pacte se termine par **« Le blocage marche-t-il ? »** : cinq lignes ✅/⚠️ (les deux autorisations, la surveillance en marche, les applications suivies, les minutes du jour) et un bouton **« Voir l'écran de blocage »** pour l'essayer tout de suite.
 
 **Important sur le Honor 400 Pro (MagicOS)** : Paramètres → Batterie → Lancement d'applications → Notre Semaine → désactiver « Gestion automatique » et tout autoriser en manuel. Sans cela, MagicOS tue la surveillance en arrière-plan. Sur le S23 : Paramètres → Batterie → « Non restreinte ».
 
@@ -104,6 +109,7 @@ Chaque proposition **remplit les champs** — rien n'est enregistré tant que vo
 9. ✅ **V8** — « Aujourd'hui » devient **Planning** (récap jour + semaine + raccourcis + bouton Planifier la semaine) ; **modifier et supprimer** ajoutés sur les tâches, les objectifs, les repas et les courses
 10. ✅ **V8.1** — **confier une tâche à l'autre**, écran **Mes performances** (KPI + graphiques), grille de 8 raccourcis en symboles, « Préparer demain » accessible à tout moment, adresse Supabase corrigeable et nettoyée automatiquement
 11. ✅ **V9** — **créneaux horaires** sur les tâches (avec rappel à l'heure dite), **vue de la journée heure par heure**, onglets **Finance** et **Enfants** dans Maison, tâches confiées visibles dans Maison
+12. ✅ **V9.1** — **le Pacte bloque enfin** : autorisation « par-dessus les autres applications », notification plein écran de secours, détection de l'application ouverte corrigée, écran d'auto-diagnostic
 
 ### Sommeil & sport : ce qui marchera vraiment
 Health Connect ne contient **que** ce qu'une montre, un bracelet ou une appli (Samsung Health…) y écrit. Sans source, sommeil et séances resteront à zéro — c'est une limite d'Android, pas de l'application. D'où la saisie de secours dans **Réglages → Sommeil & sport** : deux heures à taper pour la nuit, un bouton `20′ / 30′ / 45′ / 60′` pour une séance. Une mesure automatique n'écrase jamais une saisie manuelle du même jour.

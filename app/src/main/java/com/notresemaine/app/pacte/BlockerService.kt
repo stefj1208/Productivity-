@@ -35,11 +35,14 @@ class BlockerService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        running = true
         startForeground(NOTIF_ID, buildNotification())
         scope.launch { loop() }
     }
 
     override fun onDestroy() {
+        running = false
+        clearBlockNotification()
         scope.cancel()
         super.onDestroy()
     }
@@ -90,18 +93,66 @@ class BlockerService : Service() {
                     val blocked = foreground != null && foreground !in ALWAYS_ALLOWED &&
                         (foreground in social || (curfewOn && s.curfewStrict))
                     if (blocked) {
-                        startActivity(
-                            Intent(this, BlockActivity::class.java)
-                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                .putExtra("minutes", socialMinutes)
-                                .putExtra("curfew", curfewOn)
-                                .putExtra("curfewLabel", Curfew.label(s))
-                        )
+                        showBlock(socialMinutes, curfewOn, Curfew.label(s))
+                    } else {
+                        clearBlockNotification()
                     }
+                } else {
+                    clearBlockNotification()
                 }
+            } else {
+                clearBlockNotification()
             }
-            delay(4_000)
+            delay(if (overLimit || curfewOn) 2_000 else 4_000)
         }
+    }
+
+    /**
+     * Affiche l'écran de blocage — par deux chemins, parce qu'aucun des deux
+     * n'est garanti seul :
+     *
+     * 1. Le lancement direct. Depuis Android 10, une application en arrière-plan
+     *    n'a pas le droit d'ouvrir un écran : il est ignoré en silence, sauf si
+     *    « Afficher par-dessus les autres applications » a été accordé. C'était
+     *    la seule route de la version précédente — d'où un pacte qui ne bloquait
+     *    rien alors que tout le reste fonctionnait.
+     * 2. Une notification plein écran. Android la laisse passer même en
+     *    arrière-plan, et si le plein écran est refusé elle s'affiche au moins
+     *    en bandeau sonore par-dessus l'application en cours.
+     */
+    private fun showBlock(minutes: Int, curfew: Boolean, label: String) {
+        if (BlockActivity.visible) return
+        val intent = BlockActivity.intent(this, minutes, curfew, label)
+
+        runCatching { startActivity(intent) }
+
+        val pending = PendingIntent.getActivity(
+            this, 1, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val nm = getSystemService(NotificationManager::class.java)
+        nm.createNotificationChannel(
+            NotificationChannel(BLOCK_CHANNEL_ID, "Blocage du pacte", NotificationManager.IMPORTANCE_HIGH)
+                .apply { description = "S'affiche quand la limite convenue est atteinte" }
+        )
+        val notif = NotificationCompat.Builder(this, BLOCK_CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_lock_idle_lock)
+            .setContentTitle(if (curfew) "🌙 Couvre-feu" else "Limite atteinte")
+            .setContentText(
+                if (curfew) "C'est l'heure de dormir."
+                else "$minutes min sur les applications choisies aujourd'hui."
+            )
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setContentIntent(pending)
+            .setFullScreenIntent(pending, true)
+            .setAutoCancel(true)
+            .build()
+        runCatching { nm.notify(BLOCK_NOTIF_ID, notif) }
+    }
+
+    private fun clearBlockNotification() {
+        runCatching { getSystemService(NotificationManager::class.java).cancel(BLOCK_NOTIF_ID) }
     }
 
     private fun buildNotification(): Notification {
@@ -125,6 +176,13 @@ class BlockerService : Service() {
     companion object {
         private const val CHANNEL_ID = "pacte"
         private const val NOTIF_ID = 10
+        private const val BLOCK_CHANNEL_ID = "pacte_blocage"
+        private const val BLOCK_NOTIF_ID = 11
+
+        /** Vrai tant que la surveillance tourne : affiché dans l'écran du Pacte. */
+        @Volatile
+        var running: Boolean = false
+            private set
 
         /**
          * Jamais bloqué, même en couvre-feu strict : téléphone, messages, urgences,

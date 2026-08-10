@@ -33,6 +33,9 @@ class BlockActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Doit s'afficher même téléphone verrouillé, comme un réveil.
+        setShowWhenLocked(true)
+        setTurnScreenOn(true)
         val minutes = intent.getIntExtra("minutes", 0)
         val isCurfew = intent.getBooleanExtra("curfew", false)
         val curfewLabel = intent.getStringExtra("curfewLabel") ?: ""
@@ -44,6 +47,11 @@ class BlockActivity : ComponentActivity() {
                 var requested by remember { mutableStateOf(false) }
                 val settings by repo.settings.flow.collectAsState(initial = null)
                 val s = settings
+
+                // Le binôme a accordé la pause : l'écran s'efface tout seul.
+                androidx.compose.runtime.LaunchedEffect(s?.graceUntil) {
+                    if (s != null && s.graceUntil > System.currentTimeMillis()) finish()
+                }
 
                 Surface(color = MaterialTheme.colorScheme.background) {
                     Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
@@ -95,6 +103,16 @@ class BlockActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        visible = true
+    }
+
+    override fun onStop() {
+        visible = false
+        super.onStop()
+    }
+
     private fun goHome() {
         startActivity(
             Intent(Intent.ACTION_MAIN)
@@ -102,5 +120,19 @@ class BlockActivity : ComponentActivity() {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         )
         finish()
+    }
+
+    companion object {
+        /** Évite de relancer l'écran toutes les deux secondes s'il est déjà là. */
+        @Volatile
+        var visible: Boolean = false
+            private set
+
+        fun intent(context: android.content.Context, minutes: Int, curfew: Boolean, curfewLabel: String): Intent =
+            Intent(context, BlockActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                .putExtra("minutes", minutes)
+                .putExtra("curfew", curfew)
+                .putExtra("curfewLabel", curfewLabel)
     }
 }

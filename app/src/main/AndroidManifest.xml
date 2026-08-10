@@ -20,6 +20,10 @@
         android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
 
+    <!-- Pacte d'écran : sans « Afficher par-dessus les autres applications »,
+         Android interdit au service d'ouvrir l'écran de blocage. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
     <!-- Health Connect : lecture seule du sommeil, des pas et des séances -->
     <uses-permission android:name="android.permission.health.READ_SLEEP" />
     <uses-permission android:name="android.permission.health.READ_STEPS" />
@@ -75,7 +79,10 @@
             android:name=".pacte.BlockActivity"
             android:exported="false"
             android:excludeFromRecents="true"
-            android:launchMode="singleTop" />
+            android:launchMode="singleInstance"
+            android:taskAffinity=""
+            android:turnScreenOn="true"
+            android:showWhenLocked="true" />
 
         <service
             android:name=".pacte.BlockerService"

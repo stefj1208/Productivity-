@@ -6,7 +6,9 @@ import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Process
+import android.provider.Settings
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -60,19 +62,52 @@ object Usage {
         return DayUsage((totalMs / 60_000).toInt(), (socialMs / 60_000).toInt(), unlocks)
     }
 
-    /** Application actuellement au premier plan (approximation via les derniers événements). */
+    /**
+     * Application actuellement au premier plan.
+     *
+     * On remonte loin dans l'historique des événements, et c'est le point clé :
+     * Android n'émet un événement qu'au *changement* d'application. Quelqu'un
+     * qui fait défiler Instagram depuis dix minutes n'a produit aucun événement
+     * récent. L'ancienne version ne regardait que les 10 dernières secondes :
+     * elle rendait « rien au premier plan » et le blocage ne partait jamais
+     * pendant qu'on scrollait — exactement le moment où il sert.
+     */
     fun foregroundPackage(context: Context): String? {
         val usm = context.getSystemService(UsageStatsManager::class.java)
         val end = System.currentTimeMillis()
-        val events = usm.queryEvents(end - 10_000, end)
+        // Quatre heures couvrent une très longue session ; à défaut, la journée.
+        return lastResumed(usm, end - 4 * 60 * 60_000L, end)
+            ?: lastResumed(usm, minOf(startOfToday(), end - 24 * 60 * 60_000L), end)
+    }
+
+    private fun lastResumed(usm: UsageStatsManager, from: Long, to: Long): String? {
+        val events = usm.queryEvents(from, to)
         val event = UsageEvents.Event()
         var latest: String? = null
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
-            if (event.eventType == UsageEvents.Event.ACTIVITY_RESUMED) latest = event.packageName
+            when (event.eventType) {
+                UsageEvents.Event.ACTIVITY_RESUMED -> latest = event.packageName
+                // Application quittée, ou téléphone verrouillé : plus rien devant.
+                UsageEvents.Event.ACTIVITY_STOPPED ->
+                    if (event.packageName == latest) latest = null
+                UsageEvents.Event.KEYGUARD_SHOWN -> latest = null
+            }
         }
         return latest
     }
+
+    /**
+     * « Afficher par-dessus les autres applications ». Sans elle, Android
+     * interdit à un service d'ouvrir un écran : le blocage part dans le vide.
+     */
+    fun canOverlay(context: Context): Boolean = Settings.canDrawOverlays(context)
+
+    fun overlaySettingsIntent(context: Context): Intent =
+        Intent(
+            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+            Uri.parse("package:${context.packageName}")
+        )
 
     /** Applications installées lançables, pour choisir la liste « réseaux sociaux ». */
     fun launchableApps(context: Context): List<InstalledApp> {

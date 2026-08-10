@@ -91,6 +91,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         vm.requestSync()
+        vm.ensureBlockerRunning()
     }
 }
 

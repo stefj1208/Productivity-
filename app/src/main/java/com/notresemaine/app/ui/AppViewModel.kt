@@ -314,6 +314,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * MagicOS et One UI tuent volontiers les services en arrière-plan. À chaque
+     * retour dans l'application, on remet la surveillance en marche si besoin.
+     */
+    fun ensureBlockerRunning() {
+        viewModelScope.launch {
+            if (repo.settings.current().pacteEnabled) {
+                BlockerService.startIfEnabled(getApplication(), true)
+            }
+        }
+    }
+
     fun refreshUsage() {
         viewModelScope.launch {
             UsageWorker.collect(getApplication())
