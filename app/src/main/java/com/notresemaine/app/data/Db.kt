@@ -22,6 +22,7 @@ data class TaskEntity(
     val isSport: Boolean = false,
     val goalId: String? = null, // séance générée par un objectif
     val done: Boolean = false,
+    val assignedBy: String = "", // identifiant de celui qui a confié la tâche, sinon vide
     val deleted: Boolean = false,
     val updatedAt: Long
 )
@@ -474,7 +475,7 @@ interface HealthDao {
         InboxItemEntity::class, UsageDayEntity::class, GraceRequestEntity::class,
         MealEntity::class, ShoppingItemEntity::class, HealthDayEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDb : RoomDatabase() {

@@ -165,9 +165,20 @@ class SettingsStore(private val context: Context) {
         context.dataStore.edit { p -> p[K.themeMode] = mode }
     }
 
+    /**
+     * L'adresse doit être nue : `https://xxxx.supabase.co`.
+     * Le tableau de bord affiche souvent le point d'accès REST avec un chemin —
+     * on le retire ici plutôt que de laisser l'utilisateur deviner son erreur.
+     */
     suspend fun setSupabaseConfig(url: String, key: String) {
+        var clean = url.trim().trimEnd('/')
+        listOf("/rest/v1", "/auth/v1", "/storage/v1", "/realtime/v1", "/functions/v1").forEach { suffix ->
+            if (clean.endsWith(suffix, ignoreCase = true)) {
+                clean = clean.dropLast(suffix.length).trimEnd('/')
+            }
+        }
         context.dataStore.edit { p ->
-            p[K.supabaseUrl] = url.trim().trimEnd('/')
+            p[K.supabaseUrl] = clean
             p[K.supabaseKey] = key.trim()
         }
     }

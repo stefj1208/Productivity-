@@ -34,6 +34,7 @@ fun MeScreen(
     onRitual: () -> Unit,
     onScreenTime: () -> Unit,
     onHealth: () -> Unit,
+    onPerformance: () -> Unit,
     onAssistant: () -> Unit,
     onReminders: () -> Unit,
     onMethod: () -> Unit,
@@ -100,6 +101,13 @@ fun MeScreen(
             subtitle = if (avgSleep > 0) "${avgSleep / 60} h ${avgSleep % 60} en moyenne cette semaine"
             else "Aucune mesure cette semaine",
             onClick = onHealth
+        )
+
+        ShortcutTile(
+            emoji = "📈",
+            title = "Mes performances",
+            subtitle = "Tâches, séances, sommeil, écran — les chiffres",
+            onClick = onPerformance
         )
 
         Spacer(Modifier.height(20.dp))

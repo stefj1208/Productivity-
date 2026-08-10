@@ -162,6 +162,7 @@ create table if not exists health_days (
 alter table tasks add column if not exists goal_id text;
 
 -- Réglages du Pacte, partagés dans le couple (V4)
+alter table tasks add column if not exists assigned_by text not null default '';
 alter table profiles add column if not exists pacte_enabled boolean not null default false;
 alter table profiles add column if not exists daily_limit_minutes int not null default 45;
 alter table profiles add column if not exists curfew_enabled boolean not null default false;

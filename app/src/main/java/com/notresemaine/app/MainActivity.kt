@@ -59,6 +59,7 @@ import com.notresemaine.app.ui.MeScreen
 import com.notresemaine.app.ui.ProfileScreen
 import com.notresemaine.app.ui.RemindersScreen
 import com.notresemaine.app.ui.SyncScreen
+import com.notresemaine.app.ui.PerformanceScreen
 import com.notresemaine.app.ui.PlanningScreen
 import com.notresemaine.app.ui.UsScreen
 import com.notresemaine.app.ui.HouseScreen
@@ -158,7 +159,11 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings) {
                     onGoals = { navController.navigate("goals") },
                     onReview = { week -> navController.navigate("review/$week") },
                     onMenus = { week -> navController.navigate("menus/$week") },
-                    onShopping = { week -> navController.navigate("shopping/$week") }
+                    onShopping = { week -> navController.navigate("shopping/$week") },
+                    onScreenTime = { navController.navigate("screentime") },
+                    onHealth = { navController.navigate("health") },
+                    onPerformance = { navController.navigate("performance") },
+                    onMethod = { navController.navigate("method") }
                 )
             }
             composable("goals") {
@@ -185,12 +190,16 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings) {
                     onRitual = { navController.navigate("ritual") },
                     onScreenTime = { navController.navigate("screentime") },
                     onHealth = { navController.navigate("health") },
+                    onPerformance = { navController.navigate("performance") },
                     onAssistant = { navController.navigate("assistant") },
                     onReminders = { navController.navigate("reminders") },
                     onMethod = { navController.navigate("method") },
                     onSync = { navController.navigate("sync") },
                     onProfile = { navController.navigate("profile") }
                 )
+            }
+            composable("performance") {
+                PerformanceScreen(vm, settings, onBack = { navController.popBackStack() })
             }
             composable("assistant") {
                 AssistantScreen(vm, settings, onBack = { navController.popBackStack() })

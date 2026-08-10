@@ -39,6 +39,7 @@ data class TaskDto(
     val title: String,
     val date: String? = null,
     @SerialName("week_start") val weekStart: String? = null,
+    @SerialName("assigned_by") val assignedBy: String = "",
     @SerialName("is_priority") val isPriority: Boolean = false,
     @SerialName("is_sport") val isSport: Boolean = false,
     @SerialName("goal_id") val goalId: String? = null,
@@ -376,7 +377,7 @@ class SyncManager(private val repo: Repository) {
                 // Envoi : uniquement mes lignes modifiées depuis le dernier envoi.
                 val tasks = db.tasks().modifiedSince(s.lastPushTs).filter { it.userId == myId }
                 api.upsert("tasks", token, tasks.map {
-                    TaskDto(it.id, it.userId, it.title, it.date, it.weekStart, it.isPriority, it.isSport, it.goalId, it.done, it.deleted, it.updatedAt)
+                    TaskDto(it.id, it.userId, it.title, it.date, it.weekStart, it.assignedBy, it.isPriority, it.isSport, it.goalId, it.done, it.deleted, it.updatedAt)
                 }, TaskDto.serializer())
 
                 val goals = db.goals().modifiedSince(s.lastPushTs).filter { it.userId == myId }
@@ -452,7 +453,7 @@ class SyncManager(private val repo: Repository) {
                     pullMark = maxOf(pullMark, dto.updatedAt)
                     val local = db.tasks().byId(dto.id)
                     if (local == null || dto.updatedAt > local.updatedAt) {
-                        db.tasks().upsert(TaskEntity(dto.id, dto.userId, dto.title, dto.date, dto.weekStart, dto.isPriority, dto.isSport, dto.goalId, dto.done, dto.deleted, dto.updatedAt))
+                        db.tasks().upsert(TaskEntity(dto.id, dto.userId, dto.title, dto.date, dto.weekStart, dto.isPriority, dto.isSport, dto.goalId, dto.done, dto.assignedBy, dto.deleted, dto.updatedAt))
                     }
                 }
                 api.select("goals", token, s.lastPullTs, GoalDto.serializer()).forEach { dto ->

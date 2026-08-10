@@ -1,0 +1,250 @@
+package com.notresemaine.app.ui
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.notresemaine.app.data.AppSettings
+import com.notresemaine.app.data.Dates
+import com.notresemaine.app.ui.theme.accentFor
+import java.time.LocalDate
+
+/**
+ * « Mes performances » : les chiffres, en gros, sans commentaire.
+ *
+ * Les mesures étaient dispersées — un peu sur l'accueil, un peu dans Sommeil.
+ * Elles sont réunies ici : d'abord ce que je constate cette semaine, puis
+ * l'évolution sur quatre semaines. Aucun badge, aucune félicitation : on regarde,
+ * on décide, on referme.
+ */
+@Composable
+fun PerformanceScreen(
+    vm: AppViewModel,
+    settings: AppSettings,
+    onBack: () -> Unit
+) {
+    val myId = settings.myUserId
+    val accent = accentFor(settings.myColor)
+    val weekStart = Dates.weekStartIso()
+
+    val weekTasks by remember(weekStart) { vm.repo.db.tasks().byWeekAllUsers(weekStart) }
+        .collectAsState(initial = emptyList())
+    val goals by remember { vm.repo.db.goals().all() }
+        .collectAsState(initial = emptyList())
+    val ritualLogs by remember { vm.repo.db.ritual().logs() }
+        .collectAsState(initial = emptyList())
+    val healthDays by remember { vm.repo.db.health().since(Dates.weekStartIsoOffset(-3)) }
+        .collectAsState(initial = emptyList())
+    val usageDays by remember { vm.repo.db.usage().since(Dates.weekStartIsoOffset(-3)) }
+        .collectAsState(initial = emptyList())
+    val profiles by remember { vm.repo.db.profiles().all() }
+        .collectAsState(initial = emptyList())
+
+    val partner = profiles.firstOrNull { it.id != myId }
+    val myTasks = weekTasks.filter { it.userId == myId }
+    val doneTasks = myTasks.count { it.done }
+
+    val myGoals = goals.filter { it.userId == myId && it.active }
+    val plannedSessions = myGoals.sumOf { it.sessionsPerWeek }
+    val doneSessions = myTasks.count { it.goalId != null && it.done }
+
+    val streak = vm.repo.ritualStreak(ritualLogs, myId)
+
+    val days = Dates.daysOfWeek(weekStart)
+    val myHealth = healthDays.filter { it.userId == myId }
+    val thisWeekHealth = myHealth.filter { it.date >= days.first() && it.date <= days.last() }
+    val nights = thisWeekHealth.filter { it.sleepMinutes > 0 }
+    val avgSleep = if (nights.isEmpty()) 0 else nights.sumOf { it.sleepMinutes } / nights.size
+    val sportMinutes = thisWeekHealth.sumOf { it.exerciseMinutes }
+
+    val myUsage = usageDays.filter { it.userId == myId }
+    val thisWeekUsage = myUsage.filter { it.date >= days.first() && it.date <= days.last() }
+    val avgSocial = if (thisWeekUsage.isEmpty()) 0
+    else thisWeekUsage.sumOf { it.socialMinutes } / thisWeekUsage.size
+
+    // Tâches échangées : ce que j'ai confié, ce que j'ai reçu.
+    val given = if (partner == null) 0
+    else weekTasks.count { it.userId == partner.id && it.assignedBy == myId }
+    val received = if (partner == null) 0
+    else weekTasks.count { it.userId == myId && it.assignedBy == partner.id }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp)
+            .verticalScroll(rememberScrollState())
+    ) {
+        ScreenHeader(
+            title = "📈 Mes performances",
+            subtitle = Dates.weekRangeLabel(weekStart),
+            onBack = onBack
+        )
+
+        Spacer(Modifier.height(12.dp))
+        SectionLabel("CETTE SEMAINE")
+
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            KpiTile(
+                value = if (myTasks.isEmpty()) "—" else "$doneTasks/${myTasks.size}",
+                label = "tâches faites",
+                accent = accent,
+                modifier = Modifier.weight(1f)
+            )
+            KpiTile(
+                value = if (plannedSessions == 0) "—" else "$doneSessions/$plannedSessions",
+                label = "séances d'objectifs",
+                accent = accent,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(top = 10.dp)
+        ) {
+            KpiTile(
+                value = if (streak == 0) "—" else "$streak j",
+                label = "série du rituel",
+                accent = accent,
+                modifier = Modifier.weight(1f)
+            )
+            KpiTile(
+                value = if (avgSleep == 0) "—" else "${avgSleep / 60} h ${avgSleep % 60}",
+                label = "sommeil / nuit",
+                accent = accent,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(top = 10.dp)
+        ) {
+            KpiTile(
+                value = if (sportMinutes == 0) "—" else "$sportMinutes min",
+                label = "sport",
+                accent = accent,
+                modifier = Modifier.weight(1f)
+            )
+            KpiTile(
+                value = if (avgSocial == 0) "—" else "$avgSocial min",
+                label = "réseaux / jour",
+                accent = accent,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Spacer(Modifier.height(24.dp))
+        SectionLabel("CE QU'ON SE CONFIE")
+        if (partner == null) {
+            Text(
+                text = "Personne n'est encore relié à vous. Une fois la synchronisation " +
+                    "en place, vous pourrez vous confier des tâches.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                KpiTile(
+                    value = "$given",
+                    label = "confiées à ${partner.name}",
+                    accent = accent,
+                    modifier = Modifier.weight(1f)
+                )
+                KpiTile(
+                    value = "$received",
+                    label = "reçues de ${partner.name}",
+                    accent = accent,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            Text(
+                text = "Pour confier une tâche : touchez le crayon ✏️ sur la ligne, " +
+                    "puis « Confier à ${partner.name} ».",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 10.dp)
+            )
+        }
+
+        Spacer(Modifier.height(28.dp))
+        SectionLabel("4 DERNIÈRES SEMAINES")
+
+        val weekKeys = (-3..0).map { Dates.weekStartIsoOffset(it) }
+        val weekLabels = weekKeys.map { key ->
+            if (Dates.weekOffsetOf(key) == 0) "cette sem." else "S${LocalDate.parse(key).dayOfMonth}"
+        }
+
+        fun weekOf(dateIso: String) = Dates.weekStartIso(LocalDate.parse(dateIso))
+
+        val sleepPerWeek = weekKeys.map { key ->
+            val n = myHealth.filter { weekOf(it.date) == key && it.sleepMinutes > 0 }
+            if (n.isEmpty()) 0f else n.sumOf { it.sleepMinutes }.toFloat() / n.size / 60f
+        }
+        val sportPerWeek = weekKeys.map { key ->
+            myHealth.filter { weekOf(it.date) == key }.sumOf { it.exerciseMinutes }.toFloat()
+        }
+        val screenPerWeek = weekKeys.map { key ->
+            val d = myUsage.filter { weekOf(it.date) == key }
+            if (d.isEmpty()) 0f else d.sumOf { it.socialMinutes }.toFloat() / d.size
+        }
+        val tasksPerWeek = weekKeys.map { key ->
+            weekTasks.filter { it.userId == myId && it.weekStart == key && it.done }.size.toFloat()
+        }
+
+        Spacer(Modifier.height(8.dp))
+        Text("✅ Tâches faites", style = MaterialTheme.typography.bodyLarge)
+        MiniBarChart(
+            values = tasksPerWeek, labels = weekLabels, accent = accent,
+            valueLabel = { "${it.toInt()}" },
+            modifier = Modifier.padding(top = 6.dp)
+        )
+
+        Spacer(Modifier.height(20.dp))
+        Text("😴 Sommeil — moyenne par nuit", style = MaterialTheme.typography.bodyLarge)
+        MiniBarChart(
+            values = sleepPerWeek, labels = weekLabels, accent = accent,
+            valueLabel = { "%.1f h".format(it) },
+            modifier = Modifier.padding(top = 6.dp)
+        )
+
+        Spacer(Modifier.height(20.dp))
+        Text("🏃 Sport — total de la semaine", style = MaterialTheme.typography.bodyLarge)
+        MiniBarChart(
+            values = sportPerWeek, labels = weekLabels, accent = accent,
+            valueLabel = { "${it.toInt()} min" },
+            modifier = Modifier.padding(top = 6.dp)
+        )
+
+        Spacer(Modifier.height(20.dp))
+        Text("📱 Réseaux — moyenne par jour", style = MaterialTheme.typography.bodyLarge)
+        MiniBarChart(
+            values = screenPerWeek, labels = weekLabels, accent = accent,
+            valueLabel = { "${it.toInt()} min" },
+            modifier = Modifier.padding(top = 6.dp)
+        )
+
+        if (myHealth.isEmpty() && myUsage.isEmpty()) {
+            Text(
+                text = "Aucune mesure pour l'instant. Activez Health Connect ou saisissez " +
+                    "votre sommeil en 10 secondes depuis Sommeil & sport.",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 12.dp)
+            )
+        }
+        Spacer(Modifier.height(32.dp))
+    }
+}

@@ -68,6 +68,23 @@ class Repository private constructor(context: Context) {
         db.tasks().upsert(t.copy(deleted = true, updatedAt = now()))
     }
 
+    /**
+     * Confie une tâche à l'autre : elle change de propriétaire et garde la trace
+     * de qui l'a donnée, pour qu'elle n'apparaisse jamais comme tombée du ciel.
+     */
+    suspend fun giveTaskToPartner(taskId: String, partnerId: String, fromUserId: String) {
+        val t = db.tasks().byId(taskId) ?: return
+        if (partnerId.isBlank() || partnerId == t.userId) return
+        db.tasks().upsert(
+            t.copy(
+                userId = partnerId,
+                assignedBy = fromUserId,
+                isPriority = false, // la priorité du jour reste le choix de celui qui la reçoit
+                updatedAt = now()
+            )
+        )
+    }
+
     suspend fun assignTaskToDay(taskId: String, date: String?) {
         val t = db.tasks().byId(taskId) ?: return
         if (date != null && !t.isSport && db.tasks().countForDay(t.userId, date) >= MAX_TASKS_PER_DAY) return

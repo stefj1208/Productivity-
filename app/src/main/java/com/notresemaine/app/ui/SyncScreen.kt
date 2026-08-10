@@ -37,6 +37,9 @@ import com.notresemaine.app.data.AppSettings
 @Composable
 fun SyncScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
     val status by vm.syncStatus.collectAsState()
+    // Sans ça, une adresse mal collée enfermait l'utilisateur à l'étape suivante.
+    var editingConfig by remember { mutableStateOf(false) }
+    val configured = settings.supabaseUrl.isNotBlank() && settings.supabaseKey.isNotBlank()
 
     val stepLabel = when {
         settings.supabaseUrl.isBlank() || settings.supabaseKey.isBlank() -> "Étape 1 sur 3"
@@ -59,7 +62,7 @@ fun SyncScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
 
         Spacer(Modifier.height(12.dp))
         when {
-            settings.supabaseUrl.isBlank() || settings.supabaseKey.isBlank() -> {
+            !configured || editingConfig -> {
                 Text(
                     text = "Facultatif : l'application fonctionne très bien sans. C'est ce qui " +
                         "permet de voir la semaine de l'autre et de partager les menus.",
@@ -73,8 +76,8 @@ fun SyncScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
                     modifier = Modifier.padding(top = 8.dp)
                 )
                 Spacer(Modifier.height(12.dp))
-                var url by remember { mutableStateOf("") }
-                var key by remember { mutableStateOf("") }
+                var url by remember { mutableStateOf(settings.supabaseUrl) }
+                var key by remember { mutableStateOf(settings.supabaseKey) }
                 OutlinedTextField(
                     value = url, onValueChange = { url = it },
                     label = { Text("Adresse du projet (https://…supabase.co)") },
@@ -88,10 +91,25 @@ fun SyncScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
                     textStyle = MaterialTheme.typography.bodyLarge,
                     singleLine = true, modifier = Modifier.fillMaxWidth()
                 )
-                TextButton(
-                    onClick = { vm.saveSupabaseConfig(url, key) },
-                    enabled = url.startsWith("https://") && key.length > 20
-                ) { Text("Enregistrer la configuration") }
+                Text(
+                    text = "L'adresse doit être nue : https://xxxx.supabase.co — sans /rest/v1 " +
+                        "ni barre oblique à la fin. L'application retire ces suffixes toute seule.",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+                Row {
+                    TextButton(
+                        onClick = {
+                            vm.saveSupabaseConfig(url, key)
+                            editingConfig = false
+                        },
+                        enabled = url.startsWith("https://") && key.length > 20
+                    ) { Text("Enregistrer la configuration") }
+                    if (editingConfig) {
+                        TextButton(onClick = { editingConfig = false }) { Text("Annuler") }
+                    }
+                }
             }
 
             settings.refreshToken.isBlank() -> {
@@ -178,6 +196,18 @@ fun SyncScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
                     ) { Text("Synchroniser maintenant") }
                 }
                 TextButton(onClick = { vm.signOut() }) { Text("Se déconnecter") }
+            }
+        }
+
+        if (configured && !editingConfig) {
+            Spacer(Modifier.height(20.dp))
+            Text(
+                text = settings.supabaseUrl,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            TextButton(onClick = { editingConfig = true }) {
+                Text("✏️ Modifier l'adresse et la clé")
             }
         }
 

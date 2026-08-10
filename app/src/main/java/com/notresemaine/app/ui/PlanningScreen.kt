@@ -57,7 +57,11 @@ fun PlanningScreen(
     onGoals: () -> Unit,
     onReview: (String) -> Unit,
     onMenus: (String) -> Unit,
-    onShopping: (String) -> Unit
+    onShopping: (String) -> Unit,
+    onScreenTime: () -> Unit,
+    onHealth: () -> Unit,
+    onPerformance: () -> Unit,
+    onMethod: () -> Unit
 ) {
     val today = Dates.todayIso()
     val myId = settings.myUserId
@@ -95,6 +99,14 @@ fun PlanningScreen(
     val targetWeek = Dates.planningTargetWeekIso()
     val targetWeekPlan by remember(myId, targetWeek) { vm.repo.db.weekPlans().byWeek(myId, targetWeek) }
         .collectAsState(initial = null)
+
+    val partner = profiles.firstOrNull { it.id != myId }
+    val partnerName = partner?.name
+
+    fun noteFor(task: TaskEntity): String? =
+        if (task.assignedBy.isNotBlank() && task.assignedBy != myId)
+            "↗ confiée par ${partnerName ?: "l'autre"}"
+        else null
 
     val priority = tasks.firstOrNull { it.isPriority }
     val others = tasks.filter { !it.isPriority }
@@ -175,7 +187,8 @@ fun PlanningScreen(
                         task = priority,
                         accent = accent,
                         onToggle = { vm.toggleDone(priority.id) },
-                        onEdit = { editing = priority }
+                        onEdit = { editing = priority },
+                        note = noteFor(priority)
                     )
                 }
                 others.forEach { task ->
@@ -183,7 +196,8 @@ fun PlanningScreen(
                         task = task,
                         accent = accent,
                         onToggle = { vm.toggleDone(task.id) },
-                        onEdit = { editing = task }
+                        onEdit = { editing = task },
+                        note = noteFor(task)
                     )
                 }
                 TextButton(onClick = { addingTask = true }) { Text("+ Ajouter une tâche") }
@@ -284,54 +298,47 @@ fun PlanningScreen(
             // ----- Raccourcis -----
             Spacer(Modifier.height(24.dp))
             SectionLabel("RACCOURCIS")
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton(
-                    onClick = { onMenus(weekStart) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(52.dp)
-                ) { Text("🍽️ Menus") }
-                OutlinedButton(
-                    onClick = { onShopping(weekStart) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(52.dp)
-                ) {
-                    val remaining = shopping.count { !it.checked }
-                    Text(if (remaining > 0) "🛒 Courses ($remaining)" else "🛒 Courses")
-                }
+            val remaining = shopping.count { !it.checked }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ShortcutIcon("🍽️", "Menus", { onMenus(weekStart) }, Modifier.weight(1f))
+                ShortcutIcon(
+                    "🛒", "Courses", { onShopping(weekStart) }, Modifier.weight(1f),
+                    badge = if (remaining > 0) "($remaining)" else null
+                )
+                ShortcutIcon("🌅", "Rituel", onRitual, Modifier.weight(1f))
+                ShortcutIcon("🎯", "Objectifs", onGoals, Modifier.weight(1f))
             }
             Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.padding(top = 12.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(top = 8.dp)
             ) {
-                OutlinedButton(
-                    onClick = onRitual,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(52.dp)
-                ) { Text("🌅 Rituel") }
-                OutlinedButton(
-                    onClick = onGoals,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(52.dp)
-                ) { Text("🎯 Objectifs") }
+                ShortcutIcon("📵", "Pacte", onScreenTime, Modifier.weight(1f))
+                ShortcutIcon("😴", "Santé", onHealth, Modifier.weight(1f))
+                ShortcutIcon("📈", "Perfs", onPerformance, Modifier.weight(1f))
+                ShortcutIcon("📖", "Méthode", onMethod, Modifier.weight(1f))
             }
             Spacer(Modifier.height(24.dp))
         }
 
-        OutlinedButton(
-            onClick = { onReview(weekStart) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-        ) {
-            Text(if (weekPlan?.validatedAt != null) "Revoir la semaine" else "🗓️ Planifier la semaine")
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedButton(
+                onClick = { onReview(weekStart) },
+                modifier = Modifier
+                    .weight(1f)
+                    .height(52.dp)
+            ) {
+                Text(if (weekPlan?.validatedAt != null) "🗓️ Revoir" else "🗓️ Planifier")
+            }
+            OutlinedButton(
+                onClick = { onPrepare(Dates.tomorrowIso()) },
+                modifier = Modifier
+                    .weight(1f)
+                    .height(52.dp)
+            ) { Text("🌙 Demain") }
         }
         BigButton(
-            text = if (hour < 14) "Préparer aujourd'hui" else "Préparer demain",
-            onClick = { onPrepare(if (hour < 14) today else Dates.tomorrowIso()) },
+            text = "Préparer aujourd'hui",
+            onClick = { onPrepare(today) },
             modifier = Modifier.padding(top = 10.dp, bottom = 16.dp)
         )
     }
@@ -350,7 +357,14 @@ fun PlanningScreen(
                 vm.deleteTask(task.id)
                 editing = null
             },
-            onDismiss = { editing = null }
+            onDismiss = { editing = null },
+            extraActionLabel = partnerName?.let { "🤝 Confier à $it" },
+            onExtraAction = partnerName?.let {
+                {
+                    vm.giveTaskToPartner(task.id)
+                    editing = null
+                }
+            }
         )
     }
 

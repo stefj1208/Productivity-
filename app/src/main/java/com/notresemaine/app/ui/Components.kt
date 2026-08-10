@@ -70,7 +70,8 @@ fun TaskRow(
     accent: Color,
     onToggle: () -> Unit,
     modifier: Modifier = Modifier,
-    onEdit: (() -> Unit)? = null
+    onEdit: (() -> Unit)? = null,
+    note: String? = null
 ) {
     Row(
         modifier = modifier
@@ -91,13 +92,21 @@ fun TaskRow(
                 tint = if (task.done) NeutralGray else accent,
                 modifier = Modifier.size(28.dp)
             )
-            Text(
-                text = (if (task.isSport) "🏃 " else "") + task.title,
-                style = MaterialTheme.typography.bodyLarge,
-                color = if (task.done) NeutralGray else MaterialTheme.colorScheme.onBackground,
-                textDecoration = if (task.done) TextDecoration.LineThrough else null,
-                modifier = Modifier.padding(start = 14.dp)
-            )
+            Column(modifier = Modifier.padding(start = 14.dp)) {
+                Text(
+                    text = (if (task.isSport) "🏃 " else "") + task.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (task.done) NeutralGray else MaterialTheme.colorScheme.onBackground,
+                    textDecoration = if (task.done) TextDecoration.LineThrough else null
+                )
+                if (note != null) {
+                    Text(
+                        text = note,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
+            }
         }
         if (onEdit != null) {
             Box(
@@ -127,7 +136,9 @@ fun EditDeleteDialog(
     label: String = "Intitulé",
     onSave: (String) -> Unit,
     onDelete: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    extraActionLabel: String? = null,
+    onExtraAction: (() -> Unit)? = null
 ) {
     var text by remember { mutableStateOf(initialText) }
     var confirmDelete by remember { mutableStateOf(false) }
@@ -145,9 +156,15 @@ fun EditDeleteDialog(
                     maxLines = 3,
                     modifier = Modifier.fillMaxWidth()
                 )
+                if (extraActionLabel != null && onExtraAction != null) {
+                    androidx.compose.material3.TextButton(
+                        onClick = onExtraAction,
+                        modifier = Modifier.padding(top = 8.dp)
+                    ) { Text(extraActionLabel) }
+                }
                 androidx.compose.material3.TextButton(
                     onClick = { if (confirmDelete) onDelete() else confirmDelete = true },
-                    modifier = Modifier.padding(top = 8.dp)
+                    modifier = Modifier.padding(top = 4.dp)
                 ) {
                     Text(
                         text = if (confirmDelete) "Confirmer la suppression" else "🗑 Supprimer",
@@ -607,5 +624,59 @@ fun EmptyState(
                     .defaultMinSize(minHeight = 48.dp)
             ) { Text(actionLabel) }
         }
+    }
+}
+
+/**
+ * Raccourci carré : un gros symbole, un mot. Rien à lire, tout à reconnaître.
+ * Huit de ces tuiles tiennent dans la place que prenaient quatre boutons texte.
+ */
+@Composable
+fun ShortcutIcon(
+    emoji: String,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    badge: String? = null
+) {
+    Column(
+        modifier = modifier
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .defaultMinSize(minHeight = 76.dp)
+            .padding(vertical = 12.dp, horizontal = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(text = emoji, style = MaterialTheme.typography.titleLarge)
+        Text(
+            text = if (badge != null) "$label $badge" else label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 6.dp)
+        )
+    }
+}
+
+/** Un chiffre qui compte, en grand, avec ce qu'il mesure en dessous. */
+@Composable
+fun KpiTile(
+    value: String,
+    label: String,
+    accent: Color,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+            .defaultMinSize(minHeight = 88.dp)
+            .padding(16.dp)
+    ) {
+        Text(text = value, style = MaterialTheme.typography.displaySmall, color = accent)
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp)
+        )
     }
 }

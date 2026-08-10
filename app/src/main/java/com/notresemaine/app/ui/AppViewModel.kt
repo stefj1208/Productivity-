@@ -95,6 +95,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { repo.deleteTask(taskId); requestSync() }
     }
 
+    fun giveTaskToPartner(taskId: String) {
+        viewModelScope.launch {
+            val partner = repo.db.profiles().partnerOf(myId())
+            if (partner == null) {
+                toast("Personne n'est encore relié à vous (Moi → Synchronisation).")
+                return@launch
+            }
+            repo.giveTaskToPartner(taskId, partner.id, myId())
+            requestSync()
+            toast("Confiée à ${partner.name} ✓")
+        }
+    }
+
     fun assignTaskToDay(taskId: String, date: String?) {
         viewModelScope.launch { repo.assignTaskToDay(taskId, date); requestSync() }
     }
