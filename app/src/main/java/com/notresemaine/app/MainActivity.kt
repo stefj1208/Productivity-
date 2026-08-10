@@ -255,7 +255,7 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings) {
                         onValueChange = { text = it },
                         placeholder = { Text("Ex. : rappeler le plombier mardi") },
                         textStyle = MaterialTheme.typography.bodyLarge,
-                        singleLine = true,
+                        maxLines = 4,
                         modifier = Modifier.fillMaxWidth()
                     )
                     if (settings.aiEnabled && settings.aiApiKey.isNotBlank()) {

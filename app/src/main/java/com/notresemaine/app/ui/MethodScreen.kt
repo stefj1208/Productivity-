@@ -108,7 +108,6 @@ fun MethodScreen(onBack: () -> Unit) {
             }
         }
         Spacer(Modifier.height(16.dp))
-        TextButton(onClick = onBack) { Text("Retour") }
         Spacer(Modifier.height(24.dp))
     }
 }

@@ -60,13 +60,10 @@ fun ShoppingScreen(
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
         ) {
-            Spacer(Modifier.height(20.dp))
-            Text("🛒 Courses", style = MaterialTheme.typography.titleLarge)
-            Text(
-                text = "${Dates.weekRangeLabel(weekStart)} · $remaining article(s) à prendre",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp)
+            ScreenHeader(
+                title = "🛒 Courses",
+                subtitle = "$remaining article(s) à prendre",
+                onBack = onBack
             )
 
             // Les articles que l'application ne reconnaît pas atterrissent dans « Divers ».
@@ -99,10 +96,9 @@ fun ShoppingScreen(
 
             if (items.isEmpty()) {
                 Spacer(Modifier.height(20.dp))
-                Text(
-                    text = "Liste vide. Renseigne les menus de la semaine, " +
-                        "puis touche « Générer la liste de courses ».",
-                    style = MaterialTheme.typography.bodyLarge
+                EmptyState(
+                    emoji = "🛒",
+                    text = "Liste vide. Elle se remplit toute seule à partir des menus."
                 )
             }
 
@@ -137,12 +133,9 @@ fun ShoppingScreen(
             Spacer(Modifier.height(20.dp))
         }
 
-        Row {
-            TextButton(onClick = onBack) { Text("Retour") }
-            if (items.any { it.checked }) {
-                TextButton(onClick = { vm.clearCheckedShopping(weekStart) }) {
-                    Text("Retirer les articles pris")
-                }
+        if (items.any { it.checked }) {
+            TextButton(onClick = { vm.clearCheckedShopping(weekStart) }) {
+                Text("Retirer les articles pris")
             }
         }
         BigButton(

@@ -124,7 +124,7 @@ fun RitualScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
                 .verticalScroll(rememberScrollState())
         ) {
             Spacer(Modifier.height(20.dp))
-            Text("Rituel du matin", style = MaterialTheme.typography.titleLarge)
+            ScreenHeader(title = "🌅 Rituel du matin", onBack = onDone)
             Spacer(Modifier.height(12.dp))
             TipCard(Tips.morning())
             Spacer(Modifier.height(12.dp))
@@ -221,7 +221,6 @@ fun RitualScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
             Spacer(Modifier.height(16.dp))
         }
 
-        TextButton(onClick = onDone) { Text("Retour") }
         BigButton(
             text = if (doneToday) "Refaire quand même" else "Commencer ($totalMinutes min)",
             enabled = enabledSteps.isNotEmpty(),

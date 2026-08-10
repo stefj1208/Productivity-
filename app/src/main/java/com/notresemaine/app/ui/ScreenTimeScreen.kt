@@ -87,20 +87,21 @@ fun ScreenTimeScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
         ) {
-            Spacer(Modifier.height(20.dp))
-            Text("Temps d'écran & Pacte", style = MaterialTheme.typography.titleLarge)
+            ScreenHeader(
+                title = "📵 Pacte d'écran",
+                subtitle = if (settings.pacteEnabled) "Actif · ${settings.dailyLimitMinutes} min/jour"
+                else "Aucun engagement",
+                onBack = onBack
+            )
 
             Spacer(Modifier.height(16.dp))
-            SectionLabel("ÉTAPE 1 · PERMISSION ANDROID")
+            SectionLabel("1 · PERMISSION")
             if (hasPermission) {
                 Text("Accès aux données d'utilisation : accordé ✓", style = MaterialTheme.typography.bodyLarge)
             } else {
                 Text(
-                    text = "Android demande une permission spéciale, hors de l'application :\n" +
-                        "1. Touche le bouton ci-dessous.\n" +
-                        "2. Dans la liste, cherche « Notre Semaine ».\n" +
-                        "3. Active « Autoriser l'accès aux données d'utilisation ».\n" +
-                        "4. Reviens ici avec le bouton Retour.",
+                    text = "Android exige une autorisation, hors de l'app. " +
+                        "Cherchez « Notre Semaine » dans la liste qui s'ouvre.",
                     style = MaterialTheme.typography.bodyLarge
                 )
                 Spacer(Modifier.height(8.dp))
@@ -111,7 +112,7 @@ fun ScreenTimeScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit
             }
 
             Spacer(Modifier.height(16.dp))
-            SectionLabel("ÉTAPE 2 · MES APPLICATIONS À LIMITER")
+            SectionLabel("2 · APPLICATIONS À LIMITER")
             Text(
                 text = "${selected.size} applications suivies",
                 style = MaterialTheme.typography.bodyLarge
@@ -139,7 +140,7 @@ fun ScreenTimeScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit
             }
 
             Spacer(Modifier.height(16.dp))
-            SectionLabel("ÉTAPE 3 · LIMITE QUOTIDIENNE (minutes)")
+            SectionLabel("3 · LIMITE PAR JOUR (MINUTES)")
             OutlinedTextField(
                 value = limit,
                 onValueChange = { limit = it },
@@ -150,10 +151,10 @@ fun ScreenTimeScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit
             )
 
             Spacer(Modifier.height(16.dp))
-            SectionLabel("ÉTAPE 4 · COUVRE-FEU")
+            SectionLabel("4 · COUVRE-FEU")
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "Plus d'écran à partir d'une heure fixe, pour ne pas se coucher trop tard.",
+                    text = "Plus d'écran à partir d'une heure fixe.",
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.weight(1f)
                 )
@@ -181,8 +182,8 @@ fun ScreenTimeScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
                     Text(
-                        text = "Mode strict : toutes les applications, pas seulement les réseaux. " +
-                            "Téléphone, messages, réveil et appareil photo restent toujours accessibles.",
+                        text = "Mode strict : tout, pas seulement les réseaux. " +
+                            "Téléphone, messages, réveil et photo restent accessibles.",
                         style = MaterialTheme.typography.bodyLarge,
                         modifier = Modifier.weight(1f)
                     )
@@ -198,10 +199,7 @@ fun ScreenTimeScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit
                     modifier = Modifier.padding(top = 16.dp)
                 )
                 Text(
-                    text = aiWhy.ifBlank {
-                        "Part de votre usage réellement mesuré ces 7 derniers jours et propose " +
-                            "une marche tenable, pas un sevrage. Envoie uniquement vos moyennes."
-                    },
+                    text = aiWhy.ifBlank { "D'après vos 7 derniers jours mesurés." },
                     style = MaterialTheme.typography.labelMedium,
                     color = if (aiWhy.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant
                     else MaterialTheme.colorScheme.secondary,
@@ -210,20 +208,18 @@ fun ScreenTimeScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit
             }
 
             Spacer(Modifier.height(16.dp))
-            SectionLabel("ÉTAPE 5 · LE PACTE")
+            SectionLabel("5 · LE PACTE")
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "Au-delà de la limite ou pendant le couvre-feu, blocage.\n" +
-                        "Seule l'autre moitié peut accorder une pause.",
+                    text = "Au-delà de la limite, blocage. Seule l'autre moitié peut " +
+                        "accorder une pause.",
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.weight(1f)
                 )
                 Switch(checked = enabled, onCheckedChange = { enabled = it })
             }
             Text(
-                text = "⏳ Un engagement ne se relâche pas dans l'instant : durcir le pacte prend " +
-                    "effet immédiatement, l'assouplir attend le lendemain. Vos réglages sont " +
-                    "visibles par l'autre dans l'onglet Nous.",
+                text = "⏳ Durcir s'applique tout de suite. Assouplir attend demain.",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp)
@@ -252,17 +248,14 @@ fun ScreenTimeScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit
 
             Spacer(Modifier.height(12.dp))
             Text(
-                text = "Sur le Honor 400 Pro : Paramètres → Batterie → Lancement d'applications → " +
-                    "Notre Semaine → désactiver « Gestion automatique » et tout autoriser en manuel, " +
-                    "sinon MagicOS tuera la surveillance en arrière-plan. " +
-                    "Sur le S23 : Paramètres → Batterie → mettre l'application en « Non restreinte ».",
+                text = "Honor : Batterie → Lancement d'applications → gestion manuelle. " +
+                    "S23 : Batterie → Non restreinte. Sinon la surveillance est tuée.",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(16.dp))
         }
 
-        TextButton(onClick = onBack) { Text("Retour") }
         BigButton(
             text = "Enregistrer le pacte",
             enabled = limit.toIntOrNull() != null && (!enabled || hasPermission) &&

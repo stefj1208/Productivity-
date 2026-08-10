@@ -184,8 +184,7 @@ fun HomeScreen(
                 Spacer(Modifier.height(20.dp))
                 EmptyState(
                     emoji = "🌤️",
-                    text = "Rien de prévu aujourd'hui. Une seule décision suffit : " +
-                        "quelle est la chose qui compte le plus ?",
+                    text = "Rien de prévu. Quelle est la chose qui compte le plus ?",
                     actionLabel = "Choisir ma priorité",
                     onAction = { onPrepare(today) }
                 )

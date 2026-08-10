@@ -77,16 +77,10 @@ fun PrepareScreen(vm: AppViewModel, settings: AppSettings, dateIso: String, onDo
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
         ) {
-            Spacer(Modifier.height(20.dp))
-            Text(
-                text = if (isToday) "Aujourd'hui" else "Préparer demain",
-                style = MaterialTheme.typography.titleLarge
-            )
-            Text(
-                text = Dates.longLabel(dateIso),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp)
+            ScreenHeader(
+                title = if (isToday) "Préparer aujourd'hui" else "Préparer demain",
+                subtitle = Dates.longLabel(dateIso),
+                onBack = onDone
             )
 
             Spacer(Modifier.height(24.dp))
@@ -97,7 +91,7 @@ fun PrepareScreen(vm: AppViewModel, settings: AppSettings, dateIso: String, onDo
                 placeholder = { Text("La chose qui rend le reste plus simple") },
                 textStyle = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
+                maxLines = 3,
                 enabled = loaded
             )
 
@@ -126,7 +120,7 @@ fun PrepareScreen(vm: AppViewModel, settings: AppSettings, dateIso: String, onDo
                 placeholder = { Text("Tâche secondaire 1") },
                 textStyle = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
+                maxLines = 3,
                 enabled = loaded
             )
             Spacer(Modifier.height(8.dp))
@@ -136,7 +130,7 @@ fun PrepareScreen(vm: AppViewModel, settings: AppSettings, dateIso: String, onDo
                 placeholder = { Text("Tâche secondaire 2") },
                 textStyle = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
+                maxLines = 3,
                 enabled = loaded
             )
 
@@ -164,14 +158,11 @@ fun PrepareScreen(vm: AppViewModel, settings: AppSettings, dateIso: String, onDo
                 placeholder = { Text("Ex. : 9h–11h dossier client") },
                 textStyle = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                maxLines = 2
             )
             Spacer(Modifier.height(20.dp))
         }
 
-        TextButton(onClick = onDone, modifier = Modifier.padding(bottom = 4.dp)) {
-            Text("Annuler")
-        }
         BigButton(
             text = "C'est prêt",
             enabled = loaded && priority.isNotBlank() && wakeOk,

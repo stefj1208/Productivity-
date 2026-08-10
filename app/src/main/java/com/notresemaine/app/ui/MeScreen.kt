@@ -150,12 +150,6 @@ fun MeScreen(
             onClick = onProfile
         )
 
-        Spacer(Modifier.height(24.dp))
-        Text(
-            text = "Tout est ici : plus rien n'est caché derrière une roue dentée.",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
         Spacer(Modifier.height(32.dp))
     }
 }

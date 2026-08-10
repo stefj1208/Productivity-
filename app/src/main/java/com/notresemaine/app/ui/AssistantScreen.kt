@@ -56,14 +56,8 @@ fun AssistantScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit)
 
             Spacer(Modifier.height(12.dp))
             Text(
-                text = if (active) {
-                    "Les boutons ✨ sont visibles là où ils servent : Objectifs, revue du " +
-                        "dimanche, Préparer demain, bouton +, Menus, Courses, Temps d'écran, Sommeil."
-                } else {
-                    "Tant qu'il est éteint, aucun bouton ✨ n'apparaît dans l'application. " +
-                        "Allumez-le ci-dessous : il servira dans Objectifs, la revue du dimanche, " +
-                        "Préparer demain, le bouton +, Menus, Courses, Temps d'écran et Sommeil."
-                },
+                text = if (active) "Les boutons ✨ sont actifs dans l'application."
+                else "Éteint : aucun bouton ✨ n'apparaît.",
                 style = MaterialTheme.typography.bodyLarge
             )
 
@@ -92,8 +86,7 @@ fun AssistantScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit)
 
             Spacer(Modifier.height(12.dp))
             Text(
-                text = "Chaque bouton a son équivalent hors ligne, instantané et gratuit. " +
-                    "L'application reste entière sans clé.",
+                text = "Chaque bouton a son équivalent hors ligne, gratuit.",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -101,14 +94,13 @@ fun AssistantScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit)
             Spacer(Modifier.height(24.dp))
             SectionLabel("CE QUI SORT DU TÉLÉPHONE")
             Text(
-                text = "Vos contraintes de menus, l'intitulé d'un objectif, la note que vous " +
-                    "venez d'écrire, les titres de vos tâches en attente, vos moyennes d'écran " +
-                    "et de sommeil.",
+                text = "Contraintes de menus · intitulé d'objectif · note écrite · " +
+                    "titres de tâches · moyennes d'écran et de sommeil.",
                 style = MaterialTheme.typography.bodyLarge
             )
             Text(
-                text = "Jamais un objectif marqué privé. Jamais quoi que ce soit du partenaire. " +
-                    "Jamais le détail jour par jour de votre santé. Jamais vos identifiants.",
+                text = "Jamais : objectif privé, données du partenaire, détail de santé, " +
+                    "identifiants.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.secondary,
                 modifier = Modifier.padding(top = 8.dp)
@@ -117,9 +109,8 @@ fun AssistantScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit)
             Spacer(Modifier.height(24.dp))
             SectionLabel("LA CLÉ")
             Text(
-                text = "Deux clés possibles, l'application reconnaît laquelle toute seule : " +
-                    "une clé Google (aistudio.google.com) ou une clé Anthropic (sk-ant-…). " +
-                    "Chaque appel vous est facturé par le fournisseur choisi.",
+                text = "Google (aistudio.google.com) ou Anthropic (sk-ant-…) — reconnue " +
+                    "automatiquement. Chaque appel vous est facturé.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

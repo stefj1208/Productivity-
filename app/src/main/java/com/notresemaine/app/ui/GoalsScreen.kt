@@ -86,9 +86,8 @@ fun GoalsScreen(vm: AppViewModel, settings: AppSettings) {
             Spacer(Modifier.height(20.dp))
             EmptyState(
                 emoji = "🎯",
-                text = "Aucun objectif pour l'instant. Choisissez-en un dans la bibliothèque " +
-                    "ci-dessous : l'application place les séances de la semaine à votre place, " +
-                    "aux bons moments."
+                text = "Aucun objectif. Choisissez-en un ci-dessous : les séances se " +
+                    "placent toutes seules dans la semaine."
             )
         } else {
             Spacer(Modifier.height(16.dp))
@@ -262,7 +261,7 @@ private fun GoalWizard(
                 onValueChange = { title = it },
                 placeholder = { Text("Ex. : apprendre l'espagnol") },
                 textStyle = MaterialTheme.typography.bodyLarge,
-                singleLine = true,
+                maxLines = 3,
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -275,17 +274,14 @@ private fun GoalWizard(
                     modifier = Modifier.padding(top = 10.dp)
                 )
                 Text(
-                    text = "Remplit les questions 2 et 3 ci-dessous : combien de séances, " +
-                        "de quelle durée, quels jours, et par quoi commencer. " +
-                        "Envoie uniquement l'intitulé de l'objectif.",
+                    text = "Remplit les questions 2 et 3 à votre place.",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp)
                 )
             } else {
                 Text(
-                    text = "✨ Un assistant peut bâtir le rythme à votre place (séances, durée, " +
-                        "jours, premier pas). Il s'active dans Réglages, tout en haut.",
+                    text = "✨ Rythme bâti à votre place : activez l'assistant dans Moi.",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 10.dp)
@@ -349,7 +345,7 @@ private fun GoalWizard(
                 )
             }
             Text(
-                text = "Touche un pas pour en faire ta prochaine action.",
+                text = "Touchez un pas pour en faire votre prochaine action.",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -370,7 +366,7 @@ private fun GoalWizard(
                 onValueChange = { nextAction = it },
                 placeholder = { Text("Le tout premier pas, concret") },
                 textStyle = MaterialTheme.typography.bodyLarge,
-                singleLine = true,
+                maxLines = 3,
                 modifier = Modifier.fillMaxWidth()
             )
 

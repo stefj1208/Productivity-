@@ -80,8 +80,7 @@ fun HealthScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
         ) {
-            Spacer(Modifier.height(20.dp))
-            Text("😴 Sommeil & sport", style = MaterialTheme.typography.titleLarge)
+            ScreenHeader(title = "😴 Sommeil & sport", onBack = onBack)
 
             Spacer(Modifier.height(16.dp))
             SectionLabel("MESURE AUTOMATIQUE (HEALTH CONNECT)")
@@ -118,8 +117,7 @@ fun HealthScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
                 }
                 checked -> {
                     Text(
-                        text = "Autorise la lecture du sommeil, des pas et des séances. " +
-                            "L'application ne fait que lire — elle n'écrit jamais.",
+                        text = "Lecture seule du sommeil, des pas et des séances.",
                         style = MaterialTheme.typography.bodyLarge
                     )
                     OutlinedButton(
@@ -133,9 +131,8 @@ fun HealthScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
 
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "À savoir : Health Connect ne contient que ce qu'une montre, un bracelet ou " +
-                    "une appli (Samsung Health…) y écrit. Sans source, tout reste à zéro — " +
-                    "c'est normal, et la saisie manuelle ci-dessous prend 10 secondes.",
+                text = "Sans montre ni appli qui l'alimente, Health Connect reste à zéro. " +
+                    "C'est normal : la saisie ci-dessous prend 10 secondes.",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -160,10 +157,7 @@ fun HealthScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
                     modifier = Modifier.padding(top = 14.dp)
                 )
                 Text(
-                    text = aiRead.ifBlank {
-                        "Une phrase sur votre semaine, et un seul levier à essayer. " +
-                            "Envoie uniquement vos moyennes — jamais celles de l'autre."
-                    },
+                    text = aiRead.ifBlank { "Une phrase sur votre semaine, un levier à essayer." },
                     style = if (aiRead.isBlank()) MaterialTheme.typography.labelMedium
                     else MaterialTheme.typography.bodyLarge,
                     color = if (aiRead.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant
@@ -226,10 +220,5 @@ fun HealthScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
             Spacer(Modifier.height(20.dp))
         }
 
-        BigButton(
-            text = "Retour",
-            onClick = onBack,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
     }
 }

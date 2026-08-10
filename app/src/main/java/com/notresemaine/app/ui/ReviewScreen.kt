@@ -113,16 +113,11 @@ fun ReviewScreen(
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
         ) {
-            Spacer(Modifier.height(20.dp))
-            Text(
-                text = "${step + 1}/${titles.size} · ${titles[step]}",
-                style = MaterialTheme.typography.titleLarge
-            )
-            Text(
-                text = "${Dates.weekRelativeLabel(weekStart)} · ${Dates.weekRangeLabel(weekStart)}",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 2.dp)
+            ScreenHeader(
+                title = titles[step],
+                subtitle = "Étape ${step + 1} sur ${titles.size} · " +
+                    Dates.weekRelativeLabel(weekStart),
+                onBack = onDone
             )
             Spacer(Modifier.height(14.dp))
             TipCard(Tips.review(step))
@@ -231,6 +226,7 @@ fun ReviewScreen(
                         onValueChange = { abandon = it },
                         placeholder = { Text("Ex. : les réunions sans ordre du jour") },
                         textStyle = MaterialTheme.typography.bodyLarge,
+                        maxLines = 3,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -247,6 +243,7 @@ fun ReviewScreen(
                         onValueChange = { priority = it },
                         placeholder = { Text("Ma priorité de la semaine") },
                         textStyle = MaterialTheme.typography.bodyLarge,
+                        maxLines = 3,
                         modifier = Modifier.fillMaxWidth()
                     )
                     if (settings.aiEnabled && settings.aiApiKey.isNotBlank()) {

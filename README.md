@@ -100,6 +100,7 @@ Chaque proposition **remplit les champs** — rien n'est enregistré tant que vo
 5. ✅ **V5** — assistant facultatif (Google ou Anthropic) branché sur neuf écrans, chaque fois doublé d'une voie hors ligne
 6. ✅ **V6** — refonte de la navigation (4 onglets, plus de séparation jour/semaine), Maison en onglet, rappels en alarme plein écran
 7. ✅ **V7** — refonte UX : onglet « Moi » à la place de la roue dentée, réglages éclatés en écrans dédiés, en-têtes et états vides cohérents partout
+8. ✅ **V7.1** — passage « Don't Make Me Think » : retour en haut à gauche sur tous les écrans, moitié des mots supprimée, champs de saisie qui vont à la ligne
 
 ### Sommeil & sport : ce qui marchera vraiment
 Health Connect ne contient **que** ce qu'une montre, un bracelet ou une appli (Samsung Health…) y écrit. Sans source, sommeil et séances resteront à zéro — c'est une limite d'Android, pas de l'application. D'où la saisie de secours dans **Réglages → Sommeil & sport** : deux heures à taper pour la nuit, un bouton `20′ / 30′ / 45′ / 60′` pour une séance. Une mesure automatique n'écrase jamais une saisie manuelle du même jour.

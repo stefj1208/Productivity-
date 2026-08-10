@@ -53,33 +53,20 @@ fun MenusScreen(
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
         ) {
-            Spacer(Modifier.height(20.dp))
-            Text("🍽️ Menus", style = MaterialTheme.typography.titleLarge)
-            Text(
-                text = Dates.weekRangeLabel(weekStart),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp)
+            ScreenHeader(
+                title = "🍽️ Menus",
+                subtitle = Dates.weekRangeLabel(weekStart),
+                onBack = onBack
             )
-            Spacer(Modifier.height(12.dp))
-            TipCard(com.notresemaine.app.data.Tips.review(6))
 
-            // Pas d'inspiration ? Deux issues : la banque hors ligne, ou l'assistant.
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(8.dp))
             SectionLabel("PAS D'INSPIRATION ?")
             OutlinedButton(
                 onClick = { vm.fillMenusFromBank(weekStart) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp)
-            ) { Text("💡 Proposer une semaine complète") }
-            Text(
-                text = "Remplit uniquement les créneaux vides, avec des recettes simples. " +
-                    "Hors ligne, instantané, rien n'est envoyé nulle part.",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp)
-            )
+            ) { Text("💡 Remplir les créneaux vides") }
 
             if (settings.aiEnabled && settings.aiApiKey.isNotBlank()) {
                 Spacer(Modifier.height(10.dp))
@@ -89,7 +76,7 @@ fun MenusScreen(
                     onValueChange = { constraints = it },
                     placeholder = { Text("Contraintes : végétarien, rapide le soir…") },
                     textStyle = MaterialTheme.typography.bodyLarge,
-                    singleLine = true,
+                    maxLines = 2,
                     modifier = Modifier.fillMaxWidth()
                 )
                 AiButton(
@@ -98,17 +85,9 @@ fun MenusScreen(
                     onClick = { vm.suggestMenusWithAi(weekStart, constraints) },
                     modifier = Modifier.padding(top = 6.dp)
                 )
-                Text(
-                    text = "Envoie uniquement vos contraintes. Aucune donnée de " +
-                        "sommeil, d'écran ou de tâches ne quitte le téléphone.",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
             } else {
                 Text(
-                    text = "✨ Un assistant peut composer des menus sur mesure (végétarien, " +
-                        "rapide le soir…). Il s'active dans Réglages, tout en haut.",
+                    text = "✨ Menus sur mesure : activez l'assistant dans Moi.",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 10.dp)
@@ -138,7 +117,6 @@ fun MenusScreen(
             Spacer(Modifier.height(20.dp))
         }
 
-        TextButton(onClick = onBack) { Text("Retour") }
         BigButton(
             text = "Générer la liste de courses",
             onClick = {
@@ -178,7 +156,7 @@ private fun MealEditor(
             onValueChange = { titleText = it },
             placeholder = { Text("Ex. : pâtes bolognaise") },
             textStyle = MaterialTheme.typography.bodyLarge,
-            singleLine = true,
+            maxLines = 2,
             modifier = Modifier.fillMaxWidth()
         )
         if (titleText.isNotBlank()) {
