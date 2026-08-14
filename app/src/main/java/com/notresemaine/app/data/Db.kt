@@ -173,7 +173,7 @@ data class GraceRequestEntity(
     val updatedAt: Long
 )
 
-/** Repas du couple : un midi et un soir par jour, partagés. */
+/** Repas du couple : un matin, un midi et un soir par jour, partagés. */
 @Entity(tableName = "meals")
 data class MealEntity(
     @PrimaryKey val id: String, // "$date:$slot"
@@ -182,6 +182,25 @@ data class MealEntity(
     val slot: String,           // matin | midi | soir
     val title: String,
     val ingredients: String,    // "200 g farine, 3 œufs, 1 L lait"
+    /** Ce qu'il faut dans l'assiette de chacun : « 150 g de pâtes, 120 g de saumon ». */
+    val quantities: String = "",
+    /** Calories par personne. 0 = non renseigné, jamais affiché comme un zéro. */
+    val calories: Int = 0,
+    val deleted: Boolean = false,
+    val updatedAt: Long
+)
+
+/**
+ * Une pesée. Donnée de santé, donc personnelle par défaut : le partenaire ne
+ * la voit que si son propriétaire a coché le partage dans son profil.
+ */
+@Entity(tableName = "weights")
+data class WeightEntity(
+    @PrimaryKey val id: String, // "$userId:$date"
+    val userId: String,
+    val date: String,
+    val kilos: Double,
+    val note: String = "",
     val deleted: Boolean = false,
     val updatedAt: Long
 )
@@ -485,6 +504,27 @@ interface HouseItemDao {
 }
 
 @Dao
+interface WeightDao {
+    @Query("SELECT * FROM weights WHERE deleted = 0 ORDER BY date")
+    fun all(): Flow<List<WeightEntity>>
+
+    @Query("SELECT * FROM weights WHERE userId = :userId AND deleted = 0 ORDER BY date DESC LIMIT :limit")
+    suspend fun lastOnce(userId: String, limit: Int): List<WeightEntity>
+
+    @Query("SELECT * FROM weights WHERE id = :id")
+    suspend fun byId(id: String): WeightEntity?
+
+    @Query("SELECT * FROM weights WHERE updatedAt > :ts")
+    suspend fun modifiedSince(ts: Long): List<WeightEntity>
+
+    @Query("UPDATE weights SET userId = :newId, id = :newId || ':' || date, updatedAt = :now WHERE userId = :oldId")
+    suspend fun migrateUser(oldId: String, newId: String, now: Long)
+
+    @Upsert
+    suspend fun upsert(entry: WeightEntity)
+}
+
+@Dao
 interface HealthDao {
     @Query("SELECT * FROM health_days WHERE date >= :fromDate AND deleted = 0 ORDER BY date")
     fun since(fromDate: String): Flow<List<HealthDayEntity>>
@@ -509,9 +549,9 @@ interface HealthDao {
         GoalEntity::class, RitualStepEntity::class, RitualLogEntity::class,
         InboxItemEntity::class, UsageDayEntity::class, GraceRequestEntity::class,
         MealEntity::class, ShoppingItemEntity::class, HealthDayEntity::class,
-        HouseItemEntity::class
+        HouseItemEntity::class, WeightEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDb : RoomDatabase() {
@@ -529,6 +569,7 @@ abstract class AppDb : RoomDatabase() {
     abstract fun shopping(): ShoppingDao
     abstract fun health(): HealthDao
     abstract fun houseItems(): HouseItemDao
+    abstract fun weights(): WeightDao
 
     companion object {
         @Volatile private var instance: AppDb? = null

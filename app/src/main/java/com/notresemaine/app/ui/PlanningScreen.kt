@@ -62,6 +62,8 @@ fun PlanningScreen(
     onScreenTime: () -> Unit,
     onHealth: () -> Unit,
     onPerformance: () -> Unit,
+    onWeight: () -> Unit,
+    onCalendar: () -> Unit,
     onMethod: () -> Unit
 ) {
     val today = Dates.todayIso()
@@ -168,6 +170,37 @@ fun PlanningScreen(
                     else -> null
                 }
             )
+
+            // ----- Le pouls : trois anneaux, aucun mot -----
+            //
+            // Trois chiffres qu'on lisait auparavant dans trois écrans différents.
+            // Un anneau se lit sans phrase et sans comparaison : rempli ou non.
+            Spacer(Modifier.height(20.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                ProgressRing(
+                    progress = if (tasks.isEmpty()) 0f else doneToday / tasks.size.toFloat(),
+                    center = if (tasks.isEmpty()) "—" else "$doneToday/${tasks.size}",
+                    label = "aujourd'hui",
+                    accent = accent
+                )
+                val weekDone = weekTasks.count { it.done }
+                ProgressRing(
+                    progress = if (weekTasks.isEmpty()) 0f else weekDone / weekTasks.size.toFloat(),
+                    center = if (weekTasks.isEmpty()) "—" else "$weekDone/${weekTasks.size}",
+                    label = "la semaine",
+                    accent = accent
+                )
+                val streak = vm.repo.ritualStreak(ritualLogs, myId)
+                ProgressRing(
+                    progress = (streak / 21f).coerceAtMost(1f),
+                    center = if (streak == 0) "—" else "$streak",
+                    label = "jours de suite",
+                    accent = accent
+                )
+            }
 
             // ----- Récap du jour -----
             Spacer(Modifier.height(24.dp))
@@ -335,7 +368,16 @@ fun PlanningScreen(
             ) {
                 ShortcutIcon("📵", "Pacte", onScreenTime, Modifier.weight(1f))
                 ShortcutIcon("😴", "Santé", onHealth, Modifier.weight(1f))
+                ShortcutIcon("⚖️", "Poids", onWeight, Modifier.weight(1f))
                 ShortcutIcon("📈", "Perfs", onPerformance, Modifier.weight(1f))
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(top = 8.dp)
+            ) {
+                ShortcutIcon("🕐", "Ma journée", { onDay(today) }, Modifier.weight(1f))
+                ShortcutIcon("📅", "Agenda", onCalendar, Modifier.weight(1f))
+                ShortcutIcon("🔄", "Revue", { onReview(targetWeek) }, Modifier.weight(1f))
                 ShortcutIcon("📖", "Méthode", onMethod, Modifier.weight(1f))
             }
             Spacer(Modifier.height(24.dp))

@@ -2,7 +2,7 @@
 
 Application Android pour deux personnes : planifier la semaine, préparer le lendemain en 2 minutes, suivre UNE priorité par jour et par semaine, et se soutenir mutuellement — sans surcharge, sans gamification.
 
-**Version actuelle : V7.** Cinq destinations, une question chacune : *que fait-on maintenant* (Aujourd'hui, qui contient aussi la semaine), *où va-t-on* (Objectifs), *qu'est-ce qu'on mange* (Maison), *où en est-on à deux* (Nous), *qu'est-ce qui me concerne* (Moi). **La roue dentée a disparu** : tout ce qui était enterré dans les réglages a sa tuile dans « Moi », et chaque tuile affiche son état. Les rappels s'affichent en **alarme plein écran**, même téléphone verrouillé.
+**Version actuelle : V10.** Cinq destinations, une question chacune : *que fait-on maintenant* (Aujourd'hui, qui contient aussi la semaine), *où va-t-on* (Objectifs), *qu'est-ce qu'on mange* (Maison), *où en est-on à deux* (Nous), *qu'est-ce qui me concerne* (Moi). **La roue dentée a disparu** : tout ce qui était enterré dans les réglages a sa tuile dans « Moi », et chaque tuile affiche son état. Les rappels s'affichent en **alarme plein écran**, même téléphone verrouillé.
 
 Le numéro de version est affiché dans **Moi → Profil & apparence** : c'est le moyen de vérifier ce qui est réellement installé.
 
@@ -72,6 +72,15 @@ Réaliste, pour être honnête :
 - La demande de pause part instantanément ; le partenaire la voit à l'ouverture de son application (pas de notification poussée en V2).
 - **IA locale : abandonnée d'un commun accord.** L'analyse de texte intégrée (dates et mots-clés français) couvre la capture sans réseau.
 
+## 4 ter. Agenda : pourquoi pas l'API Google directement
+
+L'application écrit dans **l'agenda du téléphone**, pas dans l'API Google Agenda. Ce n'est pas un repli : c'est mieux ici.
+
+- L'API Google exigerait un projet Google Cloud, un écran de consentement OAuth et l'empreinte de signature de l'application. Or l'APK est reconstruit à chaque livraison avec une signature de test qui change : l'accès serait cassé en permanence.
+- L'agenda du téléphone contient déjà votre compte Google, synchronisé par Android. Ce qu'on y écrit **remonte dans Google Agenda** sur tous vos appareils, et ce qui est dans Google Agenda **descend** dans l'application.
+
+Concrètement, dans **Moi → Agenda** : autoriser l'accès, choisir l'agenda (prenez celui de votre compte Google), activer. Chaque tâche à laquelle vous donnez une heure devient un rendez-vous. Vos autres événements ne sont jamais touchés — l'application ne supprime que ce qu'elle a écrit elle-même. Et dans la vue « Ma journée », vos vraies réunions apparaissent, pour ne pas réserver un créneau déjà pris.
+
 ## 4 bis. L'assistant (facultatif)
 
 Tout ce que l'assistant fait a un équivalent **hors ligne, instantané et gratuit** : banque de menus, premiers pas par objectif, répartition des séances, classement des courses par rayon. L'assistant sert au sur-mesure et aux moments de panne d'inspiration.
@@ -82,6 +91,8 @@ Où il intervient :
 
 | Écran | Ce qu'il fait | Ce qui sort du téléphone |
 |---|---|---|
+| Repas du jour | Refait UN repas sur consigne (« plus léger », « il me reste du poulet ») avec quantités et calories | Ce repas et votre consigne |
+| Poids | Une phrase sur la tendance, un levier à essayer | Une suite de kilos et l'objectif |
 | Objectifs | Bâtit le rythme : séances, durée, moment, jours, première action | L'intitulé de l'objectif |
 | Objectifs | Trois premiers pas concrets | L'intitulé de l'objectif |
 | Revue du dimanche | Propose LA priorité et ce qu'on laisse tomber | Objectifs non privés, notes en attente |
@@ -109,6 +120,7 @@ Chaque proposition **remplit les champs** — rien n'est enregistré tant que vo
 9. ✅ **V8** — « Aujourd'hui » devient **Planning** (récap jour + semaine + raccourcis + bouton Planifier la semaine) ; **modifier et supprimer** ajoutés sur les tâches, les objectifs, les repas et les courses
 10. ✅ **V8.1** — **confier une tâche à l'autre**, écran **Mes performances** (KPI + graphiques), grille de 8 raccourcis en symboles, « Préparer demain » accessible à tout moment, adresse Supabase corrigeable et nettoyée automatiquement
 11. ✅ **V9** — **créneaux horaires** sur les tâches (avec rappel à l'heure dite), **vue de la journée heure par heure**, onglets **Finance** et **Enfants** dans Maison, tâches confiées visibles dans Maison
+13. ✅ **V10** — **poids** (courbe, objectif, partage facultatif), **agenda du téléphone** (donc Google Agenda) dans les deux sens, **quantités par personne et calories** sur chaque repas + bouton ✨ pour refaire un repas, anneaux de progression et courbes
 12. ✅ **V9.1** — **le Pacte bloque enfin** : autorisation « par-dessus les autres applications », notification plein écran de secours, détection de l'application ouverte corrigée, écran d'auto-diagnostic
 
 ### Sommeil & sport : ce qui marchera vraiment

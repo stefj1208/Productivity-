@@ -422,6 +422,25 @@ fun AiButton(
 }
 
 /** Une proposition de l'assistant : on la lit, puis on l'accepte ou on l'ignore. */
+/** Une phrase de l'assistant, à lire — rien à accepter, rien à refuser. */
+@Composable
+fun AiNote(text: String, modifier: Modifier = Modifier) {
+    if (text.isBlank()) return
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+            .padding(16.dp)
+    ) {
+        Text("✨", style = MaterialTheme.typography.bodyLarge)
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.padding(start = 10.dp)
+        )
+    }
+}
+
 @Composable
 fun AiSuggestion(
     lines: List<String>,

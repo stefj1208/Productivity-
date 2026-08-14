@@ -6,6 +6,7 @@ import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
+import androidx.health.connect.client.records.WeightRecord
 import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
@@ -32,7 +33,8 @@ object Health {
     val PERMISSIONS: Set<String> = setOf(
         HealthPermission.getReadPermission(SleepSessionRecord::class),
         HealthPermission.getReadPermission(StepsRecord::class),
-        HealthPermission.getReadPermission(ExerciseSessionRecord::class)
+        HealthPermission.getReadPermission(ExerciseSessionRecord::class),
+        HealthPermission.getReadPermission(WeightRecord::class)
     )
 
     /** SDK_UNAVAILABLE / SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED / SDK_AVAILABLE */
@@ -85,6 +87,24 @@ object Health {
             ).records.sumOf { Duration.between(it.startTime, it.endTime).toMinutes() }.toInt()
 
             HealthDay(sleepMinutes, steps, exerciseMinutes)
+        }.getOrNull()
+    }
+
+    /**
+     * Dernière pesée du jour, si une balance connectée l'a écrite dans
+     * Health Connect. Sinon null : on garde la saisie à la main.
+     */
+    suspend fun readWeight(context: Context, date: LocalDate): Double? {
+        val client = client(context) ?: return null
+        return runCatching {
+            client.readRecords(
+                ReadRecordsRequest(
+                    recordType = WeightRecord::class,
+                    timeRangeFilter = TimeRangeFilter.between(
+                        date.atStartOfDay(), date.plusDays(1).atStartOfDay()
+                    )
+                )
+            ).records.maxByOrNull { it.time }?.weight?.inKilograms
         }.getOrNull()
     }
 }

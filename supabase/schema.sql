@@ -179,6 +179,23 @@ create table if not exists house_items (
   deleted boolean not null default false,
   updated_at bigint not null
 );
+-- Menus (V10) : ce qu'il y a dans l'assiette de chacun, et les calories
+alter table meals add column if not exists quantities text not null default '';
+alter table meals add column if not exists calories int not null default 0;
+
+-- Poids (V10). Donnée de santé : elle n'est envoyée que si son propriétaire
+-- a coché le partage dans l'application. La règle RLS reste celle du couple.
+create table if not exists weights (
+  id text primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  couple_id uuid,
+  date text not null,
+  kilos double precision not null,
+  note text not null default '',
+  deleted boolean not null default false,
+  updated_at bigint not null default 0
+);
+
 alter table profiles add column if not exists pacte_enabled boolean not null default false;
 alter table profiles add column if not exists daily_limit_minutes int not null default 45;
 alter table profiles add column if not exists curfew_enabled boolean not null default false;
@@ -227,6 +244,8 @@ create or replace trigger meals_stamp before insert or update on meals
 create or replace trigger shopping_items_stamp before insert or update on shopping_items
   for each row execute function stamp_couple();
 create or replace trigger health_days_stamp before insert or update on health_days
+  for each row execute function stamp_couple();
+create or replace trigger weights_stamp before insert or update on weights
   for each row execute function stamp_couple();
 
 -- Crée l'espace couple et renvoie le code à partager (6 caractères).
@@ -424,4 +443,16 @@ create policy health_select on health_days for select
 create policy health_insert on health_days for insert
   with check (user_id = auth.uid());
 create policy health_update on health_days for update
+  using (user_id = auth.uid());
+
+-- Poids : comme la santé, écrit uniquement par son propriétaire.
+alter table weights enable row level security;
+drop policy if exists weights_select on weights;
+drop policy if exists weights_insert on weights;
+drop policy if exists weights_update on weights;
+create policy weights_select on weights for select
+  using (user_id = auth.uid() or (couple_id is not null and couple_id = my_couple()));
+create policy weights_insert on weights for insert
+  with check (user_id = auth.uid());
+create policy weights_update on weights for update
   using (user_id = auth.uid());

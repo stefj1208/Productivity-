@@ -41,6 +41,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val aiDayAdvice = MutableStateFlow<com.notresemaine.app.ai.Assistant.DayAdvice?>(null)
     val aiPacte = MutableStateFlow<com.notresemaine.app.ai.Assistant.PacteAdvice?>(null)
     val aiHealthRead = MutableStateFlow("")
+    val aiWeightRead = MutableStateFlow("")
 
     private val syncRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
@@ -113,6 +114,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             repo.setTaskSlot(taskId, startTime, durationMinutes)
             Alarms.rescheduleAll(getApplication())
+            // Réserver une heure, c'est prendre un rendez-vous : il va dans l'agenda.
+            repo.db.tasks().byId(taskId)?.date?.let { date ->
+                repo.pushDayToCalendar(getApplication(), myId(), date)
+            }
             requestSync()
         }
     }
@@ -314,6 +319,108 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ----- Poids -----
+
+    fun saveWeight(raw: String) {
+        val kilos = raw.replace(',', '.').trim().toDoubleOrNull()
+        if (kilos == null || kilos <= 0) {
+            toast("Un poids en kilos, par exemple 72,4.")
+            return
+        }
+        viewModelScope.launch {
+            repo.saveWeight(myId(), com.notresemaine.app.data.Dates.todayIso(), kilos)
+            requestSync()
+            toast("Pesée notée ✓")
+        }
+    }
+
+    fun deleteWeight(id: String) {
+        viewModelScope.launch {
+            repo.deleteWeight(id)
+            requestSync()
+        }
+    }
+
+    fun saveWeightGoal(rawTarget: String, shared: Boolean) {
+        viewModelScope.launch {
+            val target = rawTarget.replace(',', '.').trim().toDoubleOrNull() ?: 0.0
+            repo.settings.setWeightGoal(target, shared)
+            requestSync()
+            toast(if (shared) "Objectif enregistré · partagé" else "Objectif enregistré · privé")
+        }
+    }
+
+    /** Récupère la pesée du jour depuis Health Connect si une balance l'y a écrite. */
+    fun importWeightFromHealth() {
+        viewModelScope.launch {
+            val today = java.time.LocalDate.now()
+            val kilos = com.notresemaine.app.health.Health.readWeight(getApplication(), today)
+            if (kilos == null || kilos <= 0.0) {
+                toast("Aucune pesée trouvée dans Health Connect aujourd'hui.")
+            } else {
+                repo.saveWeight(myId(), today.toString(), kilos)
+                requestSync()
+                toast("Pesée récupérée ✓")
+            }
+        }
+    }
+
+    /** Envoie : une suite de kilos et l'objectif. Ni date, ni prénom, ni données de l'autre. */
+    fun readWeightWithAi() = runAi { key ->
+        val s = repo.settings.current()
+        val serie = repo.myWeightSeries(s.myUserId)
+        aiWeightRead.value = com.notresemaine.app.ai.Assistant.readWeight(key, serie, s.weightTarget)
+    }
+
+    // ----- Agenda du téléphone -----
+
+    fun chooseCalendar(id: Long, name: String) {
+        viewModelScope.launch {
+            val s = repo.settings.current()
+            repo.settings.setCalendar(s.calendarEnabled, id, name)
+            toast("Agenda « $name » choisi")
+        }
+    }
+
+    fun setCalendarEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            val s = repo.settings.current()
+            repo.settings.setCalendar(enabled, s.calendarId, s.calendarName)
+        }
+    }
+
+    fun pushDayToCalendar(context: android.content.Context, date: String) {
+        viewModelScope.launch { repo.pushDayToCalendar(context, myId(), date) }
+    }
+
+    fun pushWeekToCalendar(context: android.content.Context, weekStart: String) {
+        viewModelScope.launch {
+            val count = repo.pushWeekToCalendar(context, myId(), weekStart)
+            toast(
+                if (count > 0) "$count créneau" + (if (count > 1) "x" else "") + " posé" +
+                    (if (count > 1) "s" else "") + " dans l'agenda ✓"
+                else "Aucune tâche n'a d'heure cette semaine."
+            )
+        }
+    }
+
+    fun eraseCalendar(context: android.content.Context) {
+        viewModelScope.launch {
+            val s = repo.settings.current()
+            com.notresemaine.app.calendar.PhoneCalendar.eraseOurs(context, s.calendarId)
+            toast("Événements de l'application retirés.")
+        }
+    }
+
+    // ----- Foyer : couverts et besoin calorique -----
+
+    fun saveHousehold(size: Int, calories: Int) {
+        viewModelScope.launch {
+            repo.settings.setHousehold(size, calories)
+            toast("Enregistré ✓")
+        }
+    }
+
     /**
      * MagicOS et One UI tuent volontiers les services en arrière-plan. À chaque
      * retour dans l'application, on remet la surveillance en marche si besoin.
@@ -343,9 +450,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ----- Menus & courses -----
 
-    fun saveMeal(date: String, slot: String, title: String, ingredients: String) {
+    fun saveMeal(
+        date: String, slot: String, title: String, ingredients: String,
+        quantities: String = "", calories: Int = 0
+    ) {
         viewModelScope.launch {
-            repo.saveMeal(myId(), date, slot, title, ingredients)
+            repo.saveMeal(myId(), date, slot, title, ingredients, quantities, calories)
             requestSync()
             toast("Menu enregistré ✓")
         }
@@ -385,12 +495,38 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Menus sur mesure. Envoie : uniquement vos contraintes de repas. */
+    /** Menus sur mesure. Envoie : uniquement vos contraintes de repas et le nombre de couverts. */
     fun suggestMenusWithAi(weekStart: String, constraints: String) = runAi { key ->
-        val suggestions = com.notresemaine.app.ai.Assistant.suggestWeekMenus(key, constraints)
+        val people = repo.settings.current().householdSize
+        val suggestions = com.notresemaine.app.ai.Assistant.suggestWeekMenus(key, constraints, people)
         val applied = repo.applyMenuSuggestions(myId(), weekStart, suggestions)
         requestSync()
         toast(if (applied > 0) "$applied repas proposés ✓" else "Rien à ajouter, la semaine est déjà pleine.")
+    }
+
+    /**
+     * Refait UN repas à la demande : « plus léger », « il me reste du poulet ».
+     * Envoie : ce repas et votre consigne, rien d'autre.
+     */
+    fun reworkMealWithAi(date: String, slot: String, instruction: String) = runAi { key ->
+        val s = repo.settings.current()
+        val current = repo.db.meals().byId("$date:$slot")
+        val suggestion = com.notresemaine.app.ai.Assistant.reworkMeal(
+            apiKey = key,
+            slot = slot,
+            currentTitle = current?.title.orEmpty(),
+            currentIngredients = current?.ingredients.orEmpty(),
+            instruction = instruction,
+            people = s.householdSize,
+            targetCalories = s.dailyCalories
+        )
+        if (suggestion == null) {
+            toast("L'assistant n'a pas su proposer autre chose. Reformule ta consigne.")
+        } else {
+            repo.replaceMeal(myId(), date, slot, suggestion)
+            requestSync()
+            toast("Repas remplacé ✓")
+        }
     }
 
     /** Trois premières actions. Envoie : uniquement l'intitulé de l'objectif. */

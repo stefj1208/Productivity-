@@ -35,34 +35,109 @@ object Assistant {
 
     // ----- 1. Menus de la semaine -----
 
-    data class MealSuggestion(val dayIndex: Int, val slot: String, val title: String, val ingredients: String)
+    data class MealSuggestion(
+        val dayIndex: Int,
+        val slot: String,
+        val title: String,
+        val ingredients: String,
+        val quantities: String = "",
+        val calories: Int = 0
+    )
 
-    private const val MENU_SYSTEM =
-        "Tu proposes des menus familiaux français simples, pour deux personnes. " +
+    private fun menuSystem(people: Int): String =
+        "Tu proposes des menus familiaux français simples, pour $people personnes. " +
             "Réponds UNIQUEMENT par des lignes au format exact :\n" +
-            "jour|creneau|plat|ingredients\n" +
+            "jour|creneau|plat|ingredients|par_personne|kcal\n" +
             "jour = 0 à 6 (0 = lundi). creneau = matin, midi ou soir. " +
-            "ingredients = liste séparée par des virgules, chaque ingrédient sous la forme " +
-            "« quantité unité nom » (ex. : 400 g pâtes, 3 œufs, 1 oignon). " +
+            "ingredients = les courses pour $people personnes, séparées par des virgules, " +
+            "chacune sous la forme « quantité unité nom » (ex. : 400 g pâtes, 3 œufs, 1 oignon). " +
+            "par_personne = ce qu'il y a dans UNE assiette (ex. : 120 g pâtes, 1 œuf, 80 g sauce). " +
+            "kcal = calories d'une assiette, nombre entier seul, sans unité. " +
             "Pas de titre, pas d'introduction, pas de commentaire, pas de puces."
 
-    /** Envoie : uniquement vos contraintes de repas. */
-    suspend fun suggestWeekMenus(apiKey: String, constraints: String): List<MealSuggestion> {
+    private fun parseMeal(line: String): MealSuggestion? {
+        val parts = fields(line)
+        if (parts.size < 4) return null
+        val day = parts[0].filter { it.isDigit() }.toIntOrNull() ?: return null
+        val slot = parts[1].lowercase()
+        if (day !in 0..6 || slot !in listOf("matin", "midi", "soir")) return null
+        return MealSuggestion(
+            dayIndex = day,
+            slot = slot,
+            title = parts[2],
+            ingredients = parts[3],
+            quantities = parts.getOrElse(4) { "" },
+            calories = parts.getOrElse(5) { "" }.filter { it.isDigit() }.toIntOrNull() ?: 0
+        )
+    }
+
+    /** Envoie : uniquement vos contraintes de repas et le nombre de couverts. */
+    suspend fun suggestWeekMenus(apiKey: String, constraints: String, people: Int = 2): List<MealSuggestion> {
         val prompt = buildString {
             append("Propose 21 repas pour la semaine (matin, midi et soir, du lundi au dimanche). ")
             append("Varié, de saison, réaliste en semaine.")
             if (constraints.isNotBlank()) append(" Contraintes : ${constraints.trim()}.")
         }
-        return cleanLines(Ai.ask(apiKey, MENU_SYSTEM, prompt, maxTokens = 8000))
+        return cleanLines(Ai.ask(apiKey, menuSystem(people), prompt, maxTokens = 8000))
             .filter { it.contains('|') }
-            .mapNotNull { line ->
-                val parts = fields(line)
-                if (parts.size < 4) return@mapNotNull null
-                val day = parts[0].filter { it.isDigit() }.toIntOrNull() ?: return@mapNotNull null
-                val slot = parts[1].lowercase()
-                if (day !in 0..6 || slot !in listOf("matin", "midi", "soir")) return@mapNotNull null
-                MealSuggestion(day, slot, parts[2], parts[3])
+            .mapNotNull { parseMeal(it) }
+    }
+
+    /**
+     * Refaire UN repas à la demande : « plus léger », « il me reste du poulet »,
+     * « sans gluten », « on est quatre ce soir ».
+     *
+     * Envoie : le repas actuel, le créneau, et votre consigne. Rien d'autre.
+     */
+    suspend fun reworkMeal(
+        apiKey: String,
+        slot: String,
+        currentTitle: String,
+        currentIngredients: String,
+        instruction: String,
+        people: Int,
+        targetCalories: Int
+    ): MealSuggestion? {
+        val system =
+            "Tu réécris UN repas pour $people personnes. " +
+                "Réponds UNIQUEMENT par une seule ligne au format exact :\n" +
+                "0|$slot|plat|ingredients|par_personne|kcal\n" +
+                "ingredients = les courses pour $people personnes. " +
+                "par_personne = ce qu'il y a dans une assiette. " +
+                "kcal = calories d'une assiette, nombre entier seul. " +
+                "Pas de commentaire, pas de puce, une seule ligne."
+        val prompt = buildString {
+            append("Repas actuel ($slot) : ")
+            append(currentTitle.ifBlank { "aucun" })
+            if (currentIngredients.isNotBlank()) append(" — ingrédients : $currentIngredients")
+            append(".\nConsigne : ${instruction.ifBlank { "propose autre chose, plus simple" }}.")
+            if (targetCalories > 0) {
+                val share = when (slot) { "matin" -> 0.25; "midi" -> 0.4; else -> 0.35 }
+                append("\nViser environ ${(targetCalories * share).toInt()} kcal par assiette.")
             }
+        }
+        return cleanLines(Ai.ask(apiKey, system, prompt, maxTokens = 1500))
+            .firstOrNull { it.contains('|') }
+            ?.let { parseMeal(it) }
+    }
+
+    /**
+     * Une phrase sur l'évolution du poids et UN levier concret.
+     * Envoie : une suite de nombres et l'objectif. Aucune date, aucun nom.
+     */
+    suspend fun readWeight(apiKey: String, kilos: List<Double>, target: Double): String {
+        if (kilos.size < 2) return ""
+        val system =
+            "Tu commentes une évolution de poids en deux phrases maximum, en français, " +
+                "sans jugement, sans culpabilisation, sans conseil médical. " +
+                "Première phrase : la tendance. Deuxième phrase : UN levier concret et " +
+                "réaliste à essayer cette semaine. Pas de puce, pas de titre."
+        val serie = kilos.joinToString(", ") { String.format(java.util.Locale.FRANCE, "%.1f", it) }
+        val prompt = buildString {
+            append("Pesées successives, de la plus ancienne à la plus récente : $serie kg.")
+            if (target > 0) append(" Objectif : ${String.format(java.util.Locale.FRANCE, "%.1f", target)} kg.")
+        }
+        return cleanLines(Ai.ask(apiKey, system, prompt, maxTokens = 700)).joinToString(" ")
     }
 
     // ----- 2. Premiers pas d'un objectif -----

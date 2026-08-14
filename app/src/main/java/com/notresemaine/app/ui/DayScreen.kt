@@ -67,6 +67,18 @@ fun DayScreen(
 
     var slotFor by remember { mutableStateOf<TaskEntity?>(null) }
 
+    // Ce qui est déjà pris dans l'agenda du téléphone : sans ça, on réserve
+    // un créneau par-dessus une réunion et on ne le découvre qu'au dernier moment.
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val booked = remember(dateIso, settings.calendarEnabled) {
+        if (!settings.calendarEnabled) emptyList()
+        else runCatching {
+            com.notresemaine.app.calendar.PhoneCalendar.bookedOn(
+                context, java.time.LocalDate.parse(dateIso)
+            ).filter { !it.ours }
+        }.getOrDefault(emptyList())
+    }
+
     val scheduled = tasks.filter { it.startTime.isNotBlank() }
     val unscheduled = tasks.filter { it.startTime.isBlank() }
     val firstHour = (scheduled.mapNotNull { hourOf(it.startTime) }.minOrNull() ?: 7).coerceAtMost(7)
@@ -110,12 +122,27 @@ fun DayScreen(
                 }
             }
 
+            val allDay = booked.filter { it.allDay }
+            if (allDay.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                SectionLabel("TOUTE LA JOURNÉE")
+                allDay.forEach { ev ->
+                    Text(
+                        text = "📅 ${ev.title}",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                }
+            }
+
             Spacer(Modifier.height(8.dp))
             SectionLabel("LA JOURNÉE, HEURE PAR HEURE")
 
             (firstHour..lastHour).forEach { h ->
                 val atThisHour = scheduled.filter { hourOf(it.startTime) == h }
                 val mealHere = mealAt(meals.map { it.slot to it.title }, h)
+                val eventsHere = booked.filter { !it.allDay && it.startMinutes / 60 == h }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -132,6 +159,16 @@ fun DayScreen(
                             .padding(top = 12.dp)
                     )
                     Column(modifier = Modifier.weight(1f)) {
+                        eventsHere.forEach { ev ->
+                            Text(
+                                text = "📅 ${ev.title}  ·  %02d:%02d".format(
+                                    ev.startMinutes / 60, ev.startMinutes % 60
+                                ),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(vertical = 10.dp)
+                            )
+                        }
                         if (mealHere != null) {
                             Text(
                                 text = "🍽️ $mealHere",
@@ -173,7 +210,7 @@ fun DayScreen(
                                 TextButton(onClick = { slotFor = task }) { Text("🕐") }
                             }
                         }
-                        if (atThisHour.isEmpty() && mealHere == null) {
+                        if (atThisHour.isEmpty() && mealHere == null && eventsHere.isEmpty()) {
                             Text(
                                 text = "—",
                                 style = MaterialTheme.typography.labelMedium,

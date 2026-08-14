@@ -88,10 +88,9 @@ object Usage {
             events.getNextEvent(event)
             when (event.eventType) {
                 UsageEvents.Event.ACTIVITY_RESUMED -> latest = event.packageName
-                // Application quittée, ou téléphone verrouillé : plus rien devant.
+                // Application quittée (y compris quand on verrouille) : plus rien devant.
                 UsageEvents.Event.ACTIVITY_STOPPED ->
                     if (event.packageName == latest) latest = null
-                UsageEvents.Event.KEYGUARD_SHOWN -> latest = null
             }
         }
         return latest

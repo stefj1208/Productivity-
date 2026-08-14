@@ -35,6 +35,8 @@ fun MeScreen(
     onScreenTime: () -> Unit,
     onHealth: () -> Unit,
     onPerformance: () -> Unit,
+    onWeight: () -> Unit,
+    onCalendar: () -> Unit,
     onAssistant: () -> Unit,
     onReminders: () -> Unit,
     onMethod: () -> Unit,
@@ -53,6 +55,9 @@ fun MeScreen(
         .collectAsState(initial = emptyList())
     val usageDays by remember { vm.repo.db.usage().since(Dates.todayIso()) }
         .collectAsState(initial = emptyList())
+    val weights by remember { vm.repo.db.weights().all() }
+        .collectAsState(initial = emptyList())
+    val lastWeight = weights.filter { it.userId == myId }.maxByOrNull { it.date }
 
     val streak = vm.repo.ritualStreak(ritualLogs, myId)
     val activeSteps = ritualSteps.count { it.enabled }
@@ -104,6 +109,20 @@ fun MeScreen(
         )
 
         ShortcutTile(
+            emoji = "⚖️",
+            title = "Mon poids",
+            subtitle = when {
+                lastWeight == null -> "Aucune pesée"
+                settings.weightTarget > 0 -> String.format(
+                    java.util.Locale.FRANCE, "%.1f kg · objectif %.1f kg",
+                    lastWeight.kilos, settings.weightTarget
+                )
+                else -> String.format(java.util.Locale.FRANCE, "%.1f kg", lastWeight.kilos)
+            },
+            onClick = onWeight
+        )
+
+        ShortcutTile(
             emoji = "📈",
             title = "Mes performances",
             subtitle = "Tâches, séances, sommeil, écran — les chiffres",
@@ -112,6 +131,15 @@ fun MeScreen(
 
         Spacer(Modifier.height(20.dp))
         SectionLabel("L'APPLICATION")
+        ShortcutTile(
+            emoji = "📅",
+            title = "Agenda",
+            subtitle = if (settings.calendarEnabled && settings.calendarName.isNotBlank())
+                "Créneaux envoyés vers ${settings.calendarName}"
+            else "Relier l'agenda du téléphone (donc Google Agenda)",
+            onClick = onCalendar,
+            highlight = settings.calendarEnabled
+        )
         ShortcutTile(
             emoji = "✨",
             title = "Assistant",

@@ -14,6 +14,7 @@ import com.notresemaine.app.data.HouseItemEntity
 import com.notresemaine.app.data.TaskEntity
 import com.notresemaine.app.data.UsageDayEntity
 import com.notresemaine.app.data.WeekPlanEntity
+import com.notresemaine.app.data.WeightEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
@@ -170,6 +171,20 @@ data class MealDto(
     val slot: String,
     val title: String,
     val ingredients: String,
+    val quantities: String = "",
+    val calories: Int = 0,
+    val deleted: Boolean = false,
+    @SerialName("updated_at") val updatedAt: Long
+)
+
+/** Pesée. Ne quitte le téléphone que si son propriétaire a coché le partage. */
+@Serializable
+data class WeightDto(
+    val id: String,
+    @SerialName("user_id") val userId: String,
+    val date: String,
+    val kilos: Double,
+    val note: String = "",
     val deleted: Boolean = false,
     @SerialName("updated_at") val updatedAt: Long
 )
@@ -425,8 +440,19 @@ class SyncManager(private val repo: Repository) {
 
                 val meals = db.meals().modifiedSince(s.lastPushTs)
                 api.upsert("meals", token, meals.map {
-                    MealDto(it.id, myId, it.date, it.slot, it.title, it.ingredients, it.deleted, it.updatedAt)
+                    MealDto(it.id, myId, it.date, it.slot, it.title, it.ingredients,
+                        it.quantities, it.calories, it.deleted, it.updatedAt)
                 }, MealDto.serializer())
+
+                // Le poids ne part que si son propriétaire a coché le partage.
+                val weights = if (s.weightShared) {
+                    db.weights().modifiedSince(s.lastPushTs).filter { it.userId == myId }
+                } else emptyList()
+                if (weights.isNotEmpty()) {
+                    api.upsert("weights", token, weights.map {
+                        WeightDto(it.id, it.userId, it.date, it.kilos, it.note, it.deleted, it.updatedAt)
+                    }, WeightDto.serializer())
+                }
 
                 val shopping = db.shopping().modifiedSince(s.lastPushTs)
                 api.upsert("shopping_items", token, shopping.map {
@@ -465,7 +491,7 @@ class SyncManager(private val repo: Repository) {
                         ritualLogs.map { it.updatedAt } + usageDays.map { it.updatedAt } +
                         graces.map { it.updatedAt } + meals.map { it.updatedAt } +
                         shopping.map { it.updatedAt } + healthDays.map { it.updatedAt } +
-                        houseItems.map { it.updatedAt } +
+                        houseItems.map { it.updatedAt } + weights.map { it.updatedAt } +
                         s.lastPushTs).max()
 
                 // Réception : tout ce qui a changé dans le couple ; la ligne la plus récente gagne.
@@ -520,7 +546,17 @@ class SyncManager(private val repo: Repository) {
                     pullMark = maxOf(pullMark, dto.updatedAt)
                     val local = db.meals().byId(dto.id)
                     if (local == null || dto.updatedAt > local.updatedAt) {
-                        db.meals().upsert(MealEntity(dto.id, dto.userId, dto.date, dto.slot, dto.title, dto.ingredients, dto.deleted, dto.updatedAt))
+                        db.meals().upsert(MealEntity(dto.id, dto.userId, dto.date, dto.slot,
+                            dto.title, dto.ingredients, dto.quantities, dto.calories,
+                            dto.deleted, dto.updatedAt))
+                    }
+                }
+                api.select("weights", token, s.lastPullTs, WeightDto.serializer()).forEach { dto ->
+                    pullMark = maxOf(pullMark, dto.updatedAt)
+                    val local = db.weights().byId(dto.id)
+                    if (local == null || dto.updatedAt > local.updatedAt) {
+                        db.weights().upsert(WeightEntity(dto.id, dto.userId, dto.date, dto.kilos,
+                            dto.note, dto.deleted, dto.updatedAt))
                     }
                 }
                 api.select("shopping_items", token, s.lastPullTs, ShoppingItemDto.serializer()).forEach { dto ->

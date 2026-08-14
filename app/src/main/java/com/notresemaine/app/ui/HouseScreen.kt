@@ -61,6 +61,7 @@ fun HouseScreen(
     var tab by remember { mutableStateOf("menus") }
     var editing by remember { mutableStateOf<HouseItemEntity?>(null) }
     var creating by remember { mutableStateOf<String?>(null) }
+    var reworking by remember { mutableStateOf<String?>(null) }
 
     val meals by remember(weekStart) { vm.repo.db.meals().between(days.first(), days.last()) }
         .collectAsState(initial = emptyList())
@@ -101,14 +102,30 @@ fun HouseScreen(
             when (tab) {
                 "menus" -> {
                     SectionLabel("AU MENU AUJOURD'HUI")
+                    val todayMeals = meals.filter { it.date == today }
+                    val eaten = todayMeals.sumOf { it.calories }
                     MenuIdeas.slots.forEach { (slot, label) ->
                         val meal = meals.firstOrNull { it.date == today && it.slot == slot }
-                        Text(
-                            text = "$label · ${meal?.title?.ifBlank { null } ?: "—"}",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = if (meal?.title.isNullOrBlank()) NeutralGray
-                            else MaterialTheme.colorScheme.onBackground,
-                            modifier = Modifier.padding(vertical = 6.dp)
+                        MealCard(
+                            slot = slot,
+                            label = label,
+                            title = meal?.title.orEmpty(),
+                            quantities = meal?.quantities.orEmpty(),
+                            calories = meal?.calories ?: 0,
+                            accent = accent,
+                            aiReady = settings.aiEnabled && settings.aiApiKey.isNotBlank(),
+                            onAi = { reworking = slot }
+                        )
+                    }
+                    if (eaten > 0 && settings.dailyCalories > 0) {
+                        Spacer(Modifier.height(10.dp))
+                        Gauge(
+                            value = eaten.toFloat(),
+                            max = settings.dailyCalories.toFloat(),
+                            accent = accent,
+                            caption = "$eaten kcal prévues par personne sur " +
+                                "${settings.dailyCalories} — pour ${settings.householdSize} couvert" +
+                                (if (settings.householdSize > 1) "s" else "")
                         )
                     }
                     Spacer(Modifier.height(16.dp))
@@ -246,6 +263,21 @@ fun HouseScreen(
             onDismiss = {
                 creating = null
                 editing = null
+            }
+        )
+    }
+
+    val reworkSlot = reworking
+    if (reworkSlot != null) {
+        val aiBusy by vm.aiBusy.collectAsState()
+        MealRework(
+            slot = reworkSlot,
+            label = MenuIdeas.slotLabel(reworkSlot),
+            busy = aiBusy,
+            onDismiss = { reworking = null },
+            onSend = { instruction ->
+                vm.reworkMealWithAi(today, reworkSlot, instruction)
+                reworking = null
             }
         )
     }
@@ -398,5 +430,126 @@ private fun HouseItemDialog(
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Annuler") }
         }
+    )
+}
+
+/** Emoji du créneau : un repère visuel vaut mieux qu'un mot répété trois fois. */
+private fun slotEmoji(slot: String): String = when (slot) {
+    "matin" -> "🥐"
+    "midi" -> "🍽️"
+    else -> "🌙"
+}
+
+/**
+ * Un repas de la journée : ce qu'on mange, ce qu'il y a dans l'assiette de
+ * chacun, et ce que ça pèse en calories. Les quantités par personne sont là
+ * pour qu'on serve sans peser au hasard — pas pour compter les grammes.
+ */
+@Composable
+private fun MealCard(
+    slot: String,
+    label: String,
+    title: String,
+    quantities: String,
+    calories: Int,
+    accent: androidx.compose.ui.graphics.Color,
+    aiReady: Boolean,
+    onAi: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 5.dp)
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+            .padding(16.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(slotEmoji(slot), style = MaterialTheme.typography.titleLarge)
+            Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = title.ifBlank { "Rien de prévu" },
+                    style = MaterialTheme.typography.titleMedium,
+                    color = if (title.isBlank()) NeutralGray else MaterialTheme.colorScheme.onSurface
+                )
+            }
+            if (calories > 0) {
+                Text(
+                    text = "$calories\nkcal",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = accent,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End
+                )
+            }
+        }
+        if (quantities.isNotBlank()) {
+            Text(
+                text = "Par personne : $quantities",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
+        if (aiReady) {
+            TextButton(onClick = onAi, modifier = Modifier.padding(top = 4.dp)) {
+                Text("✨ Modifier ce repas")
+            }
+        }
+    }
+}
+
+/**
+ * « Modifier ce repas » : une consigne en français, et l'assistant réécrit le
+ * plat avec ses quantités et ses calories. On propose des consignes toutes
+ * faites, parce qu'un champ vide est une question à laquelle personne n'a envie
+ * de répondre.
+ */
+@Composable
+private fun MealRework(
+    slot: String,
+    label: String,
+    busy: Boolean,
+    onDismiss: () -> Unit,
+    onSend: (String) -> Unit
+) {
+    var instruction by remember { mutableStateOf("") }
+    val shortcuts = listOf(
+        "Plus léger", "Plus rapide (20 min)", "Végétarien",
+        "Avec ce qu'il me reste", "Pour des invités"
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("${slotEmoji(slot)} $label") },
+        text = {
+            Column {
+                Text(
+                    text = "Dites ce que vous voulez changer.",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Spacer(Modifier.height(10.dp))
+                shortcuts.forEach { s ->
+                    TextButton(onClick = { instruction = s }) { Text(s) }
+                }
+                OutlinedTextField(
+                    value = instruction,
+                    onValueChange = { instruction = it },
+                    placeholder = { Text("Ex. : il me reste du poulet et des courgettes") },
+                    textStyle = MaterialTheme.typography.bodyLarge,
+                    maxLines = 3,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSend(instruction) }, enabled = !busy) {
+                Text(if (busy) "…" else "Proposer")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Annuler") } }
     )
 }

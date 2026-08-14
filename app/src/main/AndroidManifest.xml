@@ -24,10 +24,16 @@
          Android interdit au service d'ouvrir l'écran de blocage. -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
-    <!-- Health Connect : lecture seule du sommeil, des pas et des séances -->
+    <!-- Agenda du téléphone : lire ce qui est déjà pris, y poser nos créneaux.
+         C'est ce même agenda que Google Agenda synchronise. -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <uses-permission android:name="android.permission.WRITE_CALENDAR" />
+
+    <!-- Health Connect : lecture seule du sommeil, des pas, des séances et du poids -->
     <uses-permission android:name="android.permission.health.READ_SLEEP" />
     <uses-permission android:name="android.permission.health.READ_STEPS" />
     <uses-permission android:name="android.permission.health.READ_EXERCISE" />
+    <uses-permission android:name="android.permission.health.READ_WEIGHT" />
 
     <!-- Pour lister les applications installées dans le choix « réseaux sociaux » -->
     <queries>

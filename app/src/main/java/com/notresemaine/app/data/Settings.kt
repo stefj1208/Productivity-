@@ -2,6 +2,7 @@ package com.notresemaine.app.data
 
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
@@ -53,7 +54,17 @@ data class AppSettings(
     val aiApiKey: String = "",
     // Rappels sonores : une alarme plein écran à chaque action à faire
     val alertsEnabled: Boolean = true,
-    val alertSound: Boolean = true
+    val alertSound: Boolean = true,
+    // Poids : donnée de santé, partagée seulement si on le décide
+    val weightTarget: Double = 0.0,
+    val weightShared: Boolean = false,
+    // Menus : pour qui on cuisine, et le besoin quotidien de chacun
+    val householdSize: Int = 2,
+    val dailyCalories: Int = 2000,
+    // Agenda du téléphone (donc Google Agenda, qui s'y synchronise déjà)
+    val calendarEnabled: Boolean = false,
+    val calendarId: Long = -1L,
+    val calendarName: String = ""
 )
 
 class SettingsStore(private val context: Context) {
@@ -93,6 +104,13 @@ class SettingsStore(private val context: Context) {
         val aiApiKey = stringPreferencesKey("aiApiKey")
         val alertsEnabled = booleanPreferencesKey("alertsEnabled")
         val alertSound = booleanPreferencesKey("alertSound")
+        val weightTarget = doublePreferencesKey("weightTarget")
+        val weightShared = booleanPreferencesKey("weightShared")
+        val householdSize = intPreferencesKey("householdSize")
+        val dailyCalories = intPreferencesKey("dailyCalories")
+        val calendarEnabled = booleanPreferencesKey("calendarEnabled")
+        val calendarId = longPreferencesKey("calendarId")
+        val calendarName = stringPreferencesKey("calendarName")
     }
 
     val flow: Flow<AppSettings> = context.dataStore.data.map { p ->
@@ -130,7 +148,14 @@ class SettingsStore(private val context: Context) {
             aiEnabled = p[K.aiEnabled] ?: false,
             aiApiKey = p[K.aiApiKey] ?: "",
             alertsEnabled = p[K.alertsEnabled] ?: true,
-            alertSound = p[K.alertSound] ?: true
+            alertSound = p[K.alertSound] ?: true,
+            weightTarget = p[K.weightTarget] ?: 0.0,
+            weightShared = p[K.weightShared] ?: false,
+            householdSize = p[K.householdSize] ?: 2,
+            dailyCalories = p[K.dailyCalories] ?: 2000,
+            calendarEnabled = p[K.calendarEnabled] ?: false,
+            calendarId = p[K.calendarId] ?: -1L,
+            calendarName = p[K.calendarName] ?: ""
         )
     }
 
@@ -269,6 +294,28 @@ class SettingsStore(private val context: Context) {
         context.dataStore.edit { p ->
             p[K.alertsEnabled] = enabled
             p[K.alertSound] = sound
+        }
+    }
+
+    suspend fun setWeightGoal(target: Double, shared: Boolean) {
+        context.dataStore.edit { p ->
+            p[K.weightTarget] = target
+            p[K.weightShared] = shared
+        }
+    }
+
+    suspend fun setHousehold(size: Int, calories: Int) {
+        context.dataStore.edit { p ->
+            p[K.householdSize] = size.coerceIn(1, 12)
+            p[K.dailyCalories] = calories.coerceIn(1200, 4000)
+        }
+    }
+
+    suspend fun setCalendar(enabled: Boolean, id: Long, name: String) {
+        context.dataStore.edit { p ->
+            p[K.calendarEnabled] = enabled
+            p[K.calendarId] = id
+            p[K.calendarName] = name
         }
     }
 

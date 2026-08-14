@@ -61,6 +61,8 @@ import com.notresemaine.app.ui.RemindersScreen
 import com.notresemaine.app.ui.SyncScreen
 import com.notresemaine.app.ui.DayScreen
 import com.notresemaine.app.ui.PerformanceScreen
+import com.notresemaine.app.ui.WeightScreen
+import com.notresemaine.app.ui.CalendarScreen
 import com.notresemaine.app.ui.PlanningScreen
 import com.notresemaine.app.ui.UsScreen
 import com.notresemaine.app.ui.HouseScreen
@@ -166,6 +168,8 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings) {
                     onScreenTime = { navController.navigate("screentime") },
                     onHealth = { navController.navigate("health") },
                     onPerformance = { navController.navigate("performance") },
+                    onWeight = { navController.navigate("weight") },
+                    onCalendar = { navController.navigate("calendar") },
                     onMethod = { navController.navigate("method") }
                 )
             }
@@ -194,6 +198,8 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings) {
                     onScreenTime = { navController.navigate("screentime") },
                     onHealth = { navController.navigate("health") },
                     onPerformance = { navController.navigate("performance") },
+                    onWeight = { navController.navigate("weight") },
+                    onCalendar = { navController.navigate("calendar") },
                     onAssistant = { navController.navigate("assistant") },
                     onReminders = { navController.navigate("reminders") },
                     onMethod = { navController.navigate("method") },
@@ -208,6 +214,12 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings) {
                     onPrepare = { d -> navController.navigate("prepare/$d") },
                     onBack = { navController.popBackStack() }
                 )
+            }
+            composable("weight") {
+                WeightScreen(vm, settings, onBack = { navController.popBackStack() })
+            }
+            composable("calendar") {
+                CalendarScreen(vm, settings, onBack = { navController.popBackStack() })
             }
             composable("performance") {
                 PerformanceScreen(vm, settings, onBack = { navController.popBackStack() })

@@ -507,7 +507,15 @@ class Repository private constructor(context: Context) {
 
     // ----- Menus & liste de courses -----
 
-    suspend fun saveMeal(userId: String, date: String, slot: String, title: String, ingredients: String) {
+    suspend fun saveMeal(
+        userId: String,
+        date: String,
+        slot: String,
+        title: String,
+        ingredients: String,
+        quantities: String = "",
+        calories: Int = 0
+    ) {
         db.meals().upsert(
             MealEntity(
                 id = "$date:$slot",
@@ -516,9 +524,25 @@ class Repository private constructor(context: Context) {
                 slot = slot,
                 title = title.trim(),
                 ingredients = ingredients.trim(),
+                quantities = quantities.trim(),
+                calories = calories.coerceAtLeast(0),
                 deleted = title.isBlank() && ingredients.isBlank(),
                 updatedAt = now()
             )
+        )
+    }
+
+    /** Remplace un repas par la proposition de l'assistant, quantités et calories comprises. */
+    suspend fun replaceMeal(
+        userId: String,
+        date: String,
+        slot: String,
+        suggestion: com.notresemaine.app.ai.Assistant.MealSuggestion
+    ) {
+        saveMeal(
+            userId, date, slot,
+            suggestion.title, suggestion.ingredients,
+            suggestion.quantities, suggestion.calories
         )
     }
 
@@ -556,7 +580,7 @@ class Repository private constructor(context: Context) {
         suggestions.forEach { s ->
             val date = days.getOrNull(s.dayIndex) ?: return@forEach
             if ("$date:${s.slot}" in existing) return@forEach
-            saveMeal(userId, date, s.slot, s.title, s.ingredients)
+            saveMeal(userId, date, s.slot, s.title, s.ingredients, s.quantities, s.calories)
             applied++
         }
         return applied
@@ -673,6 +697,62 @@ class Repository private constructor(context: Context) {
             existing?.sleepMinutes ?: 0, existing?.steps ?: 0,
             (existing?.exerciseMinutes ?: 0) + minutes, "manuel"
         )
+    }
+
+    // ----- Poids -----
+
+    /** Une pesée par jour : se repeser le soir remplace la pesée du matin. */
+    suspend fun saveWeight(userId: String, date: String, kilos: Double, note: String = "") {
+        if (kilos <= 0.0 || kilos > 400.0) return
+        db.weights().upsert(
+            WeightEntity(
+                id = "$userId:$date", userId = userId, date = date,
+                kilos = kilos, note = note.trim(), updatedAt = now()
+            )
+        )
+    }
+
+    suspend fun deleteWeight(id: String) {
+        val existing = db.weights().byId(id) ?: return
+        db.weights().upsert(existing.copy(deleted = true, updatedAt = now()))
+    }
+
+    /**
+     * Ce que voit l'assistant : des kilos et rien d'autre — pas de date, pas de nom,
+     * et uniquement les miens.
+     */
+    suspend fun myWeightSeries(userId: String, count: Int = 12): List<Double> =
+        db.weights().lastOnce(userId, count).reversed().map { it.kilos }
+
+    // ----- Agenda du téléphone -----
+
+    /**
+     * Envoie dans l'agenda les tâches de la journée qui ont un créneau.
+     * Idempotent : réécrire la journée remplace nos événements, jamais les autres.
+     */
+    suspend fun pushDayToCalendar(context: android.content.Context, userId: String, date: String): Int {
+        val s = settings.current()
+        if (!s.calendarEnabled || s.calendarId <= 0) return 0
+        val day = runCatching { java.time.LocalDate.parse(date) }.getOrNull() ?: return 0
+        val slots = db.tasks().byDateOnce(userId, date)
+            .filter { it.startTime.isNotBlank() && !it.deleted }
+            .mapNotNull { task ->
+                val time = runCatching { java.time.LocalTime.parse(task.startTime) }.getOrNull()
+                    ?: return@mapNotNull null
+                com.notresemaine.app.calendar.PhoneCalendar.Slot(
+                    title = task.title,
+                    startMinutes = time.hour * 60 + time.minute,
+                    durationMinutes = if (task.durationMinutes > 0) task.durationMinutes else 30
+                )
+            }
+        return com.notresemaine.app.calendar.PhoneCalendar.writeDay(context, s.calendarId, day, slots)
+    }
+
+    /** Toute la semaine d'un coup, après la préparation du dimanche. */
+    suspend fun pushWeekToCalendar(context: android.content.Context, userId: String, weekStart: String): Int {
+        var total = 0
+        Dates.daysOfWeek(weekStart).forEach { total += pushDayToCalendar(context, userId, it) }
+        return total
     }
 
     // ----- Ce que l'assistant a le droit de voir -----
@@ -806,6 +886,7 @@ class Repository private constructor(context: Context) {
         db.dayPlans().migrateUser(oldId, newId, t)
         db.weekPlans().migrateUser(oldId, newId, t)
         db.goals().migrateUser(oldId, newId, t)
+        db.weights().migrateUser(oldId, newId, t)
         val profile = db.profiles().byId(oldId)
         if (profile != null) {
             db.profiles().delete(oldId)
