@@ -64,6 +64,7 @@ fun PlanningScreen(
     onPerformance: () -> Unit,
     onWeight: () -> Unit,
     onCalendar: () -> Unit,
+    onInbox: () -> Unit,
     onMethod: () -> Unit
 ) {
     val today = Dates.todayIso()
@@ -376,8 +377,11 @@ fun PlanningScreen(
                 modifier = Modifier.padding(top = 8.dp)
             ) {
                 ShortcutIcon("🕐", "Ma journée", { onDay(today) }, Modifier.weight(1f))
+                ShortcutIcon(
+                    "📥", "Notes", onInbox, Modifier.weight(1f),
+                    badge = if (inboxCount > 0) "($inboxCount)" else null
+                )
                 ShortcutIcon("📅", "Agenda", onCalendar, Modifier.weight(1f))
-                ShortcutIcon("🔄", "Revue", { onReview(targetWeek) }, Modifier.weight(1f))
                 ShortcutIcon("📖", "Méthode", onMethod, Modifier.weight(1f))
             }
             Spacer(Modifier.height(24.dp))
@@ -399,9 +403,23 @@ fun PlanningScreen(
                     .height(52.dp)
             ) { Text("🌙 Demain") }
         }
+        // Le grand bouton n'est pas figé : il porte l'action que la boussole
+        // vient de désigner. Un bouton qui dit toujours la même chose devient
+        // du mobilier ; celui-ci se lit à chaque ouverture.
+        val action = when (step.route) {
+            "ritual" -> "🌅 Faire mon rituel" to { onRitual() }
+            "review" -> "🗓️ Planifier la semaine" to { onReview(targetWeek) }
+            "goals" -> "🚀 Choisir un objectif" to { onGoals() }
+            "prepare/tomorrow" -> "🌙 Préparer demain" to { onPrepare(Dates.tomorrowIso()) }
+            "prepare/today" -> "🎯 Choisir ma priorité" to { onPrepare(today) }
+            else -> when {
+                priority != null && !priority.done -> "🕐 Voir ma journée" to { onDay(today) }
+                else -> "🌙 Préparer demain" to { onPrepare(Dates.tomorrowIso()) }
+            }
+        }
         BigButton(
-            text = "Préparer aujourd'hui",
-            onClick = { onPrepare(today) },
+            text = action.first,
+            onClick = action.second,
             modifier = Modifier.padding(top = 10.dp, bottom = 16.dp)
         )
     }

@@ -490,6 +490,9 @@ interface ShoppingDao {
 
 @Dao
 interface HouseItemDao {
+    @Query("SELECT * FROM house_items WHERE deleted = 0 ORDER BY done, dueDate, updatedAt DESC")
+    fun all(): Flow<List<HouseItemEntity>>
+
     @Query("SELECT * FROM house_items WHERE section = :section AND deleted = 0 ORDER BY done, dueDate, updatedAt DESC")
     fun bySection(section: String): Flow<List<HouseItemEntity>>
 

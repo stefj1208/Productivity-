@@ -187,6 +187,30 @@ class Repository private constructor(context: Context) {
         }
     }
 
+    /**
+     * Étale les tâches sans date sur les jours les moins chargés de la semaine.
+     * Respecte la limite de 3 tâches par jour : ce qui ne rentre pas reste
+     * sans date plutôt que d'être entassé — c'est le signal qu'il y en a trop.
+     */
+    suspend fun spreadTasksOverWeek(userId: String, weekStart: String): Int {
+        val days = Dates.daysOfWeek(weekStart)
+        val today = Dates.todayIso()
+        // On ne remplit pas le passé : une tâche posée hier est déjà en retard.
+        val usable = days.filter { it >= today }.ifEmpty { days }
+        val load = usable.associateWith { db.tasks().countForDay(userId, it) }.toMutableMap()
+        val pending = db.tasks().byWeekOnce(userId, weekStart)
+            .filter { it.date == null && !it.deleted && !it.isSport && it.goalId == null }
+        var placed = 0
+        pending.forEach { task ->
+            val target = load.entries.filter { it.value < MAX_TASKS_PER_DAY }.minByOrNull { it.value }
+                ?: return@forEach
+            db.tasks().upsert(task.copy(date = target.key, updatedAt = now()))
+            load[target.key] = target.value + 1
+            placed++
+        }
+        return placed
+    }
+
     // ----- Plan du jour (réveil, blocs de concentration) -----
 
     suspend fun saveDayPlan(userId: String, date: String, wakeTime: String?, focusBlocks: String?) {
@@ -697,6 +721,64 @@ class Repository private constructor(context: Context) {
             existing?.sleepMinutes ?: 0, existing?.steps ?: 0,
             (existing?.exerciseMinutes ?: 0) + minutes, "manuel"
         )
+    }
+
+    /**
+     * Crée une tâche directement chez le binôme. Différent de [giveTaskToPartner],
+     * qui déplace une tâche existante : ici on en fabrique une pour lui.
+     */
+    suspend fun addTaskAssigned(toUserId: String, fromUserId: String, title: String, weekStart: String) {
+        if (title.isBlank() || toUserId.isBlank()) return
+        db.tasks().upsert(
+            TaskEntity(
+                id = UUID.randomUUID().toString(),
+                userId = toUserId,
+                title = title.trim(),
+                date = null,
+                weekStart = weekStart,
+                assignedBy = fromUserId,
+                updatedAt = now()
+            )
+        )
+    }
+
+    /**
+     * Applique les actions proposées pour la boîte de réception.
+     * Une note qui reste « inbox » n'est pas traitée : l'assistant a le droit
+     * de dire « ça demande encore réflexion », et on ne force pas.
+     */
+    suspend fun applyInboxActions(
+        userId: String,
+        notes: List<InboxItemEntity>,
+        actions: List<com.notresemaine.app.ai.Assistant.InboxAction>,
+        weekStart: String
+    ): Int {
+        var applied = 0
+        actions.forEach { action ->
+            val note = notes.getOrNull(action.index) ?: return@forEach
+            if (action.whenLabel == "inbox") return@forEach
+            val date = when (action.whenLabel) {
+                "aujourdhui" -> Dates.todayIso()
+                "demain" -> Dates.tomorrowIso()
+                else -> null
+            }
+            // La limite de 3 tâches par jour tient aussi ici : sinon la journée
+            // se remplit toute seule et la règle ne veut plus rien dire.
+            val target = if (date != null && db.tasks().countForDay(userId, date) >= MAX_TASKS_PER_DAY) null else date
+            db.tasks().upsert(
+                TaskEntity(
+                    id = UUID.randomUUID().toString(),
+                    userId = userId,
+                    title = action.action.trim(),
+                    date = target,
+                    weekStart = target?.let { Dates.weekStartIso(java.time.LocalDate.parse(it)) } ?: weekStart,
+                    updatedAt = now()
+                )
+            )
+            db.inbox().upsert(note.copy(processed = true, updatedAt = now()))
+            applied++
+        }
+        return applied
     }
 
     // ----- Poids -----

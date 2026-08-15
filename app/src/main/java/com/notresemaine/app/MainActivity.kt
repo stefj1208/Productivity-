@@ -63,6 +63,7 @@ import com.notresemaine.app.ui.DayScreen
 import com.notresemaine.app.ui.PerformanceScreen
 import com.notresemaine.app.ui.WeightScreen
 import com.notresemaine.app.ui.CalendarScreen
+import com.notresemaine.app.ui.InboxScreen
 import com.notresemaine.app.ui.PlanningScreen
 import com.notresemaine.app.ui.UsScreen
 import com.notresemaine.app.ui.HouseScreen
@@ -107,7 +108,7 @@ private data class Tab(val route: String, val label: String, val icon: ImageVect
 private val tabs = listOf(
     Tab("planning", "Planning", Icons.Filled.WbSunny),
     Tab("goals", "Objectifs", Icons.Filled.Flag),
-    Tab("house", "Maison", Icons.Filled.Home),
+    Tab("house", "Catégories", Icons.Filled.Home),
     Tab("us", "Nous", Icons.Filled.Favorite),
     Tab("me", "Moi", Icons.Filled.Person)
 )
@@ -170,6 +171,7 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings) {
                     onPerformance = { navController.navigate("performance") },
                     onWeight = { navController.navigate("weight") },
                     onCalendar = { navController.navigate("calendar") },
+                    onInbox = { navController.navigate("inbox") },
                     onMethod = { navController.navigate("method") }
                 )
             }
@@ -214,6 +216,9 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings) {
                     onPrepare = { d -> navController.navigate("prepare/$d") },
                     onBack = { navController.popBackStack() }
                 )
+            }
+            composable("inbox") {
+                InboxScreen(vm, settings, onBack = { navController.popBackStack() })
             }
             composable("weight") {
                 WeightScreen(vm, settings, onBack = { navController.popBackStack() })

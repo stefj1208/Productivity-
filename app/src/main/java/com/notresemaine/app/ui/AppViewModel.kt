@@ -42,6 +42,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val aiPacte = MutableStateFlow<com.notresemaine.app.ai.Assistant.PacteAdvice?>(null)
     val aiHealthRead = MutableStateFlow("")
     val aiWeightRead = MutableStateFlow("")
+    val aiPlan = MutableStateFlow<com.notresemaine.app.ai.Assistant.ActionPlan?>(null)
+    val aiReview = MutableStateFlow<com.notresemaine.app.ai.Assistant.WeekReview?>(null)
+    val aiAbandon = MutableStateFlow<List<String>>(emptyList())
 
     private val syncRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
@@ -140,6 +143,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun assignTaskToDay(taskId: String, date: String?) {
         viewModelScope.launch { repo.assignTaskToDay(taskId, date); requestSync() }
+    }
+
+    /** Étale les tâches sans date sur les jours les moins chargés. */
+    fun spreadTasks(weekStart: String) {
+        viewModelScope.launch {
+            val placed = repo.spreadTasksOverWeek(myId(), weekStart)
+            requestSync()
+            toast(
+                if (placed > 0) "$placed tâche" + (if (placed > 1) "s" else "") + " posée" +
+                    (if (placed > 1) "s" else "") + " ✓"
+                else "Rien à poser — ou les jours sont déjà pleins."
+            )
+        }
     }
 
     fun moveTaskToWeek(taskId: String, weekStart: String) {
@@ -317,6 +333,106 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             if (enabled) UsageWorker.schedule(getApplication())
             requestSync()
         }
+    }
+
+    // ----- Catégories : de l'intention au plan d'action -----
+
+    /** Envoie : la catégorie, l'intitulé et la description que vous avez écrits. */
+    fun planActionWithAi(category: String, title: String, description: String) = runAi { key ->
+        val plan = com.notresemaine.app.ai.Assistant.planAction(
+            key, com.notresemaine.app.data.Categories.labelOf(category), title, description
+        )
+        if (plan == null) toast("L'assistant n'a pas su découper ça. Reformule en une phrase.")
+        aiPlan.value = plan
+    }
+
+    fun clearAiPlan() {
+        aiPlan.value = null
+    }
+
+    /** Crée la tâche directement chez le binôme : elle porte la trace de qui l'a confiée. */
+    fun addTaskForPartner(title: String) {
+        if (title.isBlank()) return
+        viewModelScope.launch {
+            val partner = repo.db.profiles().partnerOf(myId())
+            if (partner == null) {
+                toast("Personne n'est encore relié à vous (Moi → Synchronisation).")
+                return@launch
+            }
+            repo.addTaskAssigned(partner.id, myId(), title, com.notresemaine.app.data.Dates.weekStartIso())
+            requestSync()
+            toast("Confiée à ${partner.name} ✓")
+        }
+    }
+
+    /** Une routine, c'est un objectif hebdomadaire : deux séances par semaine par défaut. */
+    fun makeRoutineFromPlan(title: String, category: String) {
+        viewModelScope.launch {
+            val plan = aiPlan.value
+            val ok = repo.addGoal(
+                userId = myId(),
+                title = title,
+                domain = category,
+                sessionsPerWeek = 2,
+                minutesPerSession = 30,
+                preferredTime = "soir",
+                preferredDays = listOf(2, 5),
+                nextAction = plan?.steps?.firstOrNull() ?: title,
+                isPrivate = false
+            )
+            if (ok) {
+                Alarms.rescheduleAll(getApplication())
+                requestSync()
+                toast("Routine créée ✓ Les séances seront placées avec la semaine.")
+            } else {
+                toast("Maximum 3 objectifs actifs — terminez-en un d'abord.")
+            }
+            aiPlan.value = null
+        }
+    }
+
+    // ----- Bilan de la semaine et boîte de réception -----
+
+    /** Envoie : uniquement vos chiffres agrégés. Ni le détail, ni rien de l'autre. */
+    fun reviewWeekWithAi(facts: String) = runAi { key ->
+        val review = com.notresemaine.app.ai.Assistant.reviewWeek(key, facts)
+        if (review == null) toast("L'assistant n'a pas su faire le bilan. Réessaie.")
+        aiReview.value = review
+    }
+
+    fun clearAiReview() {
+        aiReview.value = null
+    }
+
+    /** Envoie : votre priorité, vos objectifs non privés, le nombre de tâches en attente. */
+    fun suggestAbandonWithAi(priority: String, pendingTasks: Int) = runAi { key ->
+        aiAbandon.value = com.notresemaine.app.ai.Assistant.suggestAbandon(
+            key, priority, repo.goalTitlesForAi(myId()), pendingTasks
+        )
+    }
+
+    fun clearAiAbandon() {
+        aiAbandon.value = emptyList()
+    }
+
+    /**
+     * Vide la boîte de réception d'un coup : chaque note devient une action datée.
+     * Envoie : uniquement le texte de vos notes.
+     */
+    fun inboxToActionsWithAi(weekStart: String) = runAi { key ->
+        val notes = repo.db.inbox().pendingOnce(myId())
+        if (notes.isEmpty()) {
+            toast("La boîte est déjà vide.")
+            return@runAi
+        }
+        val actions = com.notresemaine.app.ai.Assistant.inboxToActions(key, notes.map { it.text })
+        val applied = repo.applyInboxActions(myId(), notes, actions, weekStart)
+        requestSync()
+        toast(
+            if (applied > 0) "$applied note" + (if (applied > 1) "s" else "") + " transformée" +
+                (if (applied > 1) "s" else "") + " en action ✓"
+            else "Rien n'a pu être transformé — triez à la main."
+        )
     }
 
     // ----- Poids -----

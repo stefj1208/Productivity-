@@ -406,4 +406,134 @@ object Assistant {
             .joinToString(" ")
             .trim()
     }
+
+    // ----- 10. Bilan de la semaine passée -----
+
+    /** Ce qui a marché, ce qui a coincé, le levier à essayer. */
+    data class WeekReview(val worked: String, val stuck: String, val lever: String)
+
+    private const val REVIEW_SYSTEM =
+        "Tu fais le bilan d'une semaine à partir de chiffres. " +
+            "Réponds UNIQUEMENT par trois lignes, dans cet ordre, sans titre ni puce :\n" +
+            "ligne 1 : ce qui a marché, une phrase\n" +
+            "ligne 2 : ce qui a coincé, une phrase, sans reproche\n" +
+            "ligne 3 : UN seul levier concret pour la semaine qui vient, une phrase\n" +
+            "Jamais de culpabilisation, jamais de conseil médical, jamais de note ou de score."
+
+    /**
+     * Envoie : uniquement vos chiffres agrégés de la semaine et votre priorité.
+     * Ni les données du partenaire, ni le détail jour par jour de la santé.
+     */
+    suspend fun reviewWeek(apiKey: String, facts: String): WeekReview? {
+        val lines = cleanLines(Ai.ask(apiKey, REVIEW_SYSTEM, facts, maxTokens = 1200))
+            .filter { it.length > 3 }
+        if (lines.isEmpty()) return null
+        return WeekReview(
+            worked = lines.getOrElse(0) { "" },
+            stuck = lines.getOrElse(1) { "" },
+            lever = lines.getOrElse(2) { "" }
+        )
+    }
+
+    // ----- 11. Ce qu'on abandonne -----
+
+    private const val ABANDON_SYSTEM =
+        "Tu aides à renoncer à quelque chose pour la semaine qui vient (méthode " +
+            "essentialiste). Réponds UNIQUEMENT par trois lignes, une proposition par " +
+            "ligne, sans puce ni numéro. Chaque proposition est une chose précise à " +
+            "arrêter, refuser ou reporter, en moins de 12 mots. Rien de moralisateur."
+
+    /** Envoie : votre priorité, vos objectifs non privés, le nombre de tâches en attente. */
+    suspend fun suggestAbandon(
+        apiKey: String,
+        priority: String,
+        goals: List<String>,
+        pendingTasks: Int
+    ): List<String> {
+        val prompt = buildString {
+            append("Priorité de la semaine : ${priority.ifBlank { "pas encore choisie" }}.\n")
+            if (goals.isNotEmpty()) append("Objectifs en cours : ${goals.joinToString(", ")}.\n")
+            append("Tâches déjà en attente : $pendingTasks.")
+        }
+        return cleanLines(Ai.ask(apiKey, ABANDON_SYSTEM, prompt, maxTokens = 800))
+            .filter { it.length > 3 }
+            .take(3)
+    }
+
+    // ----- 12. Vider la boîte de réception d'un coup -----
+
+    private const val INBOX_SYSTEM =
+        "Tu transformes des notes jetées en vrac en actions concrètes. " +
+            "Réponds UNIQUEMENT par des lignes au format exact :\n" +
+            "numero|action|quand\n" +
+            "numero = le numéro de la note, tel quel. " +
+            "action = moins de 10 mots, commence par un verbe à l'infinitif. " +
+            "quand = aujourdhui, demain, semaine ou inbox (inbox si ça demande encore " +
+            "réflexion, ou si ce n'est pas une action). " +
+            "Une ligne par note, dans l'ordre. Pas de commentaire, pas de puce."
+
+    data class InboxAction(val index: Int, val action: String, val whenLabel: String)
+
+    /** Envoie : uniquement le texte de vos notes en attente. */
+    suspend fun inboxToActions(apiKey: String, notes: List<String>): List<InboxAction> {
+        if (notes.isEmpty()) return emptyList()
+        val prompt = notes.take(25).mapIndexed { i, n -> "$i. ${n.trim()}" }.joinToString("\n")
+        return cleanLines(Ai.ask(apiKey, INBOX_SYSTEM, prompt, maxTokens = 2500))
+            .filter { it.contains('|') }
+            .mapNotNull { line ->
+                val parts = fields(line)
+                if (parts.size < 3) return@mapNotNull null
+                val index = parts[0].filter { it.isDigit() }.toIntOrNull() ?: return@mapNotNull null
+                if (parts[1].isBlank()) return@mapNotNull null
+                val raw = parts[2].lowercase().replace("'", "").replace("é", "e")
+                val whenLabel = when {
+                    raw.startsWith("aujourd") -> "aujourdhui"
+                    raw.startsWith("demain") -> "demain"
+                    raw.startsWith("semaine") -> "semaine"
+                    else -> "inbox"
+                }
+                InboxAction(index, parts[1], whenLabel)
+            }
+    }
+
+    // ----- 13. Transformer une idée de catégorie en plan d'action -----
+
+    /**
+     * [kind] vaut « routine » (ça revient chaque semaine) ou « tache » (ça se fait
+     * une fois). [steps] sont les actions concrètes, dans l'ordre.
+     */
+    data class ActionPlan(val kind: String, val steps: List<String>, val note: String)
+
+    private const val PLAN_SYSTEM =
+        "Tu transformes une intention en plan d'action concret pour un couple. " +
+            "Réponds UNIQUEMENT par des lignes, sans puce ni numéro :\n" +
+            "ligne 1 : exactement « routine » ou « tache » — routine si ça doit revenir " +
+            "régulièrement, tache si ça se règle une fois\n" +
+            "ligne 2 : une phrase qui dit pourquoi, moins de 20 mots\n" +
+            "lignes suivantes : de 2 à 5 actions concrètes, dans l'ordre, chacune " +
+            "commençant par un verbe à l'infinitif et faisable en moins d'une heure.\n" +
+            "Pas de titre, pas de commentaire."
+
+    /** Envoie : la catégorie, l'intitulé et la description que vous avez écrits. */
+    suspend fun planAction(
+        apiKey: String,
+        category: String,
+        title: String,
+        description: String
+    ): ActionPlan? {
+        val prompt = buildString {
+            append("Catégorie : $category.\n")
+            append("Intitulé : ${title.trim()}.")
+            if (description.isNotBlank()) append("\nPrécisions : ${description.trim()}.")
+        }
+        val lines = cleanLines(Ai.ask(apiKey, PLAN_SYSTEM, prompt, maxTokens = 1500))
+            .filter { it.length > 1 }
+        if (lines.size < 2) return null
+        val kind = if (lines[0].lowercase().startsWith("routine")) "routine" else "tache"
+        return ActionPlan(
+            kind = kind,
+            steps = lines.drop(2).filter { it.length > 3 }.take(5),
+            note = lines[1]
+        )
+    }
 }
