@@ -504,7 +504,7 @@ object Assistant {
      */
     data class ActionPlan(val kind: String, val steps: List<String>, val note: String)
 
-    private const val PLAN_SYSTEM =
+    private const val ACTION_PLAN_SYSTEM =
         "Tu transformes une intention en plan d'action concret pour un couple. " +
             "Réponds UNIQUEMENT par des lignes, sans puce ni numéro :\n" +
             "ligne 1 : exactement « routine » ou « tache » — routine si ça doit revenir " +
@@ -526,7 +526,7 @@ object Assistant {
             append("Intitulé : ${title.trim()}.")
             if (description.isNotBlank()) append("\nPrécisions : ${description.trim()}.")
         }
-        val lines = cleanLines(Ai.ask(apiKey, PLAN_SYSTEM, prompt, maxTokens = 1500))
+        val lines = cleanLines(Ai.ask(apiKey, ACTION_PLAN_SYSTEM, prompt, maxTokens = 1500))
             .filter { it.length > 1 }
         if (lines.size < 2) return null
         val kind = if (lines[0].lowercase().startsWith("routine")) "routine" else "tache"
