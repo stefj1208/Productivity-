@@ -213,19 +213,98 @@ fun HouseScreen(
     }
 
     val reworkSlot = reworking
-    if (reworkSlot != null) {
+    val mealProposal by vm.aiMeal.collectAsState()
+    if (reworkSlot != null && mealProposal == null) {
         val aiBusy by vm.aiBusy.collectAsState()
         MealRework(
             slot = reworkSlot,
             label = MenuIdeas.slotLabel(reworkSlot),
             busy = aiBusy,
             onDismiss = { reworking = null },
-            onSend = { instruction ->
-                vm.reworkMealWithAi(today, reworkSlot, instruction)
-                reworking = null
-            }
+            // La boîte reste ouverte : la proposition remplace le formulaire.
+            onSend = { instruction -> vm.reworkMealWithAi(today, reworkSlot, instruction) }
         )
     }
+    mealProposal?.let { p ->
+        MealProposalDialog(
+            proposal = p,
+            accent = accent,
+            onAccept = {
+                vm.acceptMeal()
+                reworking = null
+            },
+            onDismiss = { vm.clearAiMeal() }
+        )
+    }
+}
+
+/**
+ * Le repas proposé, avant remplacement. On montre ce qui va disparaître à côté
+ * de ce qui arrive : remplacer un repas déjà décidé est une perte, si petite
+ * soit-elle, et une perte se valide.
+ */
+@Composable
+private fun MealProposalDialog(
+    proposal: AppViewModel.MealProposal,
+    accent: androidx.compose.ui.graphics.Color,
+    onAccept: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val s = proposal.suggestion
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("✨ ${MenuIdeas.slotLabel(proposal.slot)}") },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                if (proposal.previousTitle.isNotBlank()) {
+                    Text(
+                        text = "À LA PLACE DE",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = proposal.previousTitle,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = NeutralGray,
+                        textDecoration = TextDecoration.LineThrough
+                    )
+                    Spacer(Modifier.height(14.dp))
+                }
+                Text(
+                    text = s.title,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = accent
+                )
+                if (s.calories > 0) {
+                    Text(
+                        text = "${s.calories} kcal par personne",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (s.quantities.isNotBlank()) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        text = "DANS L'ASSIETTE",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(s.quantities, style = MaterialTheme.typography.bodyLarge)
+                }
+                if (s.ingredients.isNotBlank()) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        text = "À ACHETER",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(s.ingredients, style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onAccept) { Text("Remplacer") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Garder l'ancien") } }
+    )
 }
 
 // ---------------------------------------------------------------- Repas

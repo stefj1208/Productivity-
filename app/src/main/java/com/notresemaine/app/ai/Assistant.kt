@@ -284,16 +284,23 @@ object Assistant {
 
     // ----- 6. Clarifier une note capturée -----
 
-    data class Clarified(val action: String, val whenLabel: String) // aujourdhui | demain | semaine | inbox
+    /**
+     * [whenLabel] vaut aujourdhui | demain | semaine | inbox.
+     * [why] est le raisonnement en une phrase : sans lui, l'assistant décide
+     * dans le dos de l'utilisateur, qui n'a aucun moyen de le contredire.
+     */
+    data class Clarified(val action: String, val whenLabel: String, val why: String = "")
 
     private const val CAPTURE_SYSTEM =
         "Tu transformes une note jetée à la volée en action concrète, " +
             "en te demandant : quelle est la toute prochaine action physique ? " +
             "Réponds UNIQUEMENT par une ligne au format exact :\n" +
-            "action|quand\n" +
+            "action|quand|pourquoi\n" +
             "action = moins de 10 mots, commence par un verbe à l'infinitif. " +
             "quand = aujourdhui, demain, semaine ou inbox (inbox si ça demande encore réflexion). " +
-            "Pas de commentaire."
+            "pourquoi = une phrase de moins de 20 mots qui explique ce que tu as compris " +
+            "et pourquoi ce jour-là. " +
+            "Pas de commentaire, pas de puce, une seule ligne."
 
     /** Envoie : uniquement la note que vous venez d'écrire. */
     suspend fun clarifyCapture(apiKey: String, text: String): Clarified? {
@@ -309,7 +316,7 @@ object Assistant {
             whenLabel.startsWith("semaine") -> "semaine"
             else -> "inbox"
         }
-        return Clarified(parts[0], normalized)
+        return Clarified(parts[0], normalized, parts.getOrElse(2) { "" })
     }
 
     // ----- 7. Rayon d'un ingrédient inconnu -----

@@ -304,14 +304,14 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings) {
                             text = "Clarifier et ranger",
                             busy = aiBusy,
                             enabled = text.isNotBlank(),
-                            onClick = {
-                                vm.captureWithAi(text)
-                                capturing = false
-                            },
+                            // La boîte reste ouverte : la proposition s'affiche
+                            // par-dessus, et rien n'est enregistré sans validation.
+                            onClick = { vm.captureWithAi(text) },
                             modifier = Modifier.padding(top = 10.dp)
                         )
                         Text(
-                            text = "Transforme la note en action concrète et choisit le bon jour.",
+                            text = "Vous verrez ce qu'il a compris avant que quoi que ce soit " +
+                                "ne soit enregistré.",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 4.dp)
@@ -328,6 +328,29 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings) {
             dismissButton = {
                 TextButton(onClick = { capturing = false }) { Text("Annuler") }
             }
+        )
+    }
+
+    // Le rappel qui arrive pendant qu'on est dans l'application : l'alarme
+    // plein écran, elle, ne s'affiche que téléphone posé.
+    com.notresemaine.app.ui.DueReminderPopup(vm, settings) { route ->
+        navController.navigate(route)
+    }
+
+    // La proposition de l'assistant, montrée avant d'agir.
+    val proposal by vm.aiCapture.collectAsState()
+    proposal?.let { p ->
+        com.notresemaine.app.ui.CaptureProposalDialog(
+            proposal = p,
+            onAccept = { action, whenLabel ->
+                vm.acceptCapture(action, whenLabel)
+                capturing = false
+            },
+            onReject = {
+                vm.rejectCapture()
+                capturing = false
+            },
+            onDismiss = { vm.clearAiCapture() }
         )
     }
 }

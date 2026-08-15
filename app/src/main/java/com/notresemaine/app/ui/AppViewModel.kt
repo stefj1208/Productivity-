@@ -46,6 +46,26 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val aiReview = MutableStateFlow<com.notresemaine.app.ai.Assistant.WeekReview?>(null)
     val aiAbandon = MutableStateFlow<List<String>>(emptyList())
 
+    /** Ce que l'assistant propose pour une note capturée, tant que rien n'est validé. */
+    data class CaptureProposal(
+        val original: String,
+        val action: String,
+        val whenLabel: String,
+        val why: String
+    )
+
+    val aiCapture = MutableStateFlow<CaptureProposal?>(null)
+
+    /** Le repas proposé pour remplacer celui du jour — tant qu'on n'a pas dit oui. */
+    data class MealProposal(
+        val date: String,
+        val slot: String,
+        val previousTitle: String,
+        val suggestion: com.notresemaine.app.ai.Assistant.MealSuggestion
+    )
+
+    val aiMeal = MutableStateFlow<MealProposal?>(null)
+
     private val syncRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
     init {
@@ -639,10 +659,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (suggestion == null) {
             toast("L'assistant n'a pas su proposer autre chose. Reformule ta consigne.")
         } else {
-            repo.replaceMeal(myId(), date, slot, suggestion)
+            // Remplacer un repas efface celui qui était prévu : on montre d'abord.
+            aiMeal.value = MealProposal(date, slot, current?.title.orEmpty(), suggestion)
+        }
+    }
+
+    fun acceptMeal() {
+        val proposal = aiMeal.value ?: return
+        viewModelScope.launch {
+            repo.replaceMeal(myId(), proposal.date, proposal.slot, proposal.suggestion)
+            aiMeal.value = null
             requestSync()
             toast("Repas remplacé ✓")
         }
+    }
+
+    fun clearAiMeal() {
+        aiMeal.value = null
     }
 
     /** Trois premières actions. Envoie : uniquement l'intitulé de l'objectif. */
@@ -698,17 +731,54 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Capture clarifiée. Envoie : uniquement la note que vous venez d'écrire. */
+    /**
+     * Demande à l'assistant ce qu'il comprend — et s'arrête là.
+     *
+     * L'ancienne version appliquait directement : la note disparaissait, une
+     * tâche apparaissait ailleurs, et on ne savait ni ce qui avait été compris
+     * ni pourquoi ce jour-là. Une proposition qu'on ne voit pas est une décision
+     * prise à votre place. Rien n'est enregistré tant que vous n'avez pas validé.
+     */
     fun captureWithAi(text: String) = runAi { key ->
         val clarified = com.notresemaine.app.ai.Assistant.clarifyCapture(key, text)
         if (clarified == null) {
             // L'assistant n'a pas compris : la capture hors ligne prend le relais.
             val message = repo.capture(myId(), text)
             if (message.isNotBlank()) toast(message)
+            requestSync()
         } else {
-            val message = repo.applyClarifiedCapture(myId(), clarified.action, clarified.whenLabel)
-            if (message.isNotBlank()) toast("« ${clarified.action} » · $message")
+            aiCapture.value = CaptureProposal(
+                original = text,
+                action = clarified.action,
+                whenLabel = clarified.whenLabel,
+                why = clarified.why
+            )
         }
-        requestSync()
+    }
+
+    /** Valide la proposition, éventuellement corrigée à la main. */
+    fun acceptCapture(action: String, whenLabel: String) {
+        viewModelScope.launch {
+            val message = repo.applyClarifiedCapture(myId(), action, whenLabel)
+            if (message.isNotBlank()) toast("« $action » · $message")
+            aiCapture.value = null
+            requestSync()
+        }
+    }
+
+    /** Refuse la proposition : la note d'origine part telle quelle dans la boîte. */
+    fun rejectCapture() {
+        val proposal = aiCapture.value ?: return
+        viewModelScope.launch {
+            val message = repo.capture(myId(), proposal.original)
+            if (message.isNotBlank()) toast(message)
+            aiCapture.value = null
+            requestSync()
+        }
+    }
+
+    fun clearAiCapture() {
+        aiCapture.value = null
     }
 
     /** Rangement des articles restés dans « Divers ». Envoie : uniquement ces articles. */
