@@ -65,6 +65,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     )
 
     val aiMeal = MutableStateFlow<MealProposal?>(null)
+    val aiHabits = MutableStateFlow<List<com.notresemaine.app.ai.Assistant.HabitIdea>>(emptyList())
+    val aiSport = MutableStateFlow<List<com.notresemaine.app.ai.Assistant.SportSession>>(emptyList())
+    val aiAgenda = MutableStateFlow("")
+
+    /** Ce que l'assistant a compris d'une phrase dictée, avant toute action. */
+    val aiVoice = MutableStateFlow<com.notresemaine.app.ai.Assistant.VoiceCommand?>(null)
 
     private val syncRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
@@ -303,6 +309,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Une note traitée par erreur repart en attente : rien n'est définitif. */
+    fun reopenInbox(itemId: String) {
+        viewModelScope.launch { repo.reopenInbox(itemId); requestSync() }
+    }
+
     fun resolveInbox(itemId: String, action: String) {
         viewModelScope.launch {
             repo.resolveInbox(itemId, action, com.notresemaine.app.data.Dates.weekStartIso())
@@ -453,6 +464,134 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 (if (applied > 1) "s" else "") + " en action ✓"
             else "Rien n'a pu être transformé — triez à la main."
         )
+    }
+
+    // ----- Habitudes -----
+
+    fun addHabit(title: String, source: String) {
+        viewModelScope.launch {
+            repo.saveHabit(null, myId(), title, source, 8, 21, 2)
+            requestSync()
+            toast("Habitude ajoutée ✓")
+        }
+    }
+
+    fun saveHabit(id: String?, title: String, source: String, from: Int, to: Int, perDay: Int) {
+        viewModelScope.launch {
+            repo.saveHabit(id, myId(), title, source, from, to, perDay)
+            requestSync()
+            toast("Enregistré ✓")
+        }
+    }
+
+    fun toggleHabit(id: String) {
+        viewModelScope.launch { repo.toggleHabit(id); requestSync() }
+    }
+
+    fun deleteHabit(id: String) {
+        viewModelScope.launch { repo.deleteHabit(id); requestSync() }
+    }
+
+    /** Envoie : uniquement le thème que vous avez écrit. */
+    fun suggestHabitsWithAi(focus: String) = runAi { key ->
+        aiHabits.value = com.notresemaine.app.ai.Assistant.suggestHabits(key, focus)
+    }
+
+    fun clearAiHabits() {
+        aiHabits.value = emptyList()
+    }
+
+    // ----- Sport -----
+
+    /** Envoie : votre niveau, la fréquence et votre but. Rien de médical. */
+    fun buildSportProgramWithAi(level: String, sessionsPerWeek: Int, aim: String) = runAi { key ->
+        val program = com.notresemaine.app.ai.Assistant.sportProgram(key, level, sessionsPerWeek, aim)
+        if (program.isEmpty()) toast("L'assistant n'a pas su bâtir de programme. Réessaie.")
+        aiSport.value = program
+    }
+
+    /** Rien n'est posé tant qu'on n'a pas vu le programme et dit oui. */
+    fun applySportProgram(weekStart: String) {
+        viewModelScope.launch {
+            val placed = repo.applySportProgram(myId(), weekStart, aiSport.value)
+            aiSport.value = emptyList()
+            Alarms.rescheduleAll(getApplication())
+            requestSync()
+            toast(if (placed > 0) "$placed séance(s) posée(s) ✓" else "Rien à poser.")
+        }
+    }
+
+    fun clearAiSport() {
+        aiSport.value = emptyList()
+    }
+
+    // ----- Agenda : ce que l'assistant en dit -----
+
+    fun readAgendaWithAi(facts: String) = runAi { key ->
+        aiAgenda.value = com.notresemaine.app.ai.Assistant.agendaNote(key, facts)
+    }
+
+    // ----- La voix -----
+
+    /**
+     * Une phrase dictée est interprétée, puis MONTRÉE — jamais appliquée
+     * directement. Se tromper à l'oral est trop facile pour agir sans confirmer.
+     */
+    fun understandVoice(spoken: String) = runAi { key ->
+        val command = com.notresemaine.app.ai.Assistant.understandVoice(key, spoken)
+        if (command == null) {
+            repo.capture(myId(), spoken)
+            requestSync()
+            toast("Pas compris — gardé tel quel dans les notes.")
+        } else {
+            aiVoice.value = command
+        }
+    }
+
+    fun clearAiVoice() {
+        aiVoice.value = null
+    }
+
+    /** Exécute la commande dictée, une fois validée à l'écran. */
+    fun applyVoice(command: com.notresemaine.app.ai.Assistant.VoiceCommand) {
+        viewModelScope.launch {
+            when (command.kind) {
+                "tache" -> {
+                    val message = repo.applyClarifiedCapture(myId(), command.payload, command.whenLabel)
+                    if (message.isNotBlank()) toast("« ${command.payload} » · $message")
+                }
+                "poids" -> {
+                    val kilos = command.payload.replace(',', '.').filter { it.isDigit() || it == '.' }
+                        .toDoubleOrNull()
+                    if (kilos == null) toast("Poids non reconnu.")
+                    else {
+                        repo.saveWeight(myId(), com.notresemaine.app.data.Dates.todayIso(), kilos)
+                        toast("Pesée notée ✓")
+                    }
+                }
+                "habitude" -> {
+                    repo.saveHabit(null, myId(), command.payload, command.detail, 8, 21, 2)
+                    toast("Habitude ajoutée ✓")
+                }
+                "menus" -> {
+                    // Les menus passent par leur propre chemin : on garde la consigne
+                    // et on laisse l'écran des menus faire la proposition complète.
+                    aiVoice.value = null
+                    suggestMenusWithAi(
+                        com.notresemaine.app.data.Dates.weekStartIso(),
+                        listOfNotNull(command.payload.ifBlank { null }, command.detail.ifBlank { null })
+                            .joinToString(". ")
+                    )
+                    return@launch
+                }
+                else -> {
+                    val message = repo.capture(myId(), command.payload)
+                    if (message.isNotBlank()) toast(message)
+                }
+            }
+            aiVoice.value = null
+            requestSync()
+        }
     }
 
     // ----- Poids -----

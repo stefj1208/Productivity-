@@ -64,6 +64,11 @@ import com.notresemaine.app.ui.PerformanceScreen
 import com.notresemaine.app.ui.WeightScreen
 import com.notresemaine.app.ui.CalendarScreen
 import com.notresemaine.app.ui.InboxScreen
+import com.notresemaine.app.ui.AgendaScreen
+import com.notresemaine.app.ui.HabitsScreen
+import com.notresemaine.app.ui.SportScreen
+import com.notresemaine.app.ui.VoiceButton
+import com.notresemaine.app.ui.VoiceProposalDialog
 import com.notresemaine.app.ui.PlanningScreen
 import com.notresemaine.app.ui.UsScreen
 import com.notresemaine.app.ui.HouseScreen
@@ -151,10 +156,10 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings) {
             }
         }
     ) { padding ->
+        androidx.compose.foundation.layout.Box(modifier = Modifier.padding(padding)) {
         NavHost(
             navController = navController,
-            startDestination = "planning",
-            modifier = Modifier.padding(padding)
+            startDestination = "planning"
         ) {
             composable("planning") {
                 PlanningScreen(
@@ -162,7 +167,7 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings) {
                     onPrepare = { date -> navController.navigate("prepare/$date") },
                     onDay = { date -> navController.navigate("day/$date") },
                     onRitual = { navController.navigate("ritual") },
-                    onGoals = { navController.navigate("goals") },
+                    onGoals = { navController.navigate("goals_pushed") },
                     onReview = { week -> navController.navigate("review/$week") },
                     onMenus = { week -> navController.navigate("menus/$week") },
                     onShopping = { week -> navController.navigate("shopping/$week") },
@@ -170,13 +175,18 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings) {
                     onHealth = { navController.navigate("health") },
                     onPerformance = { navController.navigate("performance") },
                     onWeight = { navController.navigate("weight") },
-                    onCalendar = { navController.navigate("calendar") },
+                    onAgenda = { navController.navigate("agenda") },
                     onInbox = { navController.navigate("inbox") },
+                    onHabits = { navController.navigate("habits") },
+                    onSport = { navController.navigate("sport") },
                     onMethod = { navController.navigate("method") }
                 )
             }
             composable("goals") {
                 GoalsScreen(vm, settings)
+            }
+            composable("goals_pushed") {
+                GoalsScreen(vm, settings, onBack = { navController.popBackStack() })
             }
             composable("house") {
                 HouseScreen(
@@ -201,6 +211,8 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings) {
                     onHealth = { navController.navigate("health") },
                     onPerformance = { navController.navigate("performance") },
                     onWeight = { navController.navigate("weight") },
+                    onHabits = { navController.navigate("habits") },
+                    onSport = { navController.navigate("sport") },
                     onCalendar = { navController.navigate("calendar") },
                     onAssistant = { navController.navigate("assistant") },
                     onReminders = { navController.navigate("reminders") },
@@ -214,6 +226,24 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings) {
                 DayScreen(
                     vm, settings, date,
                     onPrepare = { d -> navController.navigate("prepare/$d") },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable("agenda") {
+                AgendaScreen(
+                    vm, settings,
+                    onDay = { date -> navController.navigate("day/$date") },
+                    onSettings = { navController.navigate("calendar") },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable("habits") {
+                HabitsScreen(vm, settings, onBack = { navController.popBackStack() })
+            }
+            composable("sport") {
+                SportScreen(
+                    vm, settings,
+                    onGoals = { navController.navigate("goals_pushed") },
                     onBack = { navController.popBackStack() }
                 )
             }
@@ -281,6 +311,17 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings) {
                 ShoppingScreen(vm, settings, week, onBack = { navController.popBackStack() })
             }
         }
+
+        // Le micro, présent sur toutes les pages : parler doit rester le geste
+        // le plus court, sinon on ne s'en sert que le premier jour.
+        VoiceButton(
+            vm = vm,
+            settings = settings,
+            modifier = Modifier
+                .align(androidx.compose.ui.Alignment.TopEnd)
+                .padding(end = 16.dp, top = 12.dp)
+        )
+        }
     }
 
     if (capturing) {
@@ -330,6 +371,8 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings) {
             }
         )
     }
+
+    VoiceProposalDialog(vm)
 
     // Le rappel qui arrive pendant qu'on est dans l'application : l'alarme
     // plein écran, elle, ne s'affiche que téléphone posé.

@@ -676,6 +676,43 @@ fun ShortcutIcon(
     }
 }
 
+/**
+ * Raccourci de première ligne : ce qu'on ouvre plusieurs fois par jour.
+ * Deux fois plus haut qu'un raccourci ordinaire — la taille est la seule
+ * hiérarchie qui se lise sans lire.
+ */
+@Composable
+fun BigShortcut(
+    emoji: String,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    badge: String? = null
+) {
+    Column(
+        modifier = modifier
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(20.dp))
+            .clickable(onClick = onClick)
+            .defaultMinSize(minHeight = 112.dp)
+            .padding(vertical = 18.dp, horizontal = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(text = emoji, style = MaterialTheme.typography.displaySmall)
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+        if (badge != null) {
+            Text(
+                text = badge,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
 /** Un chiffre qui compte, en grand, avec ce qu'il mesure en dessous. */
 @Composable
 fun KpiTile(

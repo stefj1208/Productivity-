@@ -39,7 +39,7 @@ import com.notresemaine.app.ui.theme.NeutralGray
 import com.notresemaine.app.ui.theme.accentFor
 
 @Composable
-fun GoalsScreen(vm: AppViewModel, settings: AppSettings) {
+fun GoalsScreen(vm: AppViewModel, settings: AppSettings, onBack: (() -> Unit)? = null) {
     val myId = settings.myUserId
     val weekStart = Dates.weekStartIso()
 
@@ -86,7 +86,8 @@ fun GoalsScreen(vm: AppViewModel, settings: AppSettings) {
     ) {
         ScreenHeader(
             title = "Objectifs",
-            subtitle = "${myGoals.count { it.active }} actif(s) sur ${GoalTemplates.MAX_ACTIVE_GOALS} — moins mais mieux"
+            subtitle = "${myGoals.count { it.active }} actif(s) sur ${GoalTemplates.MAX_ACTIVE_GOALS} — moins mais mieux",
+            onBack = onBack
         )
         Spacer(Modifier.height(12.dp))
         TipCard(Tips.goals())

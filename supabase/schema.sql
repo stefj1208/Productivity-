@@ -196,6 +196,21 @@ create table if not exists weights (
   updated_at bigint not null default 0
 );
 
+-- Habitudes (V12) : personnelles, mais synchronisées entre vos appareils.
+create table if not exists habits (
+  id text primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  couple_id uuid,
+  title text not null,
+  source text not null default '',
+  enabled boolean not null default true,
+  from_hour int not null default 8,
+  to_hour int not null default 21,
+  per_day int not null default 2,
+  deleted boolean not null default false,
+  updated_at bigint not null default 0
+);
+
 alter table profiles add column if not exists pacte_enabled boolean not null default false;
 alter table profiles add column if not exists daily_limit_minutes int not null default 45;
 alter table profiles add column if not exists curfew_enabled boolean not null default false;
@@ -246,6 +261,8 @@ create or replace trigger shopping_items_stamp before insert or update on shoppi
 create or replace trigger health_days_stamp before insert or update on health_days
   for each row execute function stamp_couple();
 create or replace trigger weights_stamp before insert or update on weights
+  for each row execute function stamp_couple();
+create or replace trigger habits_stamp before insert or update on habits
   for each row execute function stamp_couple();
 
 -- Crée l'espace couple et renvoie le code à partager (6 caractères).
@@ -455,4 +472,16 @@ create policy weights_select on weights for select
 create policy weights_insert on weights for insert
   with check (user_id = auth.uid());
 create policy weights_update on weights for update
+  using (user_id = auth.uid());
+
+-- Habitudes : lues par le couple, écrites par leur seul propriétaire.
+alter table habits enable row level security;
+drop policy if exists habits_select on habits;
+drop policy if exists habits_insert on habits;
+drop policy if exists habits_update on habits;
+create policy habits_select on habits for select
+  using (user_id = auth.uid() or (couple_id is not null and couple_id = my_couple()));
+create policy habits_insert on habits for insert
+  with check (user_id = auth.uid());
+create policy habits_update on habits for update
   using (user_id = auth.uid());

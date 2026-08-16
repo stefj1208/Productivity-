@@ -80,7 +80,28 @@ fun DueReminderPopup(
                     )
                 }
 
-                // 2. Le rappel du soir : préparer demain.
+                // 2. Une habitude, à un moment imprévisible de la journée.
+                val date = java.time.LocalDate.now()
+                com.notresemaine.app.data.Habits.let { habits ->
+                    vm.repo.db.habits().activeOnce(myId).forEach { habit ->
+                        val moments = habits.momentsOf(
+                            habit.id, date, habit.fromHour, habit.toHour, habit.perDay
+                        )
+                        val hit = moments.firstOrNull { nowMinutes - it in 0..3 }
+                        if (hit != null) {
+                            return@run DueReminder(
+                                key = "habit:${habit.id}:$today:$hit",
+                                emoji = "🔁",
+                                title = habit.title,
+                                subtitle = habit.source.ifBlank { "Une habitude que vous avez choisie." },
+                                actionLabel = "Mes habitudes",
+                                route = "habits"
+                            )
+                        }
+                    }
+                }
+
+                // 3. Le rappel du soir : préparer demain.
                 if (settings.eveningEnabled) {
                     val evening = runCatching { LocalTime.parse(settings.eveningReminder) }.getOrNull()
                     if (evening != null) {

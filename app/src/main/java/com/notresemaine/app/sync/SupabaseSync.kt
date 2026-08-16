@@ -4,6 +4,7 @@ import com.notresemaine.app.data.DayPlanEntity
 import com.notresemaine.app.data.EncouragementEntity
 import com.notresemaine.app.data.GoalEntity
 import com.notresemaine.app.data.GraceRequestEntity
+import com.notresemaine.app.data.HabitEntity
 import com.notresemaine.app.data.HealthDayEntity
 import com.notresemaine.app.data.MealEntity
 import com.notresemaine.app.data.ProfileEntity
@@ -173,6 +174,20 @@ data class MealDto(
     val ingredients: String,
     val quantities: String = "",
     val calories: Int = 0,
+    val deleted: Boolean = false,
+    @SerialName("updated_at") val updatedAt: Long
+)
+
+@Serializable
+data class HabitDto(
+    val id: String,
+    @SerialName("user_id") val userId: String,
+    val title: String,
+    val source: String = "",
+    val enabled: Boolean = true,
+    @SerialName("from_hour") val fromHour: Int = 8,
+    @SerialName("to_hour") val toHour: Int = 21,
+    @SerialName("per_day") val perDay: Int = 2,
     val deleted: Boolean = false,
     @SerialName("updated_at") val updatedAt: Long
 )
@@ -444,6 +459,12 @@ class SyncManager(private val repo: Repository) {
                         it.quantities, it.calories, it.deleted, it.updatedAt)
                 }, MealDto.serializer())
 
+                val habits = db.habits().modifiedSince(s.lastPushTs).filter { it.userId == myId }
+                api.upsert("habits", token, habits.map {
+                    HabitDto(it.id, it.userId, it.title, it.source, it.enabled,
+                        it.fromHour, it.toHour, it.perDay, it.deleted, it.updatedAt)
+                }, HabitDto.serializer())
+
                 // Le poids ne part que si son propriétaire a coché le partage.
                 val weights = if (s.weightShared) {
                     db.weights().modifiedSince(s.lastPushTs).filter { it.userId == myId }
@@ -492,6 +513,7 @@ class SyncManager(private val repo: Repository) {
                         graces.map { it.updatedAt } + meals.map { it.updatedAt } +
                         shopping.map { it.updatedAt } + healthDays.map { it.updatedAt } +
                         houseItems.map { it.updatedAt } + weights.map { it.updatedAt } +
+                        habits.map { it.updatedAt } +
                         s.lastPushTs).max()
 
                 // Réception : tout ce qui a changé dans le couple ; la ligne la plus récente gagne.
@@ -549,6 +571,14 @@ class SyncManager(private val repo: Repository) {
                         db.meals().upsert(MealEntity(dto.id, dto.userId, dto.date, dto.slot,
                             dto.title, dto.ingredients, dto.quantities, dto.calories,
                             dto.deleted, dto.updatedAt))
+                    }
+                }
+                api.select("habits", token, s.lastPullTs, HabitDto.serializer()).forEach { dto ->
+                    pullMark = maxOf(pullMark, dto.updatedAt)
+                    val local = db.habits().byId(dto.id)
+                    if (local == null || dto.updatedAt > local.updatedAt) {
+                        db.habits().upsert(HabitEntity(dto.id, dto.userId, dto.title, dto.source,
+                            dto.enabled, dto.fromHour, dto.toHour, dto.perDay, dto.deleted, dto.updatedAt))
                     }
                 }
                 api.select("weights", token, s.lastPullTs, WeightDto.serializer()).forEach { dto ->

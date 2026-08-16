@@ -41,8 +41,10 @@ fun InboxScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
     val weekStart = Dates.weekStartIso()
     val aiReady = settings.aiEnabled && settings.aiApiKey.isNotBlank()
 
-    val inbox by remember(myId) { vm.repo.db.inbox().pending(myId) }
+    val everything by remember(myId) { vm.repo.db.inbox().allOf(myId) }
         .collectAsState(initial = emptyList())
+    val inbox = everything.filter { !it.processed }
+    val archived = everything.filter { it.processed }
     val aiBusy by vm.aiBusy.collectAsState()
     var note by remember { mutableStateOf("") }
 
@@ -81,11 +83,9 @@ fun InboxScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
                 text = "Rien en attente. Tout ce qui vous traverse l'esprit se note ici, " +
                     "et se trie plus tard — c'est tout l'intérêt."
             )
-            Spacer(Modifier.height(32.dp))
-            return@Column
         }
 
-        if (aiReady) {
+        if (inbox.isNotEmpty() && aiReady) {
             Spacer(Modifier.height(14.dp))
             AiButton(
                 text = "Tout transformer en actions",
@@ -102,8 +102,10 @@ fun InboxScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
             )
         }
 
-        Spacer(Modifier.height(16.dp))
-        SectionLabel("UNE DÉCISION PAR NOTE")
+        if (inbox.isNotEmpty()) {
+            Spacer(Modifier.height(16.dp))
+            SectionLabel("UNE DÉCISION PAR NOTE")
+        }
         inbox.forEach { item ->
             Column(modifier = Modifier.padding(vertical = 8.dp)) {
                 Text(item.text, style = MaterialTheme.typography.bodyLarge)
@@ -114,6 +116,27 @@ fun InboxScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
                     ) { Text("Planifier") }
                     TextButton(onClick = { vm.resolveInbox(item.id, "fait") }) { Text("Déjà fait") }
                     TextButton(onClick = { vm.resolveInbox(item.id, "supprimer") }) { Text("Jeter") }
+                }
+            }
+        }
+
+        // Toutes les notes, y compris celles déjà traitées : une note rangée
+        // n'est pas une note perdue, et on veut pouvoir la relire.
+        if (archived.isNotEmpty()) {
+            Spacer(Modifier.height(24.dp))
+            SectionLabel("DÉJÀ TRAITÉES (${archived.size})")
+            archived.forEach { item ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "✓ ${item.text}",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(onClick = { vm.reopenInbox(item.id) }) { Text("Rouvrir") }
                 }
             }
         }

@@ -543,4 +543,141 @@ object Assistant {
             note = lines[1]
         )
     }
+
+    // ----- 14. Les habitudes qui font la différence -----
+
+    data class HabitIdea(val title: String, val source: String)
+
+    private const val HABITS_SYSTEM =
+        "Tu proposes des micro-habitudes tirées de six livres : Miracle Morning, " +
+            "S'organiser pour réussir (GTD), Deep Work, The One Thing, L'essentialisme, " +
+            "La semaine de 4 heures. " +
+            "Réponds UNIQUEMENT par des lignes au format exact :\n" +
+            "habitude|source\n" +
+            "habitude = une consigne courte, à la deuxième personne, moins de 10 mots, " +
+            "qu'on peut appliquer immédiatement au moment où on la lit " +
+            "(ex. : « Une seule chose à la fois », « Repose le téléphone »). " +
+            "source = le livre ou la raison, moins de 8 mots. " +
+            "Pas de titre, pas de puce, pas de commentaire."
+
+    /** Envoie : uniquement le thème que vous avez choisi. */
+    suspend fun suggestHabits(apiKey: String, focus: String, count: Int = 6): List<HabitIdea> {
+        val prompt = buildString {
+            append("Propose $count habitudes différentes.")
+            if (focus.isNotBlank()) append(" Thème souhaité : ${focus.trim()}.")
+        }
+        return cleanLines(Ai.ask(apiKey, HABITS_SYSTEM, prompt, maxTokens = 1500))
+            .filter { it.contains('|') }
+            .mapNotNull { line ->
+                val parts = fields(line)
+                if (parts.size < 2 || parts[0].isBlank()) return@mapNotNull null
+                HabitIdea(parts[0], parts[1])
+            }
+            .take(count)
+    }
+
+    // ----- 15. Programme de sport -----
+
+    data class SportSession(val dayIndex: Int, val title: String, val minutes: Int)
+
+    private const val SPORT_SYSTEM =
+        "Tu bâtis un programme de sport hebdomadaire réaliste. " +
+            "Réponds UNIQUEMENT par des lignes au format exact :\n" +
+            "jour|seance|minutes\n" +
+            "jour = 0 à 6 (0 = lundi). seance = moins de 8 mots. minutes = nombre entier seul. " +
+            "Prévois au moins un jour de repos entre deux séances intenses. " +
+            "Aucun conseil médical, aucune promesse de résultat. " +
+            "Pas de titre, pas de puce, pas de commentaire."
+
+    /** Envoie : votre niveau, le nombre de séances voulu et votre but, tels que saisis. */
+    suspend fun sportProgram(
+        apiKey: String,
+        level: String,
+        sessionsPerWeek: Int,
+        aim: String
+    ): List<SportSession> {
+        val prompt = buildString {
+            append("Niveau : ${level.ifBlank { "débutant" }}.\n")
+            append("Séances par semaine : $sessionsPerWeek.\n")
+            append("But : ${aim.ifBlank { "reprendre régulièrement" }}.")
+        }
+        return cleanLines(Ai.ask(apiKey, SPORT_SYSTEM, prompt, maxTokens = 1500))
+            .filter { it.contains('|') }
+            .mapNotNull { line ->
+                val parts = fields(line)
+                if (parts.size < 3) return@mapNotNull null
+                val day = parts[0].filter { it.isDigit() }.toIntOrNull() ?: return@mapNotNull null
+                if (day !in 0..6 || parts[1].isBlank()) return@mapNotNull null
+                SportSession(day, parts[1], parts[2].filter { it.isDigit() }.toIntOrNull() ?: 30)
+            }
+    }
+
+    // ----- 16. Note sur l'agenda -----
+
+    private const val AGENDA_SYSTEM =
+        "Tu commentes un agenda en deux phrases maximum. " +
+            "Première phrase : ce que la période a de particulier (charge, trous, " +
+            "enchaînements serrés). Deuxième phrase : UN ajustement concret. " +
+            "Factuel, sans jugement, sans liste, sans titre."
+
+    /** Envoie : uniquement les intitulés et horaires que vous avez déjà dans l'app. */
+    suspend fun agendaNote(apiKey: String, facts: String): String =
+        cleanLines(Ai.ask(apiKey, AGENDA_SYSTEM, facts, maxTokens = 800)).joinToString(" ").trim()
+
+    // ----- 17. Comprendre une phrase dictée -----
+
+    /**
+     * [kind] vaut tache | menus | poids | note | habitude.
+     * [payload] est ce qu'il faut faire, [detail] les précisions, [whenLabel] le jour
+     * pour une tâche, et [say] la phrase à montrer avant de valider.
+     */
+    data class VoiceCommand(
+        val kind: String,
+        val payload: String,
+        val detail: String,
+        val whenLabel: String,
+        val say: String
+    )
+
+    private const val VOICE_SYSTEM =
+        "Tu interprètes une phrase dictée à une application de planification de couple. " +
+            "Réponds UNIQUEMENT par une seule ligne au format exact :\n" +
+            "type|quoi|precisions|quand|phrase\n" +
+            "type = exactement l'un de : tache, menus, poids, habitude, note.\n" +
+            "  tache = quelque chose à faire. menus = composer les repas de la semaine. " +
+            "poids = une pesée. habitude = une règle de conduite à se rappeler. " +
+            "note = tout le reste.\n" +
+            "quoi = pour tache, l'action à l'infinitif en moins de 10 mots ; pour menus, " +
+            "les contraintes de cuisine ; pour poids, le nombre de kilos seul ; " +
+            "pour habitude, la consigne courte ; pour note, la phrase nettoyée.\n" +
+            "precisions = ce qui reste d'utile, ou vide.\n" +
+            "quand = aujourdhui, demain, semaine ou inbox — uniquement pour une tache, " +
+            "sinon vide.\n" +
+            "phrase = ce que tu as compris, en une phrase de moins de 20 mots.\n" +
+            "Pas de commentaire, une seule ligne."
+
+    /** Envoie : uniquement la phrase que vous venez de dicter. */
+    suspend fun understandVoice(apiKey: String, spoken: String): VoiceCommand? {
+        val line = cleanLines(Ai.ask(apiKey, VOICE_SYSTEM, "Phrase : ${spoken.trim()}", maxTokens = 1000))
+            .firstOrNull { it.contains('|') } ?: return null
+        val parts = fields(line)
+        if (parts.size < 2 || parts[1].isBlank()) return null
+        val kind = parts[0].lowercase().trim().let { raw ->
+            listOf("tache", "menus", "poids", "habitude", "note").firstOrNull { raw.startsWith(it) } ?: "note"
+        }
+        val raw = parts.getOrElse(3) { "" }.lowercase().replace("'", "").replace("é", "e")
+        val whenLabel = when {
+            raw.startsWith("aujourd") -> "aujourdhui"
+            raw.startsWith("demain") -> "demain"
+            raw.startsWith("semaine") -> "semaine"
+            else -> "inbox"
+        }
+        return VoiceCommand(
+            kind = kind,
+            payload = parts[1],
+            detail = parts.getOrElse(2) { "" },
+            whenLabel = whenLabel,
+            say = parts.getOrElse(4) { "" }
+        )
+    }
 }

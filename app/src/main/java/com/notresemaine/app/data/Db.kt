@@ -191,6 +191,26 @@ data class MealEntity(
 )
 
 /**
+ * Une habitude qui fait la différence : « ne pas grignoter entre les repas »,
+ * « une seule chose à la fois ». Elle ne se coche pas — elle se rappelle, à des
+ * moments imprévisibles, parce qu'un rappel toujours à la même heure devient un
+ * meuble qu'on ne voit plus.
+ */
+@Entity(tableName = "habits")
+data class HabitEntity(
+    @PrimaryKey val id: String,
+    val userId: String,
+    val title: String,
+    val source: String = "",     // le livre ou la raison, en une ligne
+    val enabled: Boolean = true,
+    val fromHour: Int = 8,       // pas de rappel avant
+    val toHour: Int = 21,        // ni après
+    val perDay: Int = 2,         // combien de fois par jour, au hasard
+    val deleted: Boolean = false,
+    val updatedAt: Long
+)
+
+/**
  * Une pesée. Donnée de santé, donc personnelle par défaut : le partenaire ne
  * la voit que si son propriétaire a coché le partage dans son profil.
  */
@@ -409,6 +429,9 @@ interface InboxDao {
     @Query("SELECT COUNT(*) FROM inbox_items WHERE userId = :userId AND processed = 0 AND deleted = 0")
     fun pendingCount(userId: String): Flow<Int>
 
+    @Query("SELECT * FROM inbox_items WHERE userId = :userId AND deleted = 0 ORDER BY updatedAt DESC")
+    fun allOf(userId: String): Flow<List<InboxItemEntity>>
+
     @Query("SELECT * FROM inbox_items WHERE id = :id")
     suspend fun byId(id: String): InboxItemEntity?
 
@@ -507,6 +530,27 @@ interface HouseItemDao {
 }
 
 @Dao
+interface HabitDao {
+    @Query("SELECT * FROM habits WHERE deleted = 0 ORDER BY enabled DESC, updatedAt")
+    fun all(): Flow<List<HabitEntity>>
+
+    @Query("SELECT * FROM habits WHERE userId = :userId AND enabled = 1 AND deleted = 0")
+    suspend fun activeOnce(userId: String): List<HabitEntity>
+
+    @Query("SELECT * FROM habits WHERE id = :id")
+    suspend fun byId(id: String): HabitEntity?
+
+    @Query("SELECT * FROM habits WHERE updatedAt > :ts")
+    suspend fun modifiedSince(ts: Long): List<HabitEntity>
+
+    @Query("UPDATE habits SET userId = :newId, updatedAt = :now WHERE userId = :oldId")
+    suspend fun migrateUser(oldId: String, newId: String, now: Long)
+
+    @Upsert
+    suspend fun upsert(habit: HabitEntity)
+}
+
+@Dao
 interface WeightDao {
     @Query("SELECT * FROM weights WHERE deleted = 0 ORDER BY date")
     fun all(): Flow<List<WeightEntity>>
@@ -552,9 +596,9 @@ interface HealthDao {
         GoalEntity::class, RitualStepEntity::class, RitualLogEntity::class,
         InboxItemEntity::class, UsageDayEntity::class, GraceRequestEntity::class,
         MealEntity::class, ShoppingItemEntity::class, HealthDayEntity::class,
-        HouseItemEntity::class, WeightEntity::class
+        HouseItemEntity::class, WeightEntity::class, HabitEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class AppDb : RoomDatabase() {
@@ -573,6 +617,7 @@ abstract class AppDb : RoomDatabase() {
     abstract fun health(): HealthDao
     abstract fun houseItems(): HouseItemDao
     abstract fun weights(): WeightDao
+    abstract fun habits(): HabitDao
 
     companion object {
         @Volatile private var instance: AppDb? = null

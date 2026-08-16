@@ -63,8 +63,10 @@ fun PlanningScreen(
     onHealth: () -> Unit,
     onPerformance: () -> Unit,
     onWeight: () -> Unit,
-    onCalendar: () -> Unit,
+    onAgenda: () -> Unit,
     onInbox: () -> Unit,
+    onHabits: () -> Unit,
+    onSport: () -> Unit,
     onMethod: () -> Unit
 ) {
     val today = Dates.todayIso()
@@ -72,7 +74,11 @@ fun PlanningScreen(
     val accent = accentFor(settings.myColor)
     val hour = LocalTime.now().hour
 
-    var weekOffset by remember { mutableIntStateOf(Dates.weekOffsetOf(Dates.planningTargetWeekIso())) }
+    // La semaine affichée est TOUJOURS la semaine en cours au départ.
+    // Avant, elle basculait sur la suivante le week-end : une tâche rangée
+    // « cette semaine » devenait alors invisible — elle existait, mais dans
+    // l'autre semaine. C'est ce qui donnait l'impression qu'elle disparaissait.
+    var weekOffset by remember { mutableIntStateOf(0) }
     val weekStart = Dates.weekStartIsoOffset(weekOffset)
     var addingTask by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<TaskEntity?>(null) }
@@ -354,7 +360,19 @@ fun PlanningScreen(
             Spacer(Modifier.height(24.dp))
             SectionLabel("RACCOURCIS")
             val remaining = shopping.count { !it.checked }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Trois grosses tuiles d'abord : ce qu'on ouvre plusieurs fois par jour.
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                BigShortcut("🕐", "Ma journée", { onDay(today) }, Modifier.weight(1f))
+                BigShortcut(
+                    "📥", "Notes", onInbox, Modifier.weight(1f),
+                    badge = if (inboxCount > 0) "$inboxCount" else null
+                )
+                BigShortcut("🔁", "Habitudes", onHabits, Modifier.weight(1f))
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(top = 10.dp)
+            ) {
                 ShortcutIcon("🍽️", "Menus", { onMenus(weekStart) }, Modifier.weight(1f))
                 ShortcutIcon(
                     "🛒", "Courses", { onShopping(weekStart) }, Modifier.weight(1f),
@@ -376,12 +394,9 @@ fun PlanningScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.padding(top = 8.dp)
             ) {
-                ShortcutIcon("🕐", "Ma journée", { onDay(today) }, Modifier.weight(1f))
-                ShortcutIcon(
-                    "📥", "Notes", onInbox, Modifier.weight(1f),
-                    badge = if (inboxCount > 0) "($inboxCount)" else null
-                )
-                ShortcutIcon("📅", "Agenda", onCalendar, Modifier.weight(1f))
+                ShortcutIcon("📅", "Agenda", onAgenda, Modifier.weight(1f))
+                ShortcutIcon("🏃", "Sport", onSport, Modifier.weight(1f))
+                ShortcutIcon("🔄", "Bilan", { onReview(targetWeek) }, Modifier.weight(1f))
                 ShortcutIcon("📖", "Méthode", onMethod, Modifier.weight(1f))
             }
             Spacer(Modifier.height(24.dp))
@@ -394,7 +409,7 @@ fun PlanningScreen(
                     .weight(1f)
                     .height(52.dp)
             ) {
-                Text(if (weekPlan?.validatedAt != null) "🗓️ Revoir" else "🗓️ Planifier")
+                Text("🗓️ Bilan")
             }
             OutlinedButton(
                 onClick = { onPrepare(Dates.tomorrowIso()) },
@@ -408,7 +423,7 @@ fun PlanningScreen(
         // du mobilier ; celui-ci se lit à chaque ouverture.
         val action = when (step.route) {
             "ritual" -> "🌅 Faire mon rituel" to { onRitual() }
-            "review" -> "🗓️ Planifier la semaine" to { onReview(targetWeek) }
+            "review" -> "🗓️ Faire le bilan de la semaine" to { onReview(targetWeek) }
             "goals" -> "🚀 Choisir un objectif" to { onGoals() }
             "prepare/tomorrow" -> "🌙 Préparer demain" to { onPrepare(Dates.tomorrowIso()) }
             "prepare/today" -> "🎯 Choisir ma priorité" to { onPrepare(today) }

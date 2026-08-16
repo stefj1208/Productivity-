@@ -82,13 +82,10 @@ fun MethodScreen(onBack: () -> Unit) {
             .padding(horizontal = 24.dp)
             .verticalScroll(rememberScrollState())
     ) {
-        Spacer(Modifier.height(20.dp))
-        Text("La méthode", style = MaterialTheme.typography.titleLarge)
-        Text(
-            text = "Six livres, une application. Voici ce qu'elle applique pour vous.",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 6.dp)
+        ScreenHeader(
+            title = "📖 La méthode",
+            subtitle = "Six livres, une application",
+            onBack = onBack
         )
         books.forEach { book ->
             Spacer(Modifier.height(20.dp))

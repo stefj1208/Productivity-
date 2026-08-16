@@ -501,6 +501,11 @@ class Repository private constructor(context: Context) {
         }
     }
 
+    suspend fun reopenInbox(itemId: String) {
+        val item = db.inbox().byId(itemId) ?: return
+        db.inbox().upsert(item.copy(processed = false, updatedAt = now()))
+    }
+
     // ----- Pacte d'écran -----
 
     suspend fun saveUsageDay(userId: String, date: String, totalMin: Int, socialMin: Int, unlocks: Int) {
@@ -781,6 +786,70 @@ class Repository private constructor(context: Context) {
         return applied
     }
 
+    // ----- Habitudes -----
+
+    suspend fun saveHabit(
+        id: String?, userId: String, title: String, source: String,
+        fromHour: Int, toHour: Int, perDay: Int
+    ) {
+        if (title.isBlank()) return
+        val existing = id?.let { db.habits().byId(it) }
+        db.habits().upsert(
+            HabitEntity(
+                id = existing?.id ?: UUID.randomUUID().toString(),
+                userId = existing?.userId ?: userId,
+                title = title.trim(),
+                source = source.trim(),
+                enabled = existing?.enabled ?: true,
+                fromHour = fromHour.coerceIn(0, 23),
+                toHour = toHour.coerceIn(1, 23),
+                perDay = perDay.coerceIn(1, 8),
+                updatedAt = now()
+            )
+        )
+    }
+
+    suspend fun toggleHabit(id: String) {
+        val h = db.habits().byId(id) ?: return
+        db.habits().upsert(h.copy(enabled = !h.enabled, updatedAt = now()))
+    }
+
+    suspend fun deleteHabit(id: String) {
+        val h = db.habits().byId(id) ?: return
+        db.habits().upsert(h.copy(deleted = true, updatedAt = now()))
+    }
+
+    // ----- Sport -----
+
+    /** Pose le programme sur la semaine, en séances de sport datées. */
+    suspend fun applySportProgram(
+        userId: String,
+        weekStart: String,
+        sessions: List<com.notresemaine.app.ai.Assistant.SportSession>
+    ): Int {
+        val days = Dates.daysOfWeek(weekStart)
+        var placed = 0
+        sessions.forEach { session ->
+            val date = days.getOrNull(session.dayIndex) ?: return@forEach
+            db.tasks().upsert(
+                TaskEntity(
+                    id = UUID.randomUUID().toString(),
+                    userId = userId,
+                    title = "${session.title} · ${session.minutes} min",
+                    date = date,
+                    weekStart = weekStart,
+                    // Une séance ne compte pas dans la limite de trois tâches :
+                    // le corps n'est pas une tâche de plus dans la journée.
+                    isSport = true,
+                    durationMinutes = session.minutes,
+                    updatedAt = now()
+                )
+            )
+            placed++
+        }
+        return placed
+    }
+
     // ----- Poids -----
 
     /** Une pesée par jour : se repeser le soir remplace la pesée du matin. */
@@ -969,6 +1038,7 @@ class Repository private constructor(context: Context) {
         db.weekPlans().migrateUser(oldId, newId, t)
         db.goals().migrateUser(oldId, newId, t)
         db.weights().migrateUser(oldId, newId, t)
+        db.habits().migrateUser(oldId, newId, t)
         val profile = db.profiles().byId(oldId)
         if (profile != null) {
             db.profiles().delete(oldId)

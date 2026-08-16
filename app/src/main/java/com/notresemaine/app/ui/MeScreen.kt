@@ -36,6 +36,8 @@ fun MeScreen(
     onHealth: () -> Unit,
     onPerformance: () -> Unit,
     onWeight: () -> Unit,
+    onHabits: () -> Unit,
+    onSport: () -> Unit,
     onCalendar: () -> Unit,
     onAssistant: () -> Unit,
     onReminders: () -> Unit,
@@ -58,6 +60,9 @@ fun MeScreen(
     val weights by remember { vm.repo.db.weights().all() }
         .collectAsState(initial = emptyList())
     val lastWeight = weights.filter { it.userId == myId }.maxByOrNull { it.date }
+    val habits by remember { vm.repo.db.habits().all() }
+        .collectAsState(initial = emptyList())
+    val habitCount = habits.count { it.userId == myId && it.enabled }
 
     val streak = vm.repo.ritualStreak(ritualLogs, myId)
     val activeSteps = ritualSteps.count { it.enabled }
@@ -108,6 +113,20 @@ fun MeScreen(
             onClick = onHealth
         )
 
+        ShortcutTile(
+            emoji = "🔁",
+            title = "Mes habitudes",
+            subtitle = if (habitCount == 0) "Aucune — rappels au hasard dans la journée"
+            else "$habitCount active(s)",
+            onClick = onHabits,
+            highlight = habitCount > 0
+        )
+        ShortcutTile(
+            emoji = "🏃",
+            title = "Sport",
+            subtitle = "Séances de la semaine et programme sur mesure",
+            onClick = onSport
+        )
         ShortcutTile(
             emoji = "⚖️",
             title = "Mon poids",
