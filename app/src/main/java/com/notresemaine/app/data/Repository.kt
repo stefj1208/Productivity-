@@ -113,7 +113,9 @@ class Repository private constructor(context: Context) {
                 title = title.trim(),
                 detail = detail.trim(),
                 amount = amount,
-                dueDate = dueDate?.ifBlank { null },
+                // Une échéance qu'on ne sait pas relire n'est pas une échéance :
+                // on la refuse à l'entrée plutôt que de planter à l'affichage.
+                dueDate = dueDate?.let { Dates.normalizeDate(it) },
                 done = existing?.done ?: false,
                 updatedAt = now()
             )

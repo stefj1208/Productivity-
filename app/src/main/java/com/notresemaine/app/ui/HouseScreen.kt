@@ -605,11 +605,20 @@ private fun CategoryItemDialog(
                 OutlinedTextField(
                     value = due,
                     onValueChange = { due = it },
-                    label = { Text("Échéance AAAA-MM-JJ (facultatif)") },
+                    label = { Text("Échéance (facultatif)") },
+                    placeholder = { Text("12/03/2026") },
+                    isError = due.isNotBlank() && !Dates.isValidDate(due),
                     textStyle = MaterialTheme.typography.bodyLarge,
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+                if (due.isNotBlank() && !Dates.isValidDate(due)) {
+                    Text(
+                        text = "Date non comprise — elle ne sera pas enregistrée.",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 if (onDelete != null) {
                     TextButton(onClick = onDelete, modifier = Modifier.padding(top = 8.dp)) {
                         Text("🗑 Supprimer", color = MaterialTheme.colorScheme.onSurfaceVariant)

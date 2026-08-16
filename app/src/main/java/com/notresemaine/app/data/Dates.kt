@@ -66,20 +66,51 @@ object Dates {
             weekStartIsoOffset(0)
         }
 
-    /** "mercredi 6 août" */
+    /**
+     * "mercredi 6 août".
+     *
+     * Ne lève jamais : une partie des dates vient de champs libres, et une date
+     * mal tapée doit s'afficher telle quelle, pas faire tomber tout l'écran.
+     * (C'est exactement ce qui arrivait à l'onglet Enfants : une échéance
+     * saisie autrement qu'en AAAA-MM-JJ plantait l'application à chaque
+     * ouverture, tant que la ligne existait.)
+     */
     fun longLabel(iso: String): String {
-        val d = LocalDate.parse(iso)
+        val d = parseOrNull(iso) ?: return iso
         val day = d.dayOfWeek.getDisplayName(TextStyle.FULL, FR)
         val month = d.month.getDisplayName(TextStyle.FULL, FR)
         return "$day ${d.dayOfMonth} $month"
     }
 
-    /** "lun. 4" */
+    /** "lun. 4" — ne lève jamais, pour la même raison. */
     fun shortLabel(iso: String): String {
-        val d = LocalDate.parse(iso)
+        val d = parseOrNull(iso) ?: return iso
         val day = d.dayOfWeek.getDisplayName(TextStyle.SHORT, FR)
         return "$day ${d.dayOfMonth}"
     }
+
+    fun parseOrNull(iso: String): LocalDate? =
+        runCatching { LocalDate.parse(iso.trim()) }.getOrNull()
+
+    /**
+     * Accepte aussi ce qu'on tape naturellement en français : 12/03/2026,
+     * 12-03-2026, 12.03.2026. L'étiquette dit « AAAA-MM-JJ », mais personne
+     * n'écrit une date comme ça — autant comprendre les deux.
+     * Renvoie toujours la forme ISO, ou null si c'est illisible.
+     */
+    fun normalizeDate(text: String): String? {
+        val t = text.trim()
+        if (t.isBlank()) return null
+        parseOrNull(t)?.let { return it.format(ISO) }
+        val parts = t.split('/', '-', '.').map { it.trim() }
+        if (parts.size != 3) return null
+        val day = parts[0].toIntOrNull() ?: return null
+        val month = parts[1].toIntOrNull() ?: return null
+        val year = parts[2].toIntOrNull()?.let { if (it < 100) 2000 + it else it } ?: return null
+        return runCatching { LocalDate.of(year, month, day).format(ISO) }.getOrNull()
+    }
+
+    fun isValidDate(text: String): Boolean = normalizeDate(text) != null
 
     /** Initiale du jour pour les puces : L M M J V S D */
     fun dayInitial(dayOfWeek: DayOfWeek): String = when (dayOfWeek) {
