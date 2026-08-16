@@ -9,3 +9,6 @@ captures/
 .cxx
 *.apk
 *.keystore
+# Exception : la clé de signature du projet doit être versionnée, sinon chaque
+# construction en fabrique une neuve et les mises à jour deviennent impossibles.
+!signing/notre-semaine.keystore
