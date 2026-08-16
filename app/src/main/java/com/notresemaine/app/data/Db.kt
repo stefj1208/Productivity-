@@ -9,6 +9,7 @@ import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Upsert
+import androidx.room.migration.Migration
 import kotlinx.coroutines.flow.Flow
 
 @Entity(tableName = "tasks")
@@ -620,9 +621,27 @@ abstract class AppDb : RoomDatabase() {
     abstract fun habits(): HabitDao
 
     companion object {
+        /**
+         * Passages d'une version de base à la suivante, **sans rien effacer**.
+         *
+         * Jusqu'ici la base était simplement remise à zéro à chaque changement
+         * de structure : ce qui n'était pas synchronisé disparaissait. À partir
+         * de la version 7, chaque évolution s'écrit ici.
+         *
+         * La règle pour la suite : ajouter une colonne se fait toujours en
+         * `ALTER TABLE … ADD COLUMN … NOT NULL DEFAULT …`, et une nouvelle table
+         * en `CREATE TABLE IF NOT EXISTS`, avec exactement les types que Room
+         * attend — sinon Room refuse d'ouvrir la base au démarrage suivant.
+         */
+        private val MIGRATIONS: Array<Migration> = arrayOf()
+
         @Volatile private var instance: AppDb? = null
         fun get(context: Context): AppDb = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, AppDb::class.java, "notre_semaine.db")
+                .addMigrations(*MIGRATIONS)
+                // Filet de sécurité : si une migration manque, mieux vaut une base
+                // vide qu'une application qui refuse de démarrer. La synchronisation
+                // Supabase reste alors le seul moyen de retrouver ses données.
                 .fallbackToDestructiveMigration()
                 .build()
                 .also { instance = it }

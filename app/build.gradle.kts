@@ -16,11 +16,37 @@ android {
         targetSdk = 35
         // À incrémenter à chaque livraison : c'est ce que Réglages affiche,
         // et le seul moyen de vérifier quelle version est réellement installée.
-        versionCode = 17
-        versionName = "12.1"
+        versionCode = 18
+        versionName = "12.2"
+    }
+
+    /**
+     * Clé de signature fixe, versionnée avec le projet.
+     *
+     * Sans elle, chaque construction sur GitHub fabriquait une clé neuve : Android
+     * refusait alors d'installer par-dessus la version précédente (« Application
+     * non installée »), et il fallait désinstaller — donc tout reconfigurer — à
+     * chaque livraison. Avec une clé stable, toutes les versions suivantes
+     * s'installent par simple mise à jour, en gardant les réglages.
+     *
+     * Ce n'est pas une clé de publication : l'application ne va pas sur le Play
+     * Store, elle se partage entre deux téléphones. Le mot de passe est dans le
+     * dépôt, assumé — sa seule fonction est que les versions se reconnaissent
+     * entre elles.
+     */
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("../signing/notre-semaine.keystore")
+            storePassword = "notresemaine"
+            keyAlias = "notresemaine"
+            keyPassword = "notresemaine"
+        }
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("debug")
+        }
         release {
             isMinifyEnabled = false
         }

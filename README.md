@@ -18,6 +18,14 @@ Le numéro de version est affiché dans **Moi → Profil & apparence** : c'est l
 3. Tout en bas de la page, section **Artifacts** : cliquez sur **NotreSemaine-APK** pour télécharger un fichier ZIP.
 4. Envoyez ce ZIP sur chaque téléphone (par e-mail, câble, ou Google Drive), ouvrez-le : il contient `app-debug.apk`.
 
+### Mettre à jour sans rien reconfigurer
+
+À partir de la **V12.2**, l'APK est signé avec une clé fixe rangée dans le projet. Concrètement : il suffit de toucher le nouveau fichier `app-debug.apk`, Android propose **« Mettre à jour »**, et **tous vos réglages sont conservés** (prénom, couleur, synchronisation Supabase, clé de l'assistant, pacte, agenda, habitudes).
+
+Avant, chaque construction fabriquait une clé différente : Android refusait l'installation par-dessus (« Application non installée ») et il fallait désinstaller — donc tout reconfigurer. C'était un défaut du projet, pas une fatalité d'Android.
+
+> **Une dernière désinstallation est nécessaire pour passer à la V12.2**, puisque la version installée porte encore une ancienne clé. C'est la dernière. Synchronisez avant (`Moi → Synchronisation`) pour retrouver vos données.
+
 ### Installer sur le Samsung Galaxy S23 et le Honor 400 Pro
 
 1. Sur le téléphone, touchez le fichier `app-debug.apk`.
