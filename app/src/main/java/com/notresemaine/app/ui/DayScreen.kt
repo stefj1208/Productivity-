@@ -277,25 +277,25 @@ fun DayScreen(
                 Column {
                     Text(task.title, style = MaterialTheme.typography.bodyLarge)
                     Spacer(Modifier.height(12.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        OutlinedTextField(
-                            value = time,
-                            onValueChange = { time = it },
-                            label = { Text("Début") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            textStyle = MaterialTheme.typography.bodyLarge,
-                            singleLine = true,
-                            modifier = Modifier.weight(1f)
-                        )
-                        OutlinedTextField(
-                            value = duration,
-                            onValueChange = { duration = it },
-                            label = { Text("Minutes") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            textStyle = MaterialTheme.typography.bodyLarge,
-                            singleLine = true,
-                            modifier = Modifier.weight(1f)
-                        )
+                    TimeField(
+                        label = "DÉBUT",
+                        value = time,
+                        onChange = { time = it }
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = "COMBIEN DE TEMPS",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(15, 30, 45, 60, 90).forEach { minutes ->
+                            ChoiceChip(
+                                label = "$minutes′",
+                                selected = duration == minutes.toString(),
+                                onClick = { duration = minutes.toString() }
+                            )
+                        }
                     }
                     Text(
                         text = "Un rappel se déclenchera à cette heure-là.",

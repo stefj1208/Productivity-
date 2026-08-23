@@ -136,9 +136,51 @@ fun RemindersScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit)
                 )
             }
 
+            // Même autorisation que le Pacte : sans elle, Android interdit à
+            // l'application d'ouvrir un écran par-dessus une autre. C'est la
+            // différence entre un rappel qu'on voit et un rappel qui n'existe pas.
+            Spacer(Modifier.height(20.dp))
+            SectionLabel("S'AFFICHER PAR-DESSUS TOUT")
+            val context = androidx.compose.ui.platform.LocalContext.current
+            var checks by remember { mutableStateOf(0) }
+            androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
+                checks++
+                onPauseOrDispose { }
+            }
+            val canOverlay = remember(checks) {
+                com.notresemaine.app.pacte.Usage.canOverlay(context)
+            }
+            Row(
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+            ) {
+                Text(if (canOverlay) "✅" else "⚠️", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    text = "Afficher par-dessus les autres applications",
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(start = 10.dp)
+                )
+            }
+            if (!canOverlay) {
+                Text(
+                    text = "Sans elle, un rappel arrivé pendant que vous êtes dans une " +
+                        "autre application ne s'affiche qu'en petit bandeau en haut.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                androidx.compose.material3.OutlinedButton(
+                    onClick = {
+                        context.startActivity(
+                            com.notresemaine.app.pacte.Usage.overlaySettingsIntent(context)
+                        )
+                    },
+                    modifier = Modifier.height(48.dp)
+                ) { Text("Autoriser") }
+            }
+
             Spacer(Modifier.height(20.dp))
             Text(
-                text = "Si le rappel ne s'affiche pas par-dessus l'écran verrouillé : " +
+                text = "Si le rappel ne s'affiche toujours pas par-dessus l'écran verrouillé : " +
                     "Paramètres Android → Applications → Notre Semaine → autoriser " +
                     "« Alarmes et rappels » et « Notifications plein écran ». " +
                     "Sur le Honor, vérifiez aussi Batterie → Lancement d'applications → manuel.",

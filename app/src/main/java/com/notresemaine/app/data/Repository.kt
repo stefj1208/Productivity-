@@ -915,6 +915,60 @@ class Repository private constructor(context: Context) {
     // jamais un objectif privé, jamais les données de l'autre.
 
     /** Objectifs actifs, les privés exclus : ils ne quittent pas le téléphone. */
+    /**
+     * Le résumé envoyé quand on POSE une question à l'assistant.
+     *
+     * C'est le seul endroit de l'application où l'on assemble un contexte large,
+     * et donc celui où la règle doit être la plus stricte : que des données à
+     * soi, jamais un objectif privé, jamais le détail jour par jour de la santé,
+     * jamais une ligne du partenaire.
+     */
+    suspend fun weekContextForAi(userId: String, weekStart: String): String {
+        val days = Dates.daysOfWeek(weekStart)
+        val tasks = db.tasks().byWeekOnce(userId, weekStart).filter { !it.deleted }
+        val plan = db.weekPlans().byWeekOnce(userId, weekStart)
+        val goals = db.goals().activeOnce(userId).filter { !it.isPrivate }
+        val meals = db.meals().betweenOnce(days.first(), days.last()).filter { it.title.isNotBlank() }
+        val inbox = db.inbox().pendingOnce(userId)
+        val habits = db.habits().activeOnce(userId)
+        val health = db.health().betweenOnce(userId, days.first(), days.last())
+        val nights = health.filter { it.sleepMinutes > 0 }
+
+        return buildString {
+            appendLine("Aujourd'hui : ${Dates.longLabel(Dates.todayIso())}.")
+            appendLine("Priorité de la semaine : ${plan?.priority?.ifBlank { null } ?: "aucune"}.")
+            plan?.abandon?.takeIf { it.isNotBlank() }?.let { appendLine("Abandonné cette semaine : $it.") }
+            appendLine("Tâches : ${tasks.count { it.done }} faites sur ${tasks.size}.")
+            days.forEach { day ->
+                val ofDay = tasks.filter { it.date == day }
+                if (ofDay.isNotEmpty()) {
+                    appendLine(
+                        "${Dates.shortLabel(day)} : " + ofDay.joinToString(", ") { t ->
+                            t.title + if (t.startTime.isNotBlank()) " (${t.startTime})" else "" +
+                                if (t.done) " [fait]" else ""
+                        }
+                    )
+                }
+            }
+            val undated = tasks.filter { it.date == null && !it.done }
+            if (undated.isNotEmpty()) appendLine("Sans jour : ${undated.joinToString(", ") { it.title }}.")
+            if (goals.isNotEmpty()) {
+                appendLine("Objectifs : " + goals.joinToString(", ") {
+                    "${it.title} (${it.sessionsPerWeek}×/sem.)"
+                })
+            }
+            if (habits.isNotEmpty()) appendLine("Habitudes : ${habits.joinToString(", ") { it.title }}.")
+            if (meals.isNotEmpty()) appendLine("Repas décidés : ${meals.size} sur 21.")
+            if (inbox.isNotEmpty()) appendLine("Notes en attente : ${inbox.joinToString(", ") { it.text }}.")
+            if (nights.isNotEmpty()) {
+                val avg = nights.sumOf { it.sleepMinutes } / nights.size
+                appendLine("Sommeil moyen : ${avg / 60} h ${avg % 60}.")
+            }
+            val sport = health.sumOf { it.exerciseMinutes }
+            if (sport > 0) appendLine("Sport : $sport min dans la semaine.")
+        }
+    }
+
     suspend fun goalTitlesForAi(userId: String): List<String> =
         db.goals().activeOnce(userId).filter { !it.isPrivate }.map { it.title }
 

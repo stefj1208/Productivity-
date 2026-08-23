@@ -38,13 +38,16 @@ class AlertActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setShowWhenLocked(true)
-        setTurnScreenOn(true)
-
         val emoji = intent.getStringExtra(Alarms.EXTRA_EMOJI) ?: "⏰"
         val title = intent.getStringExtra(Alarms.EXTRA_TITLE) ?: "Rappel"
         val text = intent.getStringExtra(Alarms.EXTRA_TEXT).orEmpty()
-        val sound = intent.getBooleanExtra(Alarms.EXTRA_SOUND, true)
+        val nudge = intent.getBooleanExtra(Alarms.EXTRA_NUDGE, false)
+        val sound = intent.getBooleanExtra(Alarms.EXTRA_SOUND, true) && !nudge
+
+        // Une habitude s'affiche par-dessus tout, mais n'allume pas l'écran :
+        // on ne réveille personne pour lui rappeler de se tenir droit.
+        setShowWhenLocked(!nudge)
+        setTurnScreenOn(!nudge)
 
         Alarms.dismissNotification(this)
         if (sound) startAlarm()
@@ -75,18 +78,21 @@ class AlertActivity : ComponentActivity() {
 
                         Spacer(Modifier.height(40.dp))
                         BigButton(
-                            text = "C'est parti",
-                            onClick = { finishAndOpenApp() }
+                            text = if (nudge) "Compris" else "C'est parti",
+                            onClick = { if (nudge) finishAlert() else finishAndOpenApp() }
                         )
                         OutlinedButton(
                             onClick = {
-                                Alarms.snooze(this@AlertActivity, 10, emoji, title, text, sound)
-                                finishAlert()
+                                if (nudge) finishAndOpenApp()
+                                else {
+                                    Alarms.snooze(this@AlertActivity, 10, emoji, title, text, sound)
+                                    finishAlert()
+                                }
                             },
                             modifier = Modifier
                                 .padding(top = 12.dp)
                                 .height(56.dp)
-                        ) { Text("Dans 10 minutes") }
+                        ) { Text(if (nudge) "Ouvrir l'application" else "Dans 10 minutes") }
                     }
                 }
             }

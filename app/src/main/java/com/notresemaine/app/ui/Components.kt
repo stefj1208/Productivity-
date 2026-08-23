@@ -713,6 +713,35 @@ fun BigShortcut(
     }
 }
 
+/** Petit choix parmi quelques valeurs : un tap, un état visible, pas de clavier. */
+@Composable
+fun ChoiceChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .background(
+                if (selected) MaterialTheme.colorScheme.surfaceVariant
+                else MaterialTheme.colorScheme.surface,
+                RoundedCornerShape(12.dp)
+            )
+            .clickable(onClick = onClick)
+            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+            .padding(horizontal = 10.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (selected) MaterialTheme.colorScheme.onSurface
+            else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
 /** Un chiffre qui compte, en grand, avec ce qu'il mesure en dessous. */
 @Composable
 fun KpiTile(

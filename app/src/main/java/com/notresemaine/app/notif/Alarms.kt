@@ -40,9 +40,11 @@ object Alarms {
     const val EXTRA_TITLE = "titre"
     const val EXTRA_TEXT = "texte"
     const val EXTRA_SOUND = "son"
+    /** Un « coup de coude » : plein écran aussi, mais sans son ni réveil d'écran. */
+    const val EXTRA_NUDGE = "nudge"
 
     private const val FIRST_REQUEST_CODE = 1000
-    private const val MAX_SCHEDULED = 8
+    private const val MAX_SCHEDULED = 16
     private const val NOTIFICATION_ID = 4242
 
     /** Un rappel à venir : quand, et quoi dire. */
@@ -50,7 +52,13 @@ object Alarms {
         val at: LocalDateTime,
         val emoji: String,
         val title: String,
-        val text: String
+        val text: String,
+        /**
+         * Une habitude n'est pas un rendez-vous : elle s'affiche par-dessus tout,
+         * mais sans sonner ni allumer l'écran. Réveiller quelqu'un pour lui dire
+         * « une seule chose à la fois » serait absurde.
+         */
+        val nudge: Boolean = false
     )
 
     fun createChannel(context: Context) {
@@ -102,14 +110,36 @@ object Alarms {
                 .map { Triple(date, it.startTime, it.title) }
         }
 
+        // Les habitudes : leurs moments sont tirés au sort mais stables pour la
+        // journée, donc programmables comme n'importe quel autre rappel.
+        val habitMoments = if (settings.myUserId.isBlank()) emptyList()
+        else repo.db.habits().activeOnce(settings.myUserId).flatMap { habit ->
+            listOf(LocalDate.now(), LocalDate.now().plusDays(1)).flatMap { day ->
+                com.notresemaine.app.data.Habits
+                    .momentsOf(habit.id, day, habit.fromHour, habit.toHour, habit.perDay)
+                    .map { minutes ->
+                        Alert(
+                            at = LocalDateTime.of(day, LocalTime.of(minutes / 60, minutes % 60)),
+                            emoji = "🔁",
+                            title = habit.title,
+                            text = habit.source.ifBlank { "Une habitude que tu as choisie." },
+                            nudge = true
+                        )
+                    }
+            }
+        }
+
         val alerts = upcoming(
             settings,
             goals.map { it.title to (it.preferredTime to it.preferredDays) },
             hasRitual,
             taskSlots = slots
         )
-        alerts.take(MAX_SCHEDULED).forEachIndexed { index, alert ->
-            scheduleOne(context, FIRST_REQUEST_CODE + index, alert, settings.alertSound)
+        val now = LocalDateTime.now()
+        val all = (alerts + habitMoments.filter { it.at.isAfter(now) && it.at.isBefore(now.plusHours(24)) })
+            .sortedBy { it.at }
+        all.take(MAX_SCHEDULED).forEachIndexed { index, alert ->
+            scheduleOne(context, FIRST_REQUEST_CODE + index, alert, settings.alertSound && !alert.nudge)
         }
     }
 
@@ -201,6 +231,7 @@ object Alarms {
             .putExtra(EXTRA_TITLE, alert.title)
             .putExtra(EXTRA_TEXT, alert.text)
             .putExtra(EXTRA_SOUND, sound)
+            .putExtra(EXTRA_NUDGE, alert.nudge)
         val pending = PendingIntent.getBroadcast(
             context, requestCode, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -211,9 +242,15 @@ object Alarms {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         runCatching {
-            // setAlarmClock traverse le mode économie d'énergie : un rappel en retard
-            // d'une heure ne sert à rien.
-            alarm.setAlarmClock(AlarmManager.AlarmClockInfo(triggerAt, show), pending)
+            if (alert.nudge) {
+                // setAlarmClock afficherait l'icône de réveil dans la barre d'état
+                // en permanence : disproportionné pour une habitude.
+                alarm.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pending)
+            } else {
+                // setAlarmClock traverse le mode économie d'énergie : un rappel en retard
+                // d'une heure ne sert à rien.
+                alarm.setAlarmClock(AlarmManager.AlarmClockInfo(triggerAt, show), pending)
+            }
         }.onFailure {
             alarm.set(AlarmManager.RTC_WAKEUP, triggerAt, pending)
         }
@@ -241,18 +278,41 @@ object Alarms {
         )
     }
 
-    /** Affiche le rappel : plein écran si Android l'autorise, sinon en bandeau. */
-    fun fire(context: Context, emoji: String, title: String, text: String, sound: Boolean) {
-        if (context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
-            != PackageManager.PERMISSION_GRANTED
-        ) return
-
+    /**
+     * Affiche le rappel, par les deux mêmes chemins que l'écran de blocage du Pacte :
+     *
+     * 1. le lancement direct, qu'Android n'autorise en arrière-plan que si
+     *    « Afficher par-dessus les autres applications » a été accordé ;
+     * 2. la notification plein écran, qui passe toujours — au pire en bandeau.
+     *
+     * Les deux ensemble, parce qu'aucun des deux n'est garanti seul : c'est ce qui
+     * fait qu'un rappel s'affiche vraiment, y compris par-dessus une autre
+     * application ou l'écran verrouillé.
+     */
+    fun fire(
+        context: Context,
+        emoji: String,
+        title: String,
+        text: String,
+        sound: Boolean,
+        nudge: Boolean = false
+    ) {
         val full = Intent(context, AlertActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
             .putExtra(EXTRA_EMOJI, emoji)
             .putExtra(EXTRA_TITLE, title)
             .putExtra(EXTRA_TEXT, text)
             .putExtra(EXTRA_SOUND, sound)
+            .putExtra(EXTRA_NUDGE, nudge)
+
+        if (android.provider.Settings.canDrawOverlays(context)) {
+            runCatching { context.startActivity(full) }
+        }
+
+        if (context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+            != PackageManager.PERMISSION_GRANTED
+        ) return
+
         val pending = PendingIntent.getActivity(
             context, 0, full,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -283,7 +343,8 @@ class AlarmReceiver : BroadcastReceiver() {
             emoji = intent.getStringExtra(Alarms.EXTRA_EMOJI) ?: "⏰",
             title = intent.getStringExtra(Alarms.EXTRA_TITLE) ?: "Rappel",
             text = intent.getStringExtra(Alarms.EXTRA_TEXT).orEmpty(),
-            sound = intent.getBooleanExtra(Alarms.EXTRA_SOUND, true)
+            sound = intent.getBooleanExtra(Alarms.EXTRA_SOUND, true),
+            nudge = intent.getBooleanExtra(Alarms.EXTRA_NUDGE, false)
         )
         // Un rappel vient de partir : on recalcule la suite des 24 heures.
         Alarms.rescheduleAsync(context)

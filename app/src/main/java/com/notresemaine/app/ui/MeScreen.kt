@@ -38,6 +38,7 @@ fun MeScreen(
     onWeight: () -> Unit,
     onHabits: () -> Unit,
     onSport: () -> Unit,
+    onAsk: () -> Unit,
     onCalendar: () -> Unit,
     onAssistant: () -> Unit,
     onReminders: () -> Unit,
@@ -158,6 +159,12 @@ fun MeScreen(
             else "Relier l'agenda du téléphone (donc Google Agenda)",
             onClick = onCalendar,
             highlight = settings.calendarEnabled
+        )
+        ShortcutTile(
+            emoji = "💬",
+            title = "Demander à l'assistant",
+            subtitle = "Une question sur votre semaine, réponse d'après vos données",
+            onClick = onAsk
         )
         ShortcutTile(
             emoji = "✨",

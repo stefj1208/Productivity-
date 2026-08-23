@@ -69,6 +69,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val aiSport = MutableStateFlow<List<com.notresemaine.app.ai.Assistant.SportSession>>(emptyList())
     val aiAgenda = MutableStateFlow("")
 
+    /** L'échange de questions-réponses, du plus ancien au plus récent. */
+    data class Exchange(val question: String, val answer: String)
+
+    val aiConversation = MutableStateFlow<List<Exchange>>(emptyList())
+
     /** Ce que l'assistant a compris d'une phrase dictée, avant toute action. */
     val aiVoice = MutableStateFlow<com.notresemaine.app.ai.Assistant.VoiceCommand?>(null)
 
@@ -471,6 +476,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun addHabit(title: String, source: String) {
         viewModelScope.launch {
             repo.saveHabit(null, myId(), title, source, 8, 21, 2)
+            Alarms.rescheduleAll(getApplication())
             requestSync()
             toast("Habitude ajoutée ✓")
         }
@@ -479,17 +485,26 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun saveHabit(id: String?, title: String, source: String, from: Int, to: Int, perDay: Int) {
         viewModelScope.launch {
             repo.saveHabit(id, myId(), title, source, from, to, perDay)
+            Alarms.rescheduleAll(getApplication())
             requestSync()
             toast("Enregistré ✓")
         }
     }
 
     fun toggleHabit(id: String) {
-        viewModelScope.launch { repo.toggleHabit(id); requestSync() }
+        viewModelScope.launch {
+            repo.toggleHabit(id)
+            Alarms.rescheduleAll(getApplication())
+            requestSync()
+        }
     }
 
     fun deleteHabit(id: String) {
-        viewModelScope.launch { repo.deleteHabit(id); requestSync() }
+        viewModelScope.launch {
+            repo.deleteHabit(id)
+            Alarms.rescheduleAll(getApplication())
+            requestSync()
+        }
     }
 
     /** Envoie : uniquement le thème que vous avez écrit. */
@@ -529,6 +544,27 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun readAgendaWithAi(facts: String) = runAi { key ->
         aiAgenda.value = com.notresemaine.app.ai.Assistant.agendaNote(key, facts)
+    }
+
+    // ----- Poser une question -----
+
+    /**
+     * Envoie : votre question et le résumé de VOS données non privées.
+     * C'est le seul appel qui assemble un contexte large — le filtrage est fait
+     * dans le dépôt, pas ici, pour qu'il n'y ait qu'un seul endroit à vérifier.
+     */
+    fun askAssistant(question: String) = runAi { key ->
+        if (question.isBlank()) return@runAi
+        val context = repo.weekContextForAi(myId(), com.notresemaine.app.data.Dates.weekStartIso())
+        val answer = com.notresemaine.app.ai.Assistant.ask(key, question, context)
+        aiConversation.value = aiConversation.value + Exchange(
+            question = question.trim(),
+            answer = answer.ifBlank { "Je n'ai pas su répondre à partir de ce que contient l'application." }
+        )
+    }
+
+    fun clearConversation() {
+        aiConversation.value = emptyList()
     }
 
     // ----- La voix -----

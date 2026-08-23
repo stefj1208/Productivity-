@@ -66,6 +66,7 @@ import com.notresemaine.app.ui.CalendarScreen
 import com.notresemaine.app.ui.InboxScreen
 import com.notresemaine.app.ui.AgendaScreen
 import com.notresemaine.app.ui.HabitsScreen
+import com.notresemaine.app.ui.AskScreen
 import com.notresemaine.app.ui.SportScreen
 import com.notresemaine.app.ui.VoiceButton
 import com.notresemaine.app.ui.VoiceProposalDialog
@@ -179,6 +180,7 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings) {
                     onInbox = { navController.navigate("inbox") },
                     onHabits = { navController.navigate("habits") },
                     onSport = { navController.navigate("sport") },
+                    onAsk = { navController.navigate("ask") },
                     onMethod = { navController.navigate("method") }
                 )
             }
@@ -213,6 +215,7 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings) {
                     onWeight = { navController.navigate("weight") },
                     onHabits = { navController.navigate("habits") },
                     onSport = { navController.navigate("sport") },
+                    onAsk = { navController.navigate("ask") },
                     onCalendar = { navController.navigate("calendar") },
                     onAssistant = { navController.navigate("assistant") },
                     onReminders = { navController.navigate("reminders") },
@@ -236,6 +239,9 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings) {
                     onSettings = { navController.navigate("calendar") },
                     onBack = { navController.popBackStack() }
                 )
+            }
+            composable("ask") {
+                AskScreen(vm, settings, onBack = { navController.popBackStack() })
             }
             composable("habits") {
                 HabitsScreen(vm, settings, onBack = { navController.popBackStack() })

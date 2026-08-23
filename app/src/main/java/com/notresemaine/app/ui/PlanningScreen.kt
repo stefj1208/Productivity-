@@ -67,6 +67,7 @@ fun PlanningScreen(
     onInbox: () -> Unit,
     onHabits: () -> Unit,
     onSport: () -> Unit,
+    onAsk: () -> Unit,
     onMethod: () -> Unit
 ) {
     val today = Dates.todayIso()
@@ -396,8 +397,8 @@ fun PlanningScreen(
             ) {
                 ShortcutIcon("📅", "Agenda", onAgenda, Modifier.weight(1f))
                 ShortcutIcon("🏃", "Sport", onSport, Modifier.weight(1f))
+                ShortcutIcon("💬", "Demander", onAsk, Modifier.weight(1f))
                 ShortcutIcon("🔄", "Bilan", { onReview(targetWeek) }, Modifier.weight(1f))
-                ShortcutIcon("📖", "Méthode", onMethod, Modifier.weight(1f))
             }
             Spacer(Modifier.height(24.dp))
         }

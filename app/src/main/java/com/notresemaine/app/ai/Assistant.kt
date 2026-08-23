@@ -680,4 +680,28 @@ object Assistant {
             say = parts.getOrElse(4) { "" }
         )
     }
+
+    // ----- 18. Poser une question sur sa propre semaine -----
+
+    private const val ASK_SYSTEM =
+        "Tu réponds à une question sur l'organisation d'un couple, à partir du " +
+            "résumé de leur semaine fourni ci-dessous. " +
+            "Réponds en français, en trois phrases maximum, sans puce ni titre. " +
+            "Appuie-toi UNIQUEMENT sur ce résumé : si l'information n'y est pas, " +
+            "dis-le franchement en une phrase plutôt que d'inventer. " +
+            "Termine par une action concrète quand c'est utile. " +
+            "Aucun jugement, aucune culpabilisation, aucun conseil médical."
+
+    /**
+     * Envoie : votre question et le résumé de VOS données non privées.
+     * Ni les objectifs marqués privés, ni le détail de la santé, ni rien du partenaire.
+     */
+    suspend fun ask(apiKey: String, question: String, context: String): String =
+        cleanLines(
+            Ai.ask(
+                apiKey, ASK_SYSTEM,
+                "Résumé de la semaine :\n$context\n\nQuestion : ${question.trim()}",
+                maxTokens = 1200
+            )
+        ).joinToString(" ").trim()
 }
