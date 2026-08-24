@@ -788,6 +788,23 @@ class Repository private constructor(context: Context) {
         return applied
     }
 
+    /**
+     * Les tâches que le binôme vient de me confier et dont je n'ai pas encore
+     * été prévenu. Le suivi est LOCAL : marquer la tâche « annoncée » dans la
+     * base partagée reviendrait à faire taire la notification sur l'autre
+     * téléphone aussi.
+     */
+    suspend fun unannouncedAssignedTasks(userId: String): List<TaskEntity> {
+        if (userId.isBlank()) return emptyList()
+        val known = settings.current().alertedTaskIds
+            .split(",").filter { it.isNotBlank() }.toSet()
+        return db.tasks().assignedToMe(userId).filter { it.id !in known }
+    }
+
+    suspend fun markAssignedAnnounced(ids: List<String>) {
+        if (ids.isNotEmpty()) settings.rememberAlertedTasks(ids)
+    }
+
     // ----- Habitudes -----
 
     suspend fun saveHabit(

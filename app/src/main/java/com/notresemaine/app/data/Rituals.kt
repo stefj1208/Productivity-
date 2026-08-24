@@ -46,12 +46,12 @@ object Rituals {
         "écriture" to Guide(
             how = "Vider ce qui encombre, puis nommer ce qui compte. " +
                 "Personne ne lira : l'orthographe n'a aucune importance.",
-            start = "Écris : « Ce qui me préoccupe ce matin, c'est… »"
+            start = "Appuie sur le ＋ en bas à droite et écris : « Ce qui me préoccupe ce matin, c'est… »"
         ),
         "ecriture" to Guide(
             how = "Vider ce qui encombre, puis nommer ce qui compte. " +
                 "Personne ne lira : l'orthographe n'a aucune importance.",
-            start = "Écris : « Ce qui me préoccupe ce matin, c'est… »"
+            start = "Appuie sur le ＋ en bas à droite et écris : « Ce qui me préoccupe ce matin, c'est… »"
         )
     )
 

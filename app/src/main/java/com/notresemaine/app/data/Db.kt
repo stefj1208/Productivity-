@@ -123,6 +123,8 @@ data class RitualStepEntity(
     val minutes: Int,
     val position: Int,
     val enabled: Boolean = true,
+    /** Ce qu'on fait pendant l'étape, écrit par soi. Vide = la fiche par défaut. */
+    val detail: String = "",
     val updatedAt: Long
 )
 
@@ -279,6 +281,12 @@ interface TaskDao {
 
     @Query("SELECT * FROM tasks WHERE id = :id")
     suspend fun byId(id: String): TaskEntity?
+
+    @Query(
+        "SELECT * FROM tasks WHERE userId = :userId AND assignedBy != '' AND assignedBy != :userId " +
+            "AND done = 0 AND deleted = 0 ORDER BY updatedAt DESC LIMIT 5"
+    )
+    suspend fun assignedToMe(userId: String): List<TaskEntity>
 
     @Query("SELECT * FROM tasks WHERE updatedAt > :ts")
     suspend fun modifiedSince(ts: Long): List<TaskEntity>
@@ -599,7 +607,7 @@ interface HealthDao {
         MealEntity::class, ShoppingItemEntity::class, HealthDayEntity::class,
         HouseItemEntity::class, WeightEntity::class, HabitEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class AppDb : RoomDatabase() {
@@ -633,7 +641,14 @@ abstract class AppDb : RoomDatabase() {
          * en `CREATE TABLE IF NOT EXISTS`, avec exactement les types que Room
          * attend — sinon Room refuse d'ouvrir la base au démarrage suivant.
          */
-        private val MIGRATIONS: Array<Migration> = arrayOf()
+        private val MIGRATIONS: Array<Migration> = arrayOf(
+            // 7 → 8 : chaque étape du rituel peut porter sa propre consigne.
+            object : Migration(7, 8) {
+                override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE ritual_steps ADD COLUMN detail TEXT NOT NULL DEFAULT ''")
+                }
+            }
+        )
 
         @Volatile private var instance: AppDb? = null
         fun get(context: Context): AppDb = instance ?: synchronized(this) {

@@ -77,6 +77,11 @@ import com.notresemaine.app.ui.theme.AppTheme
 
 class MainActivity : ComponentActivity() {
 
+    companion object {
+        /** Destination demandée par un écran de rappel (« Bloquer un créneau »). */
+        const val EXTRA_ROUTE = "route"
+    }
+
     private val vm: AppViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -90,7 +95,7 @@ class MainActivity : ComponentActivity() {
                     when {
                         s == null -> {} // réglages en cours de lecture
                         !s.onboarded -> OnboardingScreen(vm)
-                        else -> MainScaffold(vm, s)
+                        else -> MainScaffold(vm, s, intent?.getStringExtra(EXTRA_ROUTE).orEmpty())
                     }
                 }
             }
@@ -120,8 +125,13 @@ private val tabs = listOf(
 )
 
 @Composable
-private fun MainScaffold(vm: AppViewModel, settings: AppSettings) {
+private fun MainScaffold(vm: AppViewModel, settings: AppSettings, openRoute: String = "") {
     val navController = rememberNavController()
+
+    // Arrivée depuis un écran de rappel : on ouvre directement le bon endroit.
+    LaunchedEffect(openRoute) {
+        if (openRoute.isNotBlank()) runCatching { navController.navigate(openRoute) }
+    }
     val snackbarHost = remember { SnackbarHostState() }
     var capturing by remember { mutableStateOf(false) }
 

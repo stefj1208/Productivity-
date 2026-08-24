@@ -42,6 +42,9 @@ object Alarms {
     const val EXTRA_SOUND = "son"
     /** Un « coup de coude » : plein écran aussi, mais sans son ni réveil d'écran. */
     const val EXTRA_NUDGE = "nudge"
+    /** Où mène le bouton principal de l'écran de rappel, et comment il s'appelle. */
+    const val EXTRA_ROUTE = "route"
+    const val EXTRA_ACTION = "action"
 
     private const val FIRST_REQUEST_CODE = 1000
     private const val MAX_SCHEDULED = 16
@@ -295,7 +298,9 @@ object Alarms {
         title: String,
         text: String,
         sound: Boolean,
-        nudge: Boolean = false
+        nudge: Boolean = false,
+        actionRoute: String = "",
+        actionLabel: String = ""
     ) {
         val full = Intent(context, AlertActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
@@ -304,6 +309,8 @@ object Alarms {
             .putExtra(EXTRA_TEXT, text)
             .putExtra(EXTRA_SOUND, sound)
             .putExtra(EXTRA_NUDGE, nudge)
+            .putExtra(EXTRA_ROUTE, actionRoute)
+            .putExtra(EXTRA_ACTION, actionLabel)
 
         if (android.provider.Settings.canDrawOverlays(context)) {
             runCatching { context.startActivity(full) }

@@ -87,7 +87,62 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         viewModelScope.launch {
-            syncRequests.debounce(3_000).collect { sync.syncNow() }
+            syncRequests.debounce(3_000).collect {
+                sync.syncNow()
+                announceAssignedTasks()
+            }
+        }
+    }
+
+    /**
+     * Une tâche confiée par l'autre s'annonce en plein écran, comme un rappel.
+     *
+     * Avant, elle apparaissait en silence dans la liste : on la découvrait le
+     * lendemain, ou jamais. Confier quelque chose à quelqu'un sans qu'il le
+     * sache, ce n'est pas le lui confier.
+     */
+    private suspend fun announceAssignedTasks() {
+        val s = repo.settings.current()
+        if (!s.alertsEnabled) return
+        val fresh = repo.unannouncedAssignedTasks(s.myUserId)
+        if (fresh.isEmpty()) return
+        val partner = repo.db.profiles().partnerOf(s.myUserId)?.name ?: "Ton binôme"
+        fresh.forEach { task ->
+            Alarms.fire(
+                context = getApplication(),
+                emoji = "🤝",
+                title = task.title,
+                text = "$partner vient de te confier cette tâche.",
+                sound = false,
+                nudge = true,
+                actionRoute = "day/${task.date ?: com.notresemaine.app.data.Dates.todayIso()}",
+                actionLabel = "Bloquer un créneau"
+            )
+        }
+        repo.markAssignedAnnounced(fresh.map { it.id })
+    }
+
+    /** Réserve le rituel dans le planning : une intention sans heure n'arrive pas. */
+    fun bookRitualSlot(totalMinutes: Int) {
+        viewModelScope.launch {
+            val s = repo.settings.current()
+            val today = com.notresemaine.app.data.Dates.todayIso()
+            val existing = repo.db.tasks().byDateOnce(myId(), today)
+                .firstOrNull { it.title == "Rituel du matin" && !it.deleted }
+            val id = existing?.id ?: run {
+                repo.addTask(myId(), "Rituel du matin", today, null, isSport = true)
+                repo.db.tasks().byDateOnce(myId(), today)
+                    .firstOrNull { it.title == "Rituel du matin" && !it.deleted }?.id
+            }
+            if (id == null) {
+                toast("Impossible de poser le créneau.")
+                return@launch
+            }
+            repo.setTaskSlot(id, s.wakeAlarm, totalMinutes.coerceAtLeast(5))
+            Alarms.rescheduleAll(getApplication())
+            repo.pushDayToCalendar(getApplication(), myId(), today)
+            requestSync()
+            toast("Créneau posé à ${s.wakeAlarm} ✓")
         }
     }
 

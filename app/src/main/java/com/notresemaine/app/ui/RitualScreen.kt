@@ -75,6 +75,7 @@ fun RitualScreen(
 
     var running by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf(false) }
+    var customising by remember { mutableStateOf<com.notresemaine.app.data.RitualStepEntity?>(null) }
     var stepIndex by remember { mutableIntStateOf(0) }
     var secondsLeft by remember { mutableIntStateOf(0) }
 
@@ -100,10 +101,17 @@ fun RitualScreen(
             // « Silence · 5 min » ne dit à personne quoi faire de ces 5 minutes.
             val stepName = step?.name.orEmpty()
             val todayGuide = guideOf(stepName)
+            val custom = step?.detail?.ifBlank { null }
             val offline = com.notresemaine.app.data.Rituals.guideFor(stepName)
             if (todayGuide != null) {
                 Text(
                     text = "✨ $todayGuide",
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(top = 12.dp)
+                )
+            } else if (custom != null) {
+                Text(
+                    text = custom,
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.padding(top = 12.dp)
                 )
@@ -241,11 +249,12 @@ fun RitualScreen(
                         if (!editing && step.enabled) {
                             val todayGuide = guideOf(step.name)
                             val detail = todayGuide
+                                ?: step.detail.ifBlank { null }
                                 ?: com.notresemaine.app.data.Rituals.guideFor(step.name)?.start
                             if (detail != null) {
                                 Text(
                                     text = if (todayGuide != null) "✨ $detail" else detail,
-                                    style = MaterialTheme.typography.labelMedium,
+                                    style = MaterialTheme.typography.bodyLarge,
                                     color = if (todayGuide != null) MaterialTheme.colorScheme.secondary
                                     else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -271,6 +280,7 @@ fun RitualScreen(
                             checked = step.enabled,
                             onCheckedChange = { vm.saveRitualStep(step.copy(enabled = it)) }
                         )
+                        TextButton(onClick = { customising = step }) { Text("✏️") }
                     } else {
                         Text(
                             text = "${step.minutes} min",
@@ -283,6 +293,14 @@ fun RitualScreen(
             TextButton(onClick = { editing = !editing }) {
                 Text(if (editing) "Terminé" else "Modifier la séquence")
             }
+
+            // Réserver le rituel comme n'importe quel autre rendez-vous : une
+            // intention qui n'a pas d'heure dans le planning n'arrive jamais.
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = { vm.bookRitualSlot(totalMinutes) },
+                modifier = Modifier.fillMaxWidth().height(48.dp)
+            ) { Text("🕐 Bloquer le créneau dans mon planning") }
 
             Spacer(Modifier.height(16.dp))
             SectionLabel("RÉVEIL")
@@ -325,6 +343,64 @@ fun RitualScreen(
                 running = true
             },
             modifier = Modifier.padding(bottom = 16.dp)
+        )
+    }
+
+    // ----- Personnaliser une étape -----
+    val custom = customising
+    if (custom != null) {
+        var name by remember(custom.id) { mutableStateOf(custom.name) }
+        var detail by remember(custom.id) {
+            mutableStateOf(
+                custom.detail.ifBlank {
+                    com.notresemaine.app.data.Rituals.guideFor(custom.name)?.start.orEmpty()
+                }
+            )
+        }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { customising = null },
+            title = { Text("Personnaliser l'étape") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Nom de l'étape") },
+                        textStyle = MaterialTheme.typography.bodyLarge,
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = detail,
+                        onValueChange = { detail = it },
+                        label = { Text("Quoi faire pendant ce temps") },
+                        placeholder = { Text("Ex. : 10 respirations lentes, puis relire ma priorité") },
+                        textStyle = MaterialTheme.typography.bodyLarge,
+                        maxLines = 4,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Text(
+                        text = "Ce texte s'affiche sous l'étape et pendant le minuteur. " +
+                            "Laissé vide, la consigne par défaut revient.",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        vm.saveRitualStep(custom.copy(name = name.trim(), detail = detail.trim()))
+                        customising = null
+                    },
+                    enabled = name.isNotBlank()
+                ) { Text("Enregistrer") }
+            },
+            dismissButton = {
+                TextButton(onClick = { customising = null }) { Text("Annuler") }
+            }
         )
     }
 }

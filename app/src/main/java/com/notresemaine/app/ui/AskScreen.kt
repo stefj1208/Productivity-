@@ -75,7 +75,7 @@ fun AskScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
                 .verticalScroll(rememberScrollState())
         ) {
             ScreenHeader(
-                title = "💬 Demander",
+                title = "💬 Chat",
                 subtitle = "Une question sur votre semaine",
                 onBack = onBack
             )

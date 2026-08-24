@@ -42,6 +42,8 @@ class AlertActivity : ComponentActivity() {
         val title = intent.getStringExtra(Alarms.EXTRA_TITLE) ?: "Rappel"
         val text = intent.getStringExtra(Alarms.EXTRA_TEXT).orEmpty()
         val nudge = intent.getBooleanExtra(Alarms.EXTRA_NUDGE, false)
+        val route = intent.getStringExtra(Alarms.EXTRA_ROUTE).orEmpty()
+        val actionLabel = intent.getStringExtra(Alarms.EXTRA_ACTION).orEmpty()
         val sound = intent.getBooleanExtra(Alarms.EXTRA_SOUND, true) && !nudge
 
         // Une habitude s'affiche par-dessus tout, mais n'allume pas l'écran :
@@ -78,8 +80,20 @@ class AlertActivity : ComponentActivity() {
 
                         Spacer(Modifier.height(40.dp))
                         BigButton(
-                            text = if (nudge) "Compris" else "C'est parti",
-                            onClick = { if (nudge) finishAlert() else finishAndOpenApp() }
+                            text = when {
+                                actionLabel.isNotBlank() -> actionLabel
+                                nudge -> "Compris"
+                                else -> "C'est parti"
+                            },
+                            onClick = {
+                                when {
+                                    // Un bouton qui mène quelque part ouvre l'application
+                                    // à l'endroit exact où l'on peut agir.
+                                    route.isNotBlank() -> finishAndOpenApp(route)
+                                    nudge -> finishAlert()
+                                    else -> finishAndOpenApp()
+                                }
+                            }
                         )
                         OutlinedButton(
                             onClick = {
@@ -99,10 +113,11 @@ class AlertActivity : ComponentActivity() {
         }
     }
 
-    private fun finishAndOpenApp() {
+    private fun finishAndOpenApp(route: String = "") {
         startActivity(
             android.content.Intent(this, com.notresemaine.app.MainActivity::class.java)
                 .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                .putExtra(com.notresemaine.app.MainActivity.EXTRA_ROUTE, route)
         )
         finishAlert()
     }

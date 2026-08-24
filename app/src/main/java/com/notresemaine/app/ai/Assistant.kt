@@ -714,17 +714,22 @@ object Assistant {
         "Tu guides un rituel du matin (méthode Miracle Morning), étape par étape, " +
             "pour LA journée qui commence. " +
             "Réponds UNIQUEMENT par des lignes au format exact :\n" +
-            "etape|consigne\n" +
-            "etape = repris mot pour mot dans la liste fournie. " +
+            "numero|consigne\n" +
+            "numero = le numéro de l'étape, repris tel quel dans la liste fournie. " +
             "consigne = ce qu'il faut faire pendant cette étape aujourd'hui, en moins " +
             "de 25 mots, en tutoyant, en lien direct avec la priorité du jour quand " +
             "c'est possible. Une consigne concrète, jamais une intention vague. " +
-            "Une ligne par étape, dans l'ordre donné. " +
+            "Une ligne par étape, dans l'ordre donné, sans en sauter aucune. " +
             "Aucun conseil médical, aucune promesse, pas de puce, pas de titre."
 
     /**
      * Envoie : les noms de vos étapes, votre priorité du jour et vos objectifs
      * non privés. Ni votre santé, ni rien du partenaire.
+     *
+     * Le modèle répond par NUMÉRO, pas par nom : quand on lui demandait de
+     * répéter l'intitulé, il écrivait « Silence » là où l'étape s'appelle
+     * « Silence / méditation », la correspondance échouait, et aucune consigne
+     * ne s'affichait. Un numéro ne se paraphrase pas.
      */
     suspend fun guideRitual(
         apiKey: String,
@@ -735,7 +740,7 @@ object Assistant {
         if (steps.isEmpty()) return emptyList()
         val prompt = buildString {
             appendLine("Étapes du rituel, dans l'ordre :")
-            steps.forEach { (name, minutes) -> appendLine("- $name ($minutes min)") }
+            steps.forEachIndexed { i, (name, minutes) -> appendLine("$i. $name ($minutes min)") }
             appendLine("Priorité du jour : ${priority.ifBlank { "pas encore choisie" }}.")
             if (goals.isNotEmpty()) appendLine("Objectifs en cours : ${goals.joinToString(", ")}.")
         }
@@ -744,7 +749,9 @@ object Assistant {
             .mapNotNull { line ->
                 val parts = fields(line)
                 if (parts.size < 2 || parts[1].isBlank()) return@mapNotNull null
-                RitualStepGuide(parts[0], parts[1])
+                val index = parts[0].filter { it.isDigit() }.toIntOrNull() ?: return@mapNotNull null
+                val name = steps.getOrNull(index)?.first ?: return@mapNotNull null
+                RitualStepGuide(name, parts[1])
             }
     }
 }

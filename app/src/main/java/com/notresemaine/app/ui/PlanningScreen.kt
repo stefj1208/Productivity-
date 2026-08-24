@@ -397,7 +397,7 @@ fun PlanningScreen(
             ) {
                 ShortcutIcon("📅", "Agenda", onAgenda, Modifier.weight(1f))
                 ShortcutIcon("🏃", "Sport", onSport, Modifier.weight(1f))
-                ShortcutIcon("💬", "Demander", onAsk, Modifier.weight(1f))
+                ShortcutIcon("💬", "Chat", onAsk, Modifier.weight(1f))
                 ShortcutIcon("🔄", "Bilan", { onReview(targetWeek) }, Modifier.weight(1f))
             }
             Spacer(Modifier.height(24.dp))

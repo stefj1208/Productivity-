@@ -162,7 +162,7 @@ fun MeScreen(
         )
         ShortcutTile(
             emoji = "💬",
-            title = "Demander à l'assistant",
+            title = "Chat avec l'assistant",
             subtitle = "Une question sur votre semaine, réponse d'après vos données",
             onClick = onAsk
         )

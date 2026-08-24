@@ -64,7 +64,9 @@ data class AppSettings(
     // Agenda du téléphone (donc Google Agenda, qui s'y synchronise déjà)
     val calendarEnabled: Boolean = false,
     val calendarId: Long = -1L,
-    val calendarName: String = ""
+    val calendarName: String = "",
+    /** Tâches confiées déjà annoncées : sert à ne pas sonner deux fois. */
+    val alertedTaskIds: String = ""
 )
 
 class SettingsStore(private val context: Context) {
@@ -111,6 +113,7 @@ class SettingsStore(private val context: Context) {
         val calendarEnabled = booleanPreferencesKey("calendarEnabled")
         val calendarId = longPreferencesKey("calendarId")
         val calendarName = stringPreferencesKey("calendarName")
+        val alertedTaskIds = stringPreferencesKey("alertedTaskIds")
     }
 
     val flow: Flow<AppSettings> = context.dataStore.data.map { p ->
@@ -155,7 +158,8 @@ class SettingsStore(private val context: Context) {
             dailyCalories = p[K.dailyCalories] ?: 2000,
             calendarEnabled = p[K.calendarEnabled] ?: false,
             calendarId = p[K.calendarId] ?: -1L,
-            calendarName = p[K.calendarName] ?: ""
+            calendarName = p[K.calendarName] ?: "",
+            alertedTaskIds = p[K.alertedTaskIds] ?: ""
         )
     }
 
@@ -316,6 +320,14 @@ class SettingsStore(private val context: Context) {
             p[K.calendarEnabled] = enabled
             p[K.calendarId] = id
             p[K.calendarName] = name
+        }
+    }
+
+    /** On ne garde que les 60 derniers identifiants : la liste ne doit pas enfler. */
+    suspend fun rememberAlertedTasks(ids: List<String>) {
+        context.dataStore.edit { p ->
+            val existing = (p[K.alertedTaskIds] ?: "").split(",").filter { it.isNotBlank() }
+            p[K.alertedTaskIds] = (existing + ids).distinct().takeLast(60).joinToString(",")
         }
     }
 
