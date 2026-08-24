@@ -17,7 +17,9 @@ object Categories {
         Cat("finance", "Finance", "💶"),
         Cat("enfants", "Enfants", "🧒"),
         Cat("administratif", "Administratif", "📄"),
-        Cat("maison", "Maison", "🏠"),
+        // Étiquette « Logement » et non « Maison » : l'onglet entier s'appelle
+        // Maison, deux « Maison » imbriqués ne se distingueraient pas.
+        Cat("maison", "Logement", "🏠"),
         Cat("projets", "Projets", "🚀")
     )
 

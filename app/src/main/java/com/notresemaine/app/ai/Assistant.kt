@@ -704,4 +704,47 @@ object Assistant {
                 maxTokens = 1200
             )
         ).joinToString(" ").trim()
+
+    // ----- 19. Le rituel du matin, guidé pour aujourd'hui -----
+
+    /** Une consigne du jour pour une étape du rituel. */
+    data class RitualStepGuide(val step: String, val instruction: String)
+
+    private const val RITUAL_SYSTEM =
+        "Tu guides un rituel du matin (méthode Miracle Morning), étape par étape, " +
+            "pour LA journée qui commence. " +
+            "Réponds UNIQUEMENT par des lignes au format exact :\n" +
+            "etape|consigne\n" +
+            "etape = repris mot pour mot dans la liste fournie. " +
+            "consigne = ce qu'il faut faire pendant cette étape aujourd'hui, en moins " +
+            "de 25 mots, en tutoyant, en lien direct avec la priorité du jour quand " +
+            "c'est possible. Une consigne concrète, jamais une intention vague. " +
+            "Une ligne par étape, dans l'ordre donné. " +
+            "Aucun conseil médical, aucune promesse, pas de puce, pas de titre."
+
+    /**
+     * Envoie : les noms de vos étapes, votre priorité du jour et vos objectifs
+     * non privés. Ni votre santé, ni rien du partenaire.
+     */
+    suspend fun guideRitual(
+        apiKey: String,
+        steps: List<Pair<String, Int>>,   // intitulé, minutes
+        priority: String,
+        goals: List<String>
+    ): List<RitualStepGuide> {
+        if (steps.isEmpty()) return emptyList()
+        val prompt = buildString {
+            appendLine("Étapes du rituel, dans l'ordre :")
+            steps.forEach { (name, minutes) -> appendLine("- $name ($minutes min)") }
+            appendLine("Priorité du jour : ${priority.ifBlank { "pas encore choisie" }}.")
+            if (goals.isNotEmpty()) appendLine("Objectifs en cours : ${goals.joinToString(", ")}.")
+        }
+        return cleanLines(Ai.ask(apiKey, RITUAL_SYSTEM, prompt, maxTokens = 1500))
+            .filter { it.contains('|') }
+            .mapNotNull { line ->
+                val parts = fields(line)
+                if (parts.size < 2 || parts[1].isBlank()) return@mapNotNull null
+                RitualStepGuide(parts[0], parts[1])
+            }
+    }
 }

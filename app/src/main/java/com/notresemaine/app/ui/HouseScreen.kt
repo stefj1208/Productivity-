@@ -42,7 +42,7 @@ import com.notresemaine.app.ui.theme.NeutralGray
 import com.notresemaine.app.ui.theme.accentFor
 
 /**
- * « Catégories » : tout ce qui se gère à deux, rangé par sujet.
+ * « Maison » : tout ce qui se gère à deux, rangé par sujet.
  *
  * Une catégorie n'existe que si elle contient quelque chose — pas de rangement
  * vide à administrer. « Repas » est la seule à avoir un écran à part, parce que
@@ -95,7 +95,7 @@ fun HouseScreen(
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
         ) {
-            ScreenHeader(title = "Catégories", subtitle = Dates.longLabel(today))
+            ScreenHeader(title = "Maison", subtitle = Dates.longLabel(today))
 
             // Rangée de catégories qui défile : en ajouter une ne coûte rien.
             Spacer(Modifier.height(8.dp))

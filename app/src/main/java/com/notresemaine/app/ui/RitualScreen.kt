@@ -42,7 +42,12 @@ import kotlinx.coroutines.delay
  * séquence personnalisable, minuteur enchaîné, série de jours, réveil réglable en un tap.
  */
 @Composable
-fun RitualScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
+fun RitualScreen(
+    vm: AppViewModel,
+    settings: AppSettings,
+    onPrepare: (String) -> Unit,
+    onDone: () -> Unit
+) {
     val context = LocalContext.current
     val myId = settings.myUserId
     val accent = accentFor(settings.myColor)
@@ -53,6 +58,15 @@ fun RitualScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
         .collectAsState(initial = emptyList())
     val logs by remember { vm.repo.db.ritual().logs() }
         .collectAsState(initial = emptyList())
+    val todayTasks by remember(myId) { vm.repo.db.tasks().byDate(myId, Dates.todayIso()) }
+        .collectAsState(initial = emptyList())
+    val guides by vm.aiRitual.collectAsState()
+    val aiBusy by vm.aiBusy.collectAsState()
+
+    val priorityToday = todayTasks.firstOrNull { it.isPriority }
+    val aiReady = settings.aiEnabled && settings.aiApiKey.isNotBlank()
+
+    fun guideOf(name: String): String? = guides[name.lowercase().trim()]
 
     val enabledSteps = steps.filter { it.enabled }
     val totalMinutes = enabledSteps.sumOf { it.minutes }
@@ -81,6 +95,32 @@ fun RitualScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(text = step?.name ?: "", style = MaterialTheme.typography.displaySmall)
+
+            // La consigne du jour d'abord, la fiche générale ensuite :
+            // « Silence · 5 min » ne dit à personne quoi faire de ces 5 minutes.
+            val stepName = step?.name.orEmpty()
+            val todayGuide = guideOf(stepName)
+            val offline = com.notresemaine.app.data.Rituals.guideFor(stepName)
+            if (todayGuide != null) {
+                Text(
+                    text = "✨ $todayGuide",
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(top = 12.dp)
+                )
+            } else if (offline != null) {
+                Text(
+                    text = offline.start,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(top = 12.dp)
+                )
+                Text(
+                    text = offline.how,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
+
             Spacer(Modifier.height(16.dp))
             Text(
                 text = "%d:%02d".format(secondsLeft / 60, secondsLeft % 60),
@@ -138,6 +178,50 @@ fun RitualScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
                 color = accent
             )
 
+            // ----- Sur quoi porte le rituel aujourd'hui -----
+            //
+            // Un rituel sans journée décidée tourne à vide : on médite sur
+            // « rien », on visualise « rien ». Mieux vaut le dire et proposer
+            // de décider maintenant — ou, idéalement, la veille au soir.
+            Spacer(Modifier.height(16.dp))
+            if (priorityToday == null) {
+                EmptyState(
+                    emoji = "🎯",
+                    text = "Ta journée n'est pas encore décidée. Le rituel prend son sens " +
+                        "quand il porte sur quelque chose de précis — et se prépare " +
+                        "mieux la veille au soir qu'à moitié réveillé.",
+                    actionLabel = "Choisir ma priorité",
+                    onAction = { onPrepare(Dates.todayIso()) }
+                )
+            } else {
+                SectionLabel("CE MATIN, ÇA PORTE SUR")
+                Text(priorityToday.title, style = MaterialTheme.typography.titleMedium)
+            }
+
+            if (aiReady) {
+                Spacer(Modifier.height(12.dp))
+                AiButton(
+                    text = if (guides.isEmpty()) "Guider mon rituel d'aujourd'hui"
+                    else "Refaire les consignes",
+                    busy = aiBusy,
+                    onClick = { vm.guideRitualWithAi() },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    text = if (guides.isEmpty())
+                        "Une consigne concrète par étape, en lien avec ta priorité du jour. " +
+                            "N'envoie que le nom de tes étapes, ta priorité et tes objectifs non privés."
+                    else "Consignes du jour ✓ — elles s'affichent sous chaque étape.",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (guides.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant
+                    else MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+                if (guides.isNotEmpty()) {
+                    TextButton(onClick = { vm.clearAiRitual() }) { Text("Effacer les consignes") }
+                }
+            }
+
             Spacer(Modifier.height(16.dp))
             SectionLabel(if (editing) "RÉGLER LA SÉQUENCE" else "LA SÉQUENCE")
             steps.forEach { step ->
@@ -147,13 +231,27 @@ fun RitualScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
                         .padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = step.name,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = if (step.enabled) MaterialTheme.colorScheme.onBackground
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f)
-                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = step.name,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = if (step.enabled) MaterialTheme.colorScheme.onBackground
+                            else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (!editing && step.enabled) {
+                            val todayGuide = guideOf(step.name)
+                            val detail = todayGuide
+                                ?: com.notresemaine.app.data.Rituals.guideFor(step.name)?.start
+                            if (detail != null) {
+                                Text(
+                                    text = if (todayGuide != null) "✨ $detail" else detail,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = if (todayGuide != null) MaterialTheme.colorScheme.secondary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
                     if (editing) {
                         OutlinedTextField(
                             value = step.minutes.toString(),
@@ -190,13 +288,11 @@ fun RitualScreen(vm: AppViewModel, settings: AppSettings, onDone: () -> Unit) {
             SectionLabel("RÉVEIL")
             var alarm by remember(settings.wakeAlarm) { mutableStateOf(settings.wakeAlarm) }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
+                TimeField(
+                    label = "HEURE DE LEVER",
                     value = alarm,
-                    onValueChange = { alarm = it },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    textStyle = MaterialTheme.typography.bodyLarge,
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(0.32f)
+                    onChange = { alarm = it },
+                    modifier = Modifier.fillMaxWidth(0.45f)
                 )
                 OutlinedButton(
                     onClick = {

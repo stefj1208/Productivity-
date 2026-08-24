@@ -74,6 +74,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     val aiConversation = MutableStateFlow<List<Exchange>>(emptyList())
 
+    /**
+     * Les consignes du jour pour le rituel : étape → quoi faire ce matin.
+     * Volontairement non enregistrées — elles ne valent que pour aujourd'hui.
+     */
+    val aiRitual = MutableStateFlow<Map<String, String>>(emptyMap())
+
     /** Ce que l'assistant a compris d'une phrase dictée, avant toute action. */
     val aiVoice = MutableStateFlow<com.notresemaine.app.ai.Assistant.VoiceCommand?>(null)
 
@@ -285,6 +291,32 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun saveRitualStep(step: RitualStepEntity) {
         viewModelScope.launch { repo.saveRitualStep(step) }
+    }
+
+    /**
+     * Guide le rituel pour LA journée qui commence.
+     * Envoie : les intitulés de vos étapes, votre priorité du jour et vos
+     * objectifs non privés. Rien d'autre.
+     */
+    fun guideRitualWithAi() = runAi { key ->
+        val steps = repo.db.ritual().stepsOnce(myId())
+            .filter { it.enabled }
+            .map { it.name to it.minutes }
+        if (steps.isEmpty()) {
+            toast("Aucune étape active dans le rituel.")
+            return@runAi
+        }
+        val today = com.notresemaine.app.data.Dates.todayIso()
+        val priority = repo.db.tasks().priorityOfDay(myId(), today)?.title.orEmpty()
+        val guides = com.notresemaine.app.ai.Assistant.guideRitual(
+            key, steps, priority, repo.goalTitlesForAi(myId())
+        )
+        if (guides.isEmpty()) toast("L'assistant n'a pas su guider le rituel. Réessaie.")
+        aiRitual.value = guides.associate { it.step.lowercase().trim() to it.instruction }
+    }
+
+    fun clearAiRitual() {
+        aiRitual.value = emptyMap()
     }
 
     fun completeRitual(minutes: Int) {

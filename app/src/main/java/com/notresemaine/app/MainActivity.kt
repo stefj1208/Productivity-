@@ -114,7 +114,7 @@ private data class Tab(val route: String, val label: String, val icon: ImageVect
 private val tabs = listOf(
     Tab("planning", "Planning", Icons.Filled.WbSunny),
     Tab("goals", "Objectifs", Icons.Filled.Flag),
-    Tab("house", "Catégories", Icons.Filled.Home),
+    Tab("house", "Maison", Icons.Filled.Home),
     Tab("us", "Nous", Icons.Filled.Favorite),
     Tab("me", "Moi", Icons.Filled.Person)
 )
@@ -281,7 +281,11 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings) {
                 HealthScreen(vm, settings, onBack = { navController.popBackStack() })
             }
             composable("ritual") {
-                RitualScreen(vm, settings, onDone = { navController.popBackStack() })
+                RitualScreen(
+                    vm, settings,
+                    onPrepare = { date -> navController.navigate("prepare/$date") },
+                    onDone = { navController.popBackStack() }
+                )
             }
             composable("method") {
                 MethodScreen(onBack = { navController.popBackStack() })
