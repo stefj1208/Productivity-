@@ -110,9 +110,9 @@ object Ai {
     ): String {
         // L'image d'abord, la consigne ensuite : c'est l'ordre que le modèle
         // interprète le mieux — il regarde, puis il lit ce qu'on lui demande.
-        val parts = JSONArray()
+        val requestParts = JSONArray()
         if (imageBase64.isNotBlank()) {
-            parts.put(
+            requestParts.put(
                 JSONObject().put(
                     "inline_data",
                     JSONObject()
@@ -121,13 +121,13 @@ object Ai {
                 )
             )
         }
-        parts.put(JSONObject().put("text", prompt))
+        requestParts.put(JSONObject().put("text", prompt))
 
         val body = JSONObject().apply {
             put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", system))))
             put(
                 "contents",
-                JSONArray().put(JSONObject().put("role", "user").put("parts", parts))
+                JSONArray().put(JSONObject().put("role", "user").put("parts", requestParts))
             )
             put("generationConfig", JSONObject().put("maxOutputTokens", maxTokens))
         }
@@ -175,9 +175,9 @@ object Ai {
         imageBase64: String = "",
         mimeType: String = ""
     ): String {
-        val content = JSONArray()
+        val requestContent = JSONArray()
         if (imageBase64.isNotBlank()) {
-            content.put(
+            requestContent.put(
                 JSONObject()
                     .put("type", "image")
                     .put(
@@ -189,7 +189,7 @@ object Ai {
                     )
             )
         }
-        content.put(JSONObject().put("type", "text").put("text", prompt))
+        requestContent.put(JSONObject().put("type", "text").put("text", prompt))
 
         val body = JSONObject().apply {
             put("model", ANTHROPIC_MODEL)
@@ -197,7 +197,7 @@ object Ai {
             put("system", system)
             put(
                 "messages",
-                JSONArray().put(JSONObject().put("role", "user").put("content", content))
+                JSONArray().put(JSONObject().put("role", "user").put("content", requestContent))
             )
         }
         val request = Request.Builder()
