@@ -616,6 +616,48 @@ class Repository private constructor(context: Context) {
         )
     }
 
+    /**
+     * « J'ai mangé ce qui était prévu » : recopie le repas du menu dans le journal.
+     *
+     * C'est le chemin le plus court, et celui qu'on empruntera le plus souvent —
+     * la photo ne sert qu'aux jours où la vraie assiette s'écarte du menu. Un
+     * deuxième appui décoche.
+     *
+     * L'identifiant est déterministe (« menu:… ») pour que cocher, décocher, puis
+     * recocher retombe sur la même ligne au lieu d'en empiler trois.
+     *
+     * Renvoie true si le repas vient d'être noté, false s'il vient d'être retiré,
+     * et null si rien n'est prévu à ce créneau — il n'y a alors rien à recopier.
+     */
+    suspend fun toggleMenuEaten(userId: String, date: String, slot: String): Boolean? {
+        val id = "menu:$userId:$date:$slot"
+        val existing = db.mealLogs().byId(id)
+        if (existing != null && !existing.deleted) {
+            db.mealLogs().upsert(existing.copy(deleted = true, updatedAt = now()))
+            return false
+        }
+        val planned = db.meals().byId("$date:$slot")
+        if (planned == null || planned.title.isBlank() || planned.deleted) return null
+        db.mealLogs().upsert(
+            MealLogEntity(
+                id = id,
+                userId = userId,
+                date = date,
+                slot = slot,
+                title = planned.title,
+                detail = planned.quantities,
+                // Le chiffre du menu vient d'une recette, pas d'une photo : il est
+                // plus solide, donc pas de fourchette ici. Basse = haute le dit.
+                calories = planned.calories,
+                caloriesLow = planned.calories,
+                caloriesHigh = planned.calories,
+                source = "menu",
+                updatedAt = now()
+            )
+        )
+        return true
+    }
+
     suspend fun deleteMealLog(id: String) {
         val log = db.mealLogs().byId(id) ?: return
         db.mealLogs().upsert(log.copy(deleted = true, updatedAt = now()))

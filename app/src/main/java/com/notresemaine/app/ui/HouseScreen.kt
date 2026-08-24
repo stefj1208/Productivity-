@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -342,9 +343,11 @@ private fun MealsTab(
             title = meal?.title.orEmpty(),
             quantities = meal?.quantities.orEmpty(),
             calories = meal?.calories ?: 0,
+            eaten = myLogs.any { it.slot == slot && it.source == "menu" },
             accent = accent,
             aiReady = aiReady,
-            onAi = { onRework(slot) }
+            onAi = { onRework(slot) },
+            onEaten = { vm.toggleMenuEaten(today, slot) }
         )
     }
 
@@ -706,9 +709,11 @@ private fun MealCard(
     title: String,
     quantities: String,
     calories: Int,
+    eaten: Boolean,
     accent: androidx.compose.ui.graphics.Color,
     aiReady: Boolean,
     onAi: () -> Unit,
+    onEaten: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -748,6 +753,25 @@ private fun MealCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp)
             )
+        }
+        // Cocher directement depuis le menu du jour : c'est là qu'on lit ce qui
+        // était prévu, donc c'est là qu'on confirme l'avoir mangé.
+        if (title.isNotBlank()) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 6.dp)
+                    .clickable(onClick = onEaten)
+                    .defaultMinSize(minHeight = 48.dp)
+            ) {
+                Checkbox(checked = eaten, onCheckedChange = { onEaten() })
+                Text(
+                    text = if (eaten) "Mangé ✓" else "J'ai mangé ça",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (eaten) accent else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
         if (aiReady) {
             TextButton(onClick = onAi, modifier = Modifier.padding(top = 4.dp)) {

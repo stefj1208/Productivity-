@@ -1025,6 +1025,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         aiPhotoMeal.value = null
     }
 
+    /** Cocher un repas du menu comme réellement mangé — ou le décocher. */
+    fun toggleMenuEaten(date: String, slot: String) {
+        viewModelScope.launch {
+            when (repo.toggleMenuEaten(myId(), date, slot)) {
+                null -> toast("Rien de prévu à ce créneau — remplissez d'abord le menu.")
+                true -> requestSync()
+                false -> requestSync()
+            }
+        }
+    }
+
     fun deleteMealLog(id: String) {
         viewModelScope.launch {
             repo.deleteMealLog(id)

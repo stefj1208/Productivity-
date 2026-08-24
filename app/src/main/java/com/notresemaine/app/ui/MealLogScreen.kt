@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -156,9 +157,40 @@ fun MealLogScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
                 )
             }
 
+            // ----- Le chemin court : cocher ce qui était prévu -----
+            //
+            // La plupart des jours, on mange ce qui était au menu. Un appui suffit
+            // alors, et la photo ne sert plus qu'aux jours où l'assiette s'écarte
+            // du plan. Mettre ceci avant l'appareil photo, c'est mettre le geste
+            // le plus fréquent en premier.
+            val plannedMeals = meals.filter { it.title.isNotBlank() }
+            if (plannedMeals.isNotEmpty()) {
+                Spacer(Modifier.height(24.dp))
+                SectionLabel("J'AI MANGÉ CE QUI ÉTAIT PRÉVU")
+                plannedMeals.forEach { meal ->
+                    val ticked = mine.any { it.slot == meal.slot && it.source == "menu" }
+                    PlannedMealRow(
+                        emoji = slotEmoji(meal.slot),
+                        label = slotLabel(meal.slot),
+                        title = meal.title,
+                        calories = meal.calories,
+                        checked = ticked,
+                        accent = accent,
+                        onToggle = { vm.toggleMenuEaten(today, meal.slot) }
+                    )
+                }
+                Text(
+                    text = "Décochez si finalement ce n'était pas ça — vous pourrez le " +
+                        "remplacer par une photo.",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 6.dp)
+                )
+            }
+
             // ----- Le créneau -----
-            Spacer(Modifier.height(20.dp))
-            SectionLabel("QUEL REPAS ?")
+            Spacer(Modifier.height(24.dp))
+            SectionLabel("SINON, QUEL REPAS ?")
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxWidth()
@@ -452,6 +484,57 @@ private fun ManualMealDialog(
     )
 }
 
+/**
+ * Un repas du menu, à cocher.
+ *
+ * La ligne entière est la cible du tap, pas seulement la case : viser une case de
+ * 20 dp au bout d'une ligne est une petite épreuve, alors que le geste voulu est
+ * évident. La case suit, elle ne commande pas.
+ */
+@Composable
+private fun PlannedMealRow(
+    emoji: String,
+    label: String,
+    title: String,
+    calories: Int,
+    checked: Boolean,
+    accent: androidx.compose.ui.graphics.Color,
+    onToggle: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 3.dp)
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
+            .clickable(onClick = onToggle)
+            .defaultMinSize(minHeight = 56.dp)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(emoji, style = MaterialTheme.typography.titleMedium)
+        Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (checked) accent else MaterialTheme.colorScheme.onSurface
+            )
+            if (calories > 0) {
+                Text(
+                    text = "$calories kcal par personne",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Checkbox(checked = checked, onCheckedChange = { onToggle() })
+    }
+}
+
 @Composable
 private fun MealLogRow(
     log: MealLogEntity,
@@ -479,8 +562,18 @@ private fun MealLogRow(
             Text(log.title, style = MaterialTheme.typography.bodyLarge)
             val line = buildList {
                 add(slotLabel(log.slot))
-                if (log.caloriesHigh > 0) add("≈ ${log.caloriesLow}–${log.caloriesHigh} kcal")
-                if (log.source == "photo") add("📷")
+                // Le chiffre du menu vient d'une recette : il n'a pas de fourchette,
+                // et l'afficher en « 507–507 » ferait passer une valeur simple pour
+                // une estimation bancale.
+                when {
+                    log.caloriesHigh <= 0 -> Unit
+                    log.caloriesLow == log.caloriesHigh -> add("${log.calories} kcal")
+                    else -> add("≈ ${log.caloriesLow}–${log.caloriesHigh} kcal")
+                }
+                when (log.source) {
+                    "photo" -> add("📷")
+                    "menu" -> add("🍽️ au menu")
+                }
             }
             Text(
                 text = line.joinToString(" · "),
