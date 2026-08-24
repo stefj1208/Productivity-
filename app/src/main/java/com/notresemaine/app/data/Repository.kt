@@ -577,6 +577,99 @@ class Repository private constructor(context: Context) {
         )
     }
 
+    // ----- Ce qu'on a réellement mangé -----
+
+    /**
+     * Enregistre un repas réellement pris. Rien à voir avec [saveMeal], qui décide
+     * du menu : ici on constate, on ne planifie pas.
+     *
+     * L'identifiant est libre (et non « date:créneau ») parce qu'une journée peut
+     * contenir plusieurs prises au même moment — un déjeuner puis un café gourmand.
+     */
+    suspend fun saveMealLog(
+        userId: String,
+        date: String,
+        slot: String,
+        title: String,
+        detail: String,
+        caloriesLow: Int,
+        caloriesHigh: Int,
+        source: String,
+        id: String? = null
+    ) {
+        val low = caloriesLow.coerceAtLeast(0)
+        val high = caloriesHigh.coerceAtLeast(low)
+        db.mealLogs().upsert(
+            MealLogEntity(
+                id = id ?: java.util.UUID.randomUUID().toString(),
+                userId = userId,
+                date = date,
+                slot = slot,
+                title = title.trim(),
+                detail = detail.trim(),
+                calories = (low + high) / 2,
+                caloriesLow = low,
+                caloriesHigh = high,
+                source = source,
+                updatedAt = now()
+            )
+        )
+    }
+
+    suspend fun deleteMealLog(id: String) {
+        val log = db.mealLogs().byId(id) ?: return
+        db.mealLogs().upsert(log.copy(deleted = true, updatedAt = now()))
+    }
+
+    /**
+     * L'écart de la semaine entre le menu prévu et ce qui a été noté, en une phrase.
+     *
+     * On ne compte que les jours où quelque chose a été enregistré : un jour sans
+     * photo n'est pas un jour de jeûne, et le présenter comme tel serait un mensonge
+     * dans le bilan.
+     */
+    suspend fun menuGapForWeek(userId: String, weekStart: String): String {
+        val days = Dates.daysOfWeek(weekStart)
+        val logs = db.mealLogs().betweenOnce(userId, days.first(), days.last())
+            .filter { !it.deleted }
+        if (logs.isEmpty()) return ""
+        val planned = db.meals().betweenOnce(days.first(), days.last())
+            .filter { it.title.isNotBlank() && !it.deleted }
+
+        val daysLogged = logs.map { it.date }.distinct()
+        val avg = daysLogged.sumOf { day -> logs.filter { it.date == day }.sumOf { it.calories } } /
+            daysLogged.size
+
+        // Un repas est « suivi » si le plat noté reprend au moins un mot marquant
+        // du plat prévu. Comparer les intitulés en entier ne marcherait jamais :
+        // personne ne réécrit « Poulet rôti et pommes de terre » à l'identique.
+        var followed = 0
+        var comparable = 0
+        logs.forEach { log ->
+            val plan = planned.firstOrNull { it.date == log.date && it.slot == log.slot } ?: return@forEach
+            comparable++
+            val plannedWords = keyWords(plan.title)
+            if (plannedWords.any { it in keyWords(log.title) }) followed++
+        }
+
+        return buildString {
+            append("Repas réellement notés : ${logs.size} sur ${daysLogged.size} jour")
+            if (daysLogged.size > 1) append("s")
+            append(", $avg kcal par jour noté en moyenne.")
+            if (comparable > 0) {
+                append(" Le menu prévu a été suivi $followed fois sur $comparable.")
+            }
+        }
+    }
+
+    /** Les mots qui distinguent un plat : on jette les liaisons et les mots courts. */
+    private fun keyWords(title: String): Set<String> =
+        title.lowercase()
+            .split(' ', ',', '\'', '-', '(', ')')
+            .map { it.trim() }
+            .filter { it.length > 3 && it !in setOf("avec", "sans", "dans", "pour", "leur", "plus") }
+            .toSet()
+
     /** Remplit les créneaux vides de la semaine depuis la banque d'idées hors ligne. */
     suspend fun fillWeekMenusFromBank(userId: String, weekStart: String): Int {
         val days = Dates.daysOfWeek(weekStart)

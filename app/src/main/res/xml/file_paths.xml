@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Le seul dossier que l'application ouvre à l'appareil photo.
+
+    Volontairement réduit à « repas » dans le cache : ni les documents, ni la
+    base de données, ni le reste du stockage ne sont accessibles depuis
+    l'extérieur. Le dossier est vidé dès que la photo a été envoyée.
+-->
+<paths>
+    <cache-path name="repas" path="repas/" />
+</paths>

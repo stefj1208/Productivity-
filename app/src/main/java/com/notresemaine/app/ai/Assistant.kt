@@ -754,4 +754,88 @@ object Assistant {
                 RitualStepGuide(name, parts[1])
             }
     }
+
+    // ----- 20. Lire une photo de repas -----
+
+    /**
+     * Ce que l'assistant a cru voir dans l'assiette.
+     *
+     * [caloriesLow] et [caloriesHigh] encadrent volontairement : demander un chiffre
+     * unique à un modèle qui regarde une photo produit un nombre très précis et
+     * très faux. La fourchette dit la vérité — on ne sait pas à 20 % près.
+     */
+    data class PhotoMeal(
+        val title: String,
+        val items: String,
+        val caloriesLow: Int,
+        val caloriesHigh: Int,
+        val confidence: String   // haute | moyenne | faible
+    ) {
+        /** Le milieu de la fourchette : c'est lui qu'on additionne, faute de mieux. */
+        val calories: Int get() = (caloriesLow + caloriesHigh) / 2
+
+        val confidenceLabel: String get() = when (confidence) {
+            "haute" -> "Plat bien identifiable"
+            "faible" -> "Difficile à juger sur cette photo"
+            else -> "Identification correcte, quantités incertaines"
+        }
+    }
+
+    private const val PHOTO_SYSTEM =
+        "Tu regardes la photo d'un repas et tu estimes ce qu'il y a dans UNE assiette. " +
+            "Réponds UNIQUEMENT par une seule ligne au format exact :\n" +
+            "plat|aliments|kcal_min|kcal_max|fiabilite\n" +
+            "plat = le nom du plat en français, 5 mots maximum. " +
+            "aliments = ce que tu identifies, séparé par des virgules, avec la portion estimée " +
+            "quand elle se devine (ex. : 150 g de pâtes, 100 g de saumon, salade verte). " +
+            "kcal_min et kcal_max = la fourchette de calories de la portion visible, " +
+            "deux nombres entiers seuls, sans unité ; garde un écart honnête " +
+            "(au moins 20 % entre les deux) car une photo ne donne pas l'échelle. " +
+            "fiabilite = haute, moyenne ou faible. " +
+            "Si la photo ne montre pas de nourriture, réponds exactement : aucun|||| " +
+            "Pas de commentaire, pas de puce, pas d'introduction, une seule ligne."
+
+    /**
+     * Envoie : **la photo** et, si vous l'avez écrite, une précision (« il y avait
+     * aussi du pain »). Rien d'autre — ni le menu prévu, ni vos objectifs, ni votre
+     * poids, ni rien de votre binôme.
+     *
+     * C'est la seule fonction de l'assistant qui transmette autre chose que du texte.
+     * Elle n'est appelée que si l'option est explicitement allumée dans les réglages.
+     */
+    suspend fun readMealPhoto(
+        apiKey: String,
+        imageBase64: String,
+        mimeType: String,
+        note: String = ""
+    ): PhotoMeal? {
+        val prompt = buildString {
+            append("Que contient cette assiette, et combien de calories environ ?")
+            if (note.isNotBlank()) append("\nPrécision de la personne : ${note.trim()}.")
+        }
+        val line = cleanLines(Ai.askWithImage(apiKey, PHOTO_SYSTEM, prompt, imageBase64, mimeType))
+            .firstOrNull { it.contains('|') } ?: return null
+
+        val parts = fields(line)
+        val title = parts.getOrElse(0) { "" }
+        if (title.isBlank() || title.equals("aucun", ignoreCase = true)) return null
+
+        val low = parts.getOrElse(2) { "" }.filter { it.isDigit() }.toIntOrNull() ?: 0
+        val high = parts.getOrElse(3) { "" }.filter { it.isDigit() }.toIntOrNull() ?: 0
+        // Un modèle qui rend « 600|600 » a oublié la consigne : on rouvre la
+        // fourchette à ±20 %, pour ne pas afficher une fausse précision.
+        val (lowOk, highOk) = when {
+            low <= 0 && high <= 0 -> 0 to 0
+            low <= 0 -> (high * 0.8).toInt() to high
+            high <= low -> (low * 0.8).toInt() to (low * 1.2).toInt()
+            else -> low to high
+        }
+        return PhotoMeal(
+            title = title,
+            items = parts.getOrElse(1) { "" },
+            caloriesLow = lowOk,
+            caloriesHigh = highOk,
+            confidence = parts.getOrElse(4) { "" }.lowercase().trim().ifBlank { "moyenne" }
+        )
+    }
 }

@@ -516,9 +516,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ----- Bilan de la semaine et boîte de réception -----
 
-    /** Envoie : uniquement vos chiffres agrégés. Ni le détail, ni rien de l'autre. */
-    fun reviewWeekWithAi(facts: String) = runAi { key ->
-        val review = com.notresemaine.app.ai.Assistant.reviewWeek(key, facts)
+    /**
+     * Envoie : uniquement vos chiffres agrégés. Ni le détail, ni rien de l'autre.
+     *
+     * L'écart entre le menu prévu et ce qui a été réellement noté est ajouté ici
+     * plutôt que dans l'écran, parce qu'il demande de lire deux tables — et qu'un
+     * écran ne doit pas attendre une base de données pour s'afficher.
+     */
+    fun reviewWeekWithAi(facts: String, weekStart: String = "") = runAi { key ->
+        val gap = if (weekStart.isBlank()) "" else repo.menuGapForWeek(myId(), weekStart)
+        val review = com.notresemaine.app.ai.Assistant.reviewWeek(
+            key, if (gap.isBlank()) facts else "$facts\n$gap"
+        )
         if (review == null) toast("L'assistant n'a pas su faire le bilan. Réessaie.")
         aiReview.value = review
     }
@@ -938,6 +947,97 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun clearAiMeal() {
         aiMeal.value = null
+    }
+
+    // ----- Ce qu'on a vraiment mangé -----
+
+    /**
+     * Ce que l'assistant a lu sur la photo, **avant** tout enregistrement.
+     * Comme partout ailleurs : on montre ce qui a été compris, on ne l'écrit pas
+     * dans le dos de l'utilisateur.
+     */
+    data class PhotoMealProposal(
+        val date: String,
+        val slot: String,
+        val plannedTitle: String,
+        val reading: com.notresemaine.app.ai.Assistant.PhotoMeal
+    )
+
+    val aiPhotoMeal = MutableStateFlow<PhotoMealProposal?>(null)
+
+    /**
+     * Envoie la photo à l'assistant, puis l'efface du téléphone.
+     *
+     * L'effacement a lieu quoi qu'il arrive — réponse, panne de réseau ou refus du
+     * modèle. Une photo de repas n'a aucune raison de traîner dans le cache.
+     */
+    fun analyzeMealPhoto(uri: android.net.Uri, date: String, slot: String, note: String) = runAi { key ->
+        val app = getApplication<android.app.Application>()
+        val s = repo.settings.current()
+        if (!s.mealPhotoEnabled) {
+            toast("Activez d'abord « Analyse photo des repas » dans Moi → Assistant.")
+            return@runAi
+        }
+        val encoded = com.notresemaine.app.data.Photo.toBase64(app, uri)
+        if (encoded == null) {
+            com.notresemaine.app.data.Photo.cleanUp(app)
+            toast("Photo illisible. Réessayez.")
+            return@runAi
+        }
+        val reading = try {
+            com.notresemaine.app.ai.Assistant.readMealPhoto(
+                key, encoded, com.notresemaine.app.data.Photo.MIME, note
+            )
+        } finally {
+            com.notresemaine.app.data.Photo.cleanUp(app)
+        }
+        if (reading == null) {
+            toast("Aucun plat reconnu sur cette photo. Notez-le à la main.")
+            return@runAi
+        }
+        val planned = repo.db.meals().byId("$date:$slot")?.title.orEmpty()
+        aiPhotoMeal.value = PhotoMealProposal(date, slot, planned, reading)
+    }
+
+    /**
+     * Enregistre ce qui a été mangé — corrigé à la main si besoin.
+     * Le titre, les aliments et la fourchette arrivent depuis l'écran : ce sont
+     * ceux que l'utilisateur a validés, pas forcément ceux du modèle.
+     */
+    fun logMeal(
+        date: String,
+        slot: String,
+        title: String,
+        detail: String,
+        caloriesLow: Int,
+        caloriesHigh: Int,
+        source: String
+    ) {
+        viewModelScope.launch {
+            repo.saveMealLog(myId(), date, slot, title, detail, caloriesLow, caloriesHigh, source)
+            aiPhotoMeal.value = null
+            requestSync()
+            toast("Repas noté ✓")
+        }
+    }
+
+    fun clearPhotoMeal() {
+        aiPhotoMeal.value = null
+    }
+
+    fun deleteMealLog(id: String) {
+        viewModelScope.launch {
+            repo.deleteMealLog(id)
+            requestSync()
+        }
+    }
+
+    /** L'interrupteur qui autorise une image à quitter le téléphone. */
+    fun saveMealPhotoSetting(enabled: Boolean) {
+        viewModelScope.launch {
+            repo.settings.setMealPhoto(enabled)
+            toast(if (enabled) "Analyse photo activée ✓" else "Analyse photo désactivée")
+        }
     }
 
     /** Trois premières actions. Envoie : uniquement l'intitulé de l'objectif. */

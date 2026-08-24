@@ -73,6 +73,7 @@ import com.notresemaine.app.ui.VoiceProposalDialog
 import com.notresemaine.app.ui.PlanningScreen
 import com.notresemaine.app.ui.UsScreen
 import com.notresemaine.app.ui.HouseScreen
+import com.notresemaine.app.ui.MealLogScreen
 import com.notresemaine.app.ui.theme.AppTheme
 
 class MainActivity : ComponentActivity() {
@@ -191,6 +192,7 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings, openRoute: Str
                     onHabits = { navController.navigate("habits") },
                     onSport = { navController.navigate("sport") },
                     onAsk = { navController.navigate("ask") },
+                    onMealLog = { navController.navigate("meallog") },
                     onMethod = { navController.navigate("method") }
                 )
             }
@@ -204,7 +206,8 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings, openRoute: Str
                 HouseScreen(
                     vm, settings,
                     onMenus = { week -> navController.navigate("menus/$week") },
-                    onShopping = { week -> navController.navigate("shopping/$week") }
+                    onShopping = { week -> navController.navigate("shopping/$week") },
+                    onMealLog = { navController.navigate("meallog") }
                 )
             }
             composable("us") {
@@ -226,6 +229,7 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings, openRoute: Str
                     onHabits = { navController.navigate("habits") },
                     onSport = { navController.navigate("sport") },
                     onAsk = { navController.navigate("ask") },
+                    onMealLog = { navController.navigate("meallog") },
                     onCalendar = { navController.navigate("calendar") },
                     onAssistant = { navController.navigate("assistant") },
                     onReminders = { navController.navigate("reminders") },
@@ -252,6 +256,9 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings, openRoute: Str
             }
             composable("ask") {
                 AskScreen(vm, settings, onBack = { navController.popBackStack() })
+            }
+            composable("meallog") {
+                MealLogScreen(vm, settings, onBack = { navController.popBackStack() })
             }
             composable("habits") {
                 HabitsScreen(vm, settings, onBack = { navController.popBackStack() })

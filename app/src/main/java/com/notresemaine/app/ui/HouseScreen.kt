@@ -54,7 +54,8 @@ fun HouseScreen(
     vm: AppViewModel,
     settings: AppSettings,
     onMenus: (String) -> Unit,
-    onShopping: (String) -> Unit
+    onShopping: (String) -> Unit,
+    onMealLog: () -> Unit
 ) {
     val today = Dates.todayIso()
     val weekStart = Dates.weekStartIso()
@@ -78,6 +79,8 @@ fun HouseScreen(
     val profiles by remember { vm.repo.db.profiles().all() }
         .collectAsState(initial = emptyList())
     val items by remember { vm.repo.db.houseItems().all() }
+        .collectAsState(initial = emptyList())
+    val mealLogs by remember(today) { vm.repo.db.mealLogs().between(today, today) }
         .collectAsState(initial = emptyList())
 
     val partner = profiles.firstOrNull { it.id != myId }
@@ -123,10 +126,12 @@ fun HouseScreen(
                     weekStart = weekStart,
                     meals = meals,
                     shopping = shopping,
+                    myLogs = mealLogs.filter { it.userId == myId },
                     accent = accent,
                     aiReady = aiReady,
                     onMenus = onMenus,
                     onShopping = onShopping,
+                    onMealLog = onMealLog,
                     onRework = { reworking = it }
                 )
             } else {
@@ -317,15 +322,18 @@ private fun MealsTab(
     weekStart: String,
     meals: List<com.notresemaine.app.data.MealEntity>,
     shopping: List<com.notresemaine.app.data.ShoppingItemEntity>,
+    myLogs: List<com.notresemaine.app.data.MealLogEntity>,
     accent: androidx.compose.ui.graphics.Color,
     aiReady: Boolean,
     onMenus: (String) -> Unit,
     onShopping: (String) -> Unit,
+    onMealLog: () -> Unit,
     onRework: (String) -> Unit
 ) {
     SectionLabel("AU MENU AUJOURD'HUI")
     val todayMeals = meals.filter { it.date == today }
-    val eaten = todayMeals.sumOf { it.calories }
+    val planned = todayMeals.sumOf { it.calories }
+    val eaten = myLogs.sumOf { it.calories }
     MenuIdeas.slots.forEach { (slot, label) ->
         val meal = todayMeals.firstOrNull { it.slot == slot }
         MealCard(
@@ -339,18 +347,40 @@ private fun MealsTab(
             onAi = { onRework(slot) }
         )
     }
-    if (eaten > 0 && settings.dailyCalories > 0) {
+
+    // Prévu et réel l'un sous l'autre : c'est l'écart entre les deux barres qui
+    // dit quelque chose, pas la longueur de l'une d'elles. Aucun dépassement
+    // n'allume de rouge — on constate, on ne sanctionne pas.
+    if ((planned > 0 || eaten > 0) && settings.dailyCalories > 0) {
         Spacer(Modifier.height(10.dp))
+        if (planned > 0) {
+            Gauge(
+                value = planned.toFloat(),
+                max = settings.dailyCalories.toFloat(),
+                accent = NeutralGray,
+                caption = "$planned kcal prévues par personne sur ${settings.dailyCalories} — " +
+                    "pour ${settings.householdSize} couvert" +
+                    (if (settings.householdSize > 1) "s" else "")
+            )
+            Spacer(Modifier.height(8.dp))
+        }
         Gauge(
             value = eaten.toFloat(),
             max = settings.dailyCalories.toFloat(),
             accent = accent,
-            caption = "$eaten kcal prévues par personne sur ${settings.dailyCalories} — " +
-                "pour ${settings.householdSize} couvert" +
-                (if (settings.householdSize > 1) "s" else "")
+            caption = if (eaten == 0) "Rien de noté aujourd'hui — ci-dessous, « Ce que j'ai mangé »"
+            else "≈ $eaten kcal réellement notées (estimation)"
         )
     }
     Spacer(Modifier.height(16.dp))
+    ShortcutTile(
+        emoji = "📷",
+        title = "Ce que j'ai mangé",
+        subtitle = if (myLogs.isEmpty()) "Une photo, et l'assistant estime le repas"
+        else "${myLogs.size} repas noté(s) aujourd'hui · ≈ $eaten kcal",
+        onClick = onMealLog,
+        highlight = myLogs.isNotEmpty()
+    )
     ShortcutTile(
         emoji = "🍽️",
         title = "Menus de la semaine",

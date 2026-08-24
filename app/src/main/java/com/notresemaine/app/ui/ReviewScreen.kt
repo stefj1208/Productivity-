@@ -84,6 +84,10 @@ fun ReviewScreen(
         val d = Dates.daysOfWeek(previousWeekStart)
         vm.repo.db.meals().between(d.first(), d.last())
     }.collectAsState(initial = emptyList())
+    val previousLogs by remember(previousWeekStart) {
+        val d = Dates.daysOfWeek(previousWeekStart)
+        vm.repo.db.mealLogs().between(d.first(), d.last())
+    }.collectAsState(initial = emptyList())
 
     // Préremplit une seule fois avec ce qui existe déjà pour cette semaine.
     if (!loadedPlan && weekPlan != null) {
@@ -229,6 +233,30 @@ fun ReviewScreen(
                         )
                     }
 
+                    // ----- Le menu prévu contre ce qui a été mangé -----
+                    //
+                    // On ne compte que les jours réellement notés : un jour sans photo
+                    // n'est pas un jour sans repas, et le présenter comme tel serait faux.
+                    val myLogs = previousLogs.filter { it.userId == myId }
+                    if (myLogs.isNotEmpty()) {
+                        val daysLogged = myLogs.map { it.date }.distinct().size
+                        val avgKcal = myLogs.sumOf { it.calories } / daysLogged
+                        Spacer(Modifier.height(16.dp))
+                        SectionLabel("CE QU'ON A VRAIMENT MANGÉ")
+                        Text(
+                            text = "${myLogs.size} repas notés sur $daysLogged jour" +
+                                (if (daysLogged > 1) "s" else "") +
+                                " · ≈ $avgKcal kcal par jour noté.",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Text(
+                            text = "Estimations d'après photo : un ordre de grandeur, pas un compte.",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+
                     val lp = previousPlan?.priority
                     if (lp != null) {
                         Spacer(Modifier.height(16.dp))
@@ -265,7 +293,8 @@ fun ReviewScreen(
                                         }
                                         append("Repas décidés à l'avance : $mealsDone sur 21.\n")
                                         if (lp != null) append("Priorité annoncée : $lp.")
-                                    }
+                                    },
+                                    previousWeekStart
                                 )
                             }
                         )

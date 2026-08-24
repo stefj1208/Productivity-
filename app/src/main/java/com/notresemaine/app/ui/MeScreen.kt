@@ -39,6 +39,7 @@ fun MeScreen(
     onHabits: () -> Unit,
     onSport: () -> Unit,
     onAsk: () -> Unit,
+    onMealLog: () -> Unit,
     onCalendar: () -> Unit,
     onAssistant: () -> Unit,
     onReminders: () -> Unit,
@@ -64,6 +65,10 @@ fun MeScreen(
     val habits by remember { vm.repo.db.habits().all() }
         .collectAsState(initial = emptyList())
     val habitCount = habits.count { it.userId == myId && it.enabled }
+    val today = Dates.todayIso()
+    val mealLogs by remember(today) { vm.repo.db.mealLogs().between(today, today) }
+        .collectAsState(initial = emptyList())
+    val loggedToday = mealLogs.count { it.userId == myId }
 
     val streak = vm.repo.ritualStreak(ritualLogs, myId)
     val activeSteps = ritualSteps.count { it.enabled }
@@ -140,6 +145,15 @@ fun MeScreen(
                 else -> String.format(java.util.Locale.FRANCE, "%.1f kg", lastWeight.kilos)
             },
             onClick = onWeight
+        )
+
+        ShortcutTile(
+            emoji = "📷",
+            title = "Ce que j'ai mangé",
+            subtitle = if (loggedToday == 0) "Le réel, en face du menu prévu"
+            else "$loggedToday repas noté(s) aujourd'hui",
+            onClick = onMealLog,
+            highlight = loggedToday > 0
         )
 
         ShortcutTile(

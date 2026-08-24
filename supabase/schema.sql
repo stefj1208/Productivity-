@@ -211,6 +211,25 @@ create table if not exists habits (
   updated_at bigint not null default 0
 );
 
+-- Ce qui a été réellement mangé (V15), à ne pas confondre avec « meals », qui est
+-- le menu prévu. Les deux coexistent : l'écart entre les deux est l'information.
+-- Les calories sont une fourchette, jamais un chiffre juste.
+create table if not exists meal_logs (
+  id text primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  couple_id uuid,
+  date text not null,
+  slot text not null,
+  title text not null default '',
+  detail text not null default '',
+  calories int not null default 0,
+  calories_low int not null default 0,
+  calories_high int not null default 0,
+  source text not null default 'manuel',
+  deleted boolean not null default false,
+  updated_at bigint not null default 0
+);
+
 alter table profiles add column if not exists pacte_enabled boolean not null default false;
 alter table profiles add column if not exists daily_limit_minutes int not null default 45;
 alter table profiles add column if not exists curfew_enabled boolean not null default false;
@@ -263,6 +282,8 @@ create or replace trigger health_days_stamp before insert or update on health_da
 create or replace trigger weights_stamp before insert or update on weights
   for each row execute function stamp_couple();
 create or replace trigger habits_stamp before insert or update on habits
+  for each row execute function stamp_couple();
+create or replace trigger meal_logs_stamp before insert or update on meal_logs
   for each row execute function stamp_couple();
 
 -- Crée l'espace couple et renvoie le code à partager (6 caractères).
@@ -484,4 +505,17 @@ create policy habits_select on habits for select
 create policy habits_insert on habits for insert
   with check (user_id = auth.uid());
 create policy habits_update on habits for update
+  using (user_id = auth.uid());
+
+-- Repas réellement pris : même règle que les habitudes — sauvegardés dans
+-- l'espace du couple, mais écrits uniquement par leur propriétaire.
+alter table meal_logs enable row level security;
+drop policy if exists meal_logs_select on meal_logs;
+drop policy if exists meal_logs_insert on meal_logs;
+drop policy if exists meal_logs_update on meal_logs;
+create policy meal_logs_select on meal_logs for select
+  using (user_id = auth.uid() or (couple_id is not null and couple_id = my_couple()));
+create policy meal_logs_insert on meal_logs for insert
+  with check (user_id = auth.uid());
+create policy meal_logs_update on meal_logs for update
   using (user_id = auth.uid());

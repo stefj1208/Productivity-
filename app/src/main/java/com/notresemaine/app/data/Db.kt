@@ -194,6 +194,38 @@ data class MealEntity(
 )
 
 /**
+ * Ce qui a été **réellement** mangé — à ne pas confondre avec [MealEntity], qui est
+ * le menu **prévu**.
+ *
+ * Les deux tables existent séparément parce que l'écart entre les deux est
+ * précisément l'information utile : un menu qu'on remplacerait par ce qu'on a
+ * vraiment mangé perdrait toute trace de ce qui était décidé, et donc toute
+ * possibilité de dire « le menu tient quatre jours sur sept, et ça lâche le soir ».
+ *
+ * Contrairement au menu, il peut y en avoir plusieurs par créneau : un déjeuner,
+ * puis un goûter. D'où un identifiant libre plutôt que « date:créneau ».
+ *
+ * Les calories sont une **fourchette**, jamais un chiffre juste : une photo ne dit
+ * pas si l'assiette fait 22 ou 28 cm. [caloriesLow] et [caloriesHigh] encadrent,
+ * [calories] est le milieu — celui qu'on additionne, faute de mieux.
+ */
+@Entity(tableName = "meal_logs")
+data class MealLogEntity(
+    @PrimaryKey val id: String,
+    val userId: String,
+    val date: String,
+    val slot: String,             // matin | midi | soir | encas
+    val title: String,
+    val detail: String = "",      // les aliments repérés, séparés par des virgules
+    val calories: Int = 0,
+    val caloriesLow: Int = 0,
+    val caloriesHigh: Int = 0,
+    val source: String = "manuel", // photo | manuel
+    val deleted: Boolean = false,
+    val updatedAt: Long
+)
+
+/**
  * Une habitude qui fait la différence : « ne pas grignoter entre les repas »,
  * « une seule chose à la fois ». Elle ne se coche pas — elle se rappelle, à des
  * moments imprévisibles, parce qu'un rappel toujours à la même heure devient un
@@ -503,6 +535,24 @@ interface MealDao {
 }
 
 @Dao
+interface MealLogDao {
+    @Query("SELECT * FROM meal_logs WHERE date >= :from AND date <= :to AND deleted = 0 ORDER BY date, slot, updatedAt")
+    fun between(from: String, to: String): Flow<List<MealLogEntity>>
+
+    @Query("SELECT * FROM meal_logs WHERE userId = :userId AND date >= :from AND date <= :to AND deleted = 0")
+    suspend fun betweenOnce(userId: String, from: String, to: String): List<MealLogEntity>
+
+    @Query("SELECT * FROM meal_logs WHERE id = :id")
+    suspend fun byId(id: String): MealLogEntity?
+
+    @Query("SELECT * FROM meal_logs WHERE updatedAt > :ts")
+    suspend fun modifiedSince(ts: Long): List<MealLogEntity>
+
+    @Upsert
+    suspend fun upsert(log: MealLogEntity)
+}
+
+@Dao
 interface ShoppingDao {
     @Query("SELECT * FROM shopping_items WHERE weekStart = :weekStart AND deleted = 0 ORDER BY aisle, label")
     fun forWeek(weekStart: String): Flow<List<ShoppingItemEntity>>
@@ -605,9 +655,10 @@ interface HealthDao {
         GoalEntity::class, RitualStepEntity::class, RitualLogEntity::class,
         InboxItemEntity::class, UsageDayEntity::class, GraceRequestEntity::class,
         MealEntity::class, ShoppingItemEntity::class, HealthDayEntity::class,
-        HouseItemEntity::class, WeightEntity::class, HabitEntity::class
+        HouseItemEntity::class, WeightEntity::class, HabitEntity::class,
+        MealLogEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 abstract class AppDb : RoomDatabase() {
@@ -622,6 +673,7 @@ abstract class AppDb : RoomDatabase() {
     abstract fun usage(): UsageDao
     abstract fun grace(): GraceDao
     abstract fun meals(): MealDao
+    abstract fun mealLogs(): MealLogDao
     abstract fun shopping(): ShoppingDao
     abstract fun health(): HealthDao
     abstract fun houseItems(): HouseItemDao
@@ -646,6 +698,26 @@ abstract class AppDb : RoomDatabase() {
             object : Migration(7, 8) {
                 override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                     db.execSQL("ALTER TABLE ritual_steps ADD COLUMN detail TEXT NOT NULL DEFAULT ''")
+                }
+            },
+            // 8 → 9 : ce qu'on a réellement mangé, à côté de ce qui était prévu.
+            object : Migration(8, 9) {
+                override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS meal_logs (" +
+                            "id TEXT NOT NULL PRIMARY KEY, " +
+                            "userId TEXT NOT NULL, " +
+                            "date TEXT NOT NULL, " +
+                            "slot TEXT NOT NULL, " +
+                            "title TEXT NOT NULL, " +
+                            "detail TEXT NOT NULL DEFAULT '', " +
+                            "calories INTEGER NOT NULL DEFAULT 0, " +
+                            "caloriesLow INTEGER NOT NULL DEFAULT 0, " +
+                            "caloriesHigh INTEGER NOT NULL DEFAULT 0, " +
+                            "source TEXT NOT NULL DEFAULT 'manuel', " +
+                            "deleted INTEGER NOT NULL DEFAULT 0, " +
+                            "updatedAt INTEGER NOT NULL)"
+                    )
                 }
             }
         )

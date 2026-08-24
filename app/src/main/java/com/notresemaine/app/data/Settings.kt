@@ -52,6 +52,13 @@ data class AppSettings(
     // Assistant (facultatif, clé fournie par l'utilisateur)
     val aiEnabled: Boolean = false,
     val aiApiKey: String = "",
+    /**
+     * Analyse photo des repas. Éteinte par défaut, et volontairement séparée de
+     * [aiEnabled] : allumer l'assistant fait sortir du texte qu'on a tapé soi-même,
+     * allumer ceci fait sortir une image de sa cuisine. Ce n'est pas la même
+     * décision, donc ce n'est pas le même interrupteur.
+     */
+    val mealPhotoEnabled: Boolean = false,
     // Rappels sonores : une alarme plein écran à chaque action à faire
     val alertsEnabled: Boolean = true,
     val alertSound: Boolean = true,
@@ -104,6 +111,7 @@ class SettingsStore(private val context: Context) {
         val pendingFromDate = stringPreferencesKey("pendingFromDate")
         val aiEnabled = booleanPreferencesKey("aiEnabled")
         val aiApiKey = stringPreferencesKey("aiApiKey")
+        val mealPhotoEnabled = booleanPreferencesKey("mealPhotoEnabled")
         val alertsEnabled = booleanPreferencesKey("alertsEnabled")
         val alertSound = booleanPreferencesKey("alertSound")
         val weightTarget = doublePreferencesKey("weightTarget")
@@ -150,6 +158,7 @@ class SettingsStore(private val context: Context) {
             pendingFromDate = p[K.pendingFromDate] ?: "",
             aiEnabled = p[K.aiEnabled] ?: false,
             aiApiKey = p[K.aiApiKey] ?: "",
+            mealPhotoEnabled = p[K.mealPhotoEnabled] ?: false,
             alertsEnabled = p[K.alertsEnabled] ?: true,
             alertSound = p[K.alertSound] ?: true,
             weightTarget = p[K.weightTarget] ?: 0.0,
@@ -292,6 +301,11 @@ class SettingsStore(private val context: Context) {
             p[K.aiEnabled] = enabled
             p[K.aiApiKey] = apiKey.trim()
         }
+    }
+
+    /** Éteindre l'assistant éteint aussi l'analyse photo : sans clé, elle n'a plus de sens. */
+    suspend fun setMealPhoto(enabled: Boolean) {
+        context.dataStore.edit { p -> p[K.mealPhotoEnabled] = enabled }
     }
 
     suspend fun setAlerts(enabled: Boolean, sound: Boolean) {

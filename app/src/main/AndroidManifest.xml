@@ -44,6 +44,10 @@
         <intent>
             <action android:name="android.intent.action.SET_ALARM" />
         </intent>
+        <!-- Photo d'un repas : trouver l'appareil photo du téléphone -->
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
         <package android:name="com.google.android.apps.healthdata" />
     </queries>
 
@@ -107,6 +111,22 @@
             android:launchMode="singleInstance"
             android:turnScreenOn="true"
             android:showWhenLocked="true" />
+
+        <!-- Photo d'un repas.
+
+             Android n'autorise plus une application à donner un chemin de fichier
+             brut à une autre : l'appareil photo doit recevoir une adresse
+             « content:// » délivrée ici. Le dossier partagé est un unique
+             sous-dossier du cache, vidé dès que la photo est partie. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.photos"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
         <receiver
             android:name=".notif.ReminderReceiver"

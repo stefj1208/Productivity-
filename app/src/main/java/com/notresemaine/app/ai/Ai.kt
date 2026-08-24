@@ -71,18 +71,63 @@ object Ai {
         text
     }
 
+    /**
+     * Même chose, mais avec une photo jointe.
+     *
+     * L'image part en clair vers le fournisseur, encodée en base64 dans la requête :
+     * c'est la seule fonction de l'application où autre chose que du texte quitte le
+     * téléphone. Elle n'est appelée que si l'option « analyse photo » est allumée,
+     * et la photo n'est jamais conservée ni synchronisée après la réponse.
+     */
+    suspend fun askWithImage(
+        apiKey: String,
+        system: String,
+        prompt: String,
+        imageBase64: String,
+        mimeType: String = "image/jpeg",
+        maxTokens: Int = 1500
+    ): String = withContext(Dispatchers.IO) {
+        val key = apiKey.trim()
+        if (key.isBlank()) throw AiException("Aucune clé enregistrée.")
+        if (imageBase64.isBlank()) throw AiException("Photo illisible.")
+        val text = when (providerOf(key)) {
+            ANTHROPIC -> askAnthropic(key, system, prompt, maxTokens, imageBase64, mimeType)
+            else -> askGoogle(key, system, prompt, maxTokens, imageBase64, mimeType)
+        }
+        if (text.isBlank()) throw AiException("Réponse vide de l'assistant.")
+        text
+    }
+
     // ----- Google (Gemini) -----
 
-    private fun askGoogle(key: String, system: String, prompt: String, maxTokens: Int): String {
+    private fun askGoogle(
+        key: String,
+        system: String,
+        prompt: String,
+        maxTokens: Int,
+        imageBase64: String = "",
+        mimeType: String = ""
+    ): String {
+        // L'image d'abord, la consigne ensuite : c'est l'ordre que le modèle
+        // interprète le mieux — il regarde, puis il lit ce qu'on lui demande.
+        val parts = JSONArray()
+        if (imageBase64.isNotBlank()) {
+            parts.put(
+                JSONObject().put(
+                    "inline_data",
+                    JSONObject()
+                        .put("mime_type", mimeType.ifBlank { "image/jpeg" })
+                        .put("data", imageBase64)
+                )
+            )
+        }
+        parts.put(JSONObject().put("text", prompt))
+
         val body = JSONObject().apply {
             put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", system))))
             put(
                 "contents",
-                JSONArray().put(
-                    JSONObject()
-                        .put("role", "user")
-                        .put("parts", JSONArray().put(JSONObject().put("text", prompt)))
-                )
+                JSONArray().put(JSONObject().put("role", "user").put("parts", parts))
             )
             put("generationConfig", JSONObject().put("maxOutputTokens", maxTokens))
         }
@@ -122,14 +167,37 @@ object Ai {
 
     // ----- Anthropic (Claude) -----
 
-    private fun askAnthropic(key: String, system: String, prompt: String, maxTokens: Int): String {
+    private fun askAnthropic(
+        key: String,
+        system: String,
+        prompt: String,
+        maxTokens: Int,
+        imageBase64: String = "",
+        mimeType: String = ""
+    ): String {
+        val content = JSONArray()
+        if (imageBase64.isNotBlank()) {
+            content.put(
+                JSONObject()
+                    .put("type", "image")
+                    .put(
+                        "source",
+                        JSONObject()
+                            .put("type", "base64")
+                            .put("media_type", mimeType.ifBlank { "image/jpeg" })
+                            .put("data", imageBase64)
+                    )
+            )
+        }
+        content.put(JSONObject().put("type", "text").put("text", prompt))
+
         val body = JSONObject().apply {
             put("model", ANTHROPIC_MODEL)
             put("max_tokens", maxTokens)
             put("system", system)
             put(
                 "messages",
-                JSONArray().put(JSONObject().put("role", "user").put("content", prompt))
+                JSONArray().put(JSONObject().put("role", "user").put("content", content))
             )
         }
         val request = Request.Builder()

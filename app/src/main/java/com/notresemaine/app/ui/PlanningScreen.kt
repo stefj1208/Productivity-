@@ -68,6 +68,7 @@ fun PlanningScreen(
     onHabits: () -> Unit,
     onSport: () -> Unit,
     onAsk: () -> Unit,
+    onMealLog: () -> Unit,
     onMethod: () -> Unit
 ) {
     val today = Dates.todayIso()
@@ -105,6 +106,8 @@ fun PlanningScreen(
     val weekPlan by remember(myId, weekStart) { vm.repo.db.weekPlans().byWeek(myId, weekStart) }
         .collectAsState(initial = null)
     val shopping by remember(weekStart) { vm.repo.db.shopping().forWeek(weekStart) }
+        .collectAsState(initial = emptyList())
+    val mealLogs by remember(today) { vm.repo.db.mealLogs().between(today, today) }
         .collectAsState(initial = emptyList())
 
     val targetWeek = Dates.planningTargetWeekIso()
@@ -370,17 +373,23 @@ fun PlanningScreen(
                 )
                 BigShortcut("🔁", "Habitudes", onHabits, Modifier.weight(1f))
             }
+            // « Repas » vient en tête : c'est le raccourci qu'on ouvre trois fois
+            // par jour, alors que les menus ne se remplissent qu'une fois par semaine.
+            val loggedToday = mealLogs.count { it.userId == myId }
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.padding(top = 10.dp)
             ) {
+                ShortcutIcon(
+                    "📷", "Repas", onMealLog, Modifier.weight(1f),
+                    badge = if (loggedToday > 0) "($loggedToday)" else null
+                )
                 ShortcutIcon("🍽️", "Menus", { onMenus(weekStart) }, Modifier.weight(1f))
                 ShortcutIcon(
                     "🛒", "Courses", { onShopping(weekStart) }, Modifier.weight(1f),
                     badge = if (remaining > 0) "($remaining)" else null
                 )
                 ShortcutIcon("🌅", "Rituel", onRitual, Modifier.weight(1f))
-                ShortcutIcon("🎯", "Objectifs", onGoals, Modifier.weight(1f))
             }
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -398,7 +407,9 @@ fun PlanningScreen(
                 ShortcutIcon("📅", "Agenda", onAgenda, Modifier.weight(1f))
                 ShortcutIcon("🏃", "Sport", onSport, Modifier.weight(1f))
                 ShortcutIcon("💬", "Chat", onAsk, Modifier.weight(1f))
-                ShortcutIcon("🔄", "Bilan", { onReview(targetWeek) }, Modifier.weight(1f))
+                // Le bilan a déjà son bouton en bas de l'écran : le répéter ici
+                // prenait la place d'un raccourci qui manquait.
+                ShortcutIcon("🎯", "Objectifs", onGoals, Modifier.weight(1f))
             }
             Spacer(Modifier.height(24.dp))
         }

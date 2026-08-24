@@ -16,8 +16,8 @@ android {
         targetSdk = 35
         // À incrémenter à chaque livraison : c'est ce que Réglages affiche,
         // et le seul moyen de vérifier quelle version est réellement installée.
-        versionCode = 21
-        versionName = "14.0"
+        versionCode = 22
+        versionName = "15.0"
     }
 
     /**
@@ -65,6 +65,10 @@ android {
 
 dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
+    // Photo d'un repas : l'orientation notée par l'appareil photo. Sans elle, une
+    // photo prise à la verticale part couchée et l'assistant décrit une assiette
+    // de travers.
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")

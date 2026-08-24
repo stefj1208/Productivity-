@@ -36,6 +36,7 @@ import com.notresemaine.app.data.AppSettings
 fun AssistantScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
     var enabled by remember(settings.aiEnabled) { mutableStateOf(settings.aiEnabled) }
     var key by remember(settings.aiApiKey) { mutableStateOf(settings.aiApiKey) }
+    var photo by remember(settings.mealPhotoEnabled) { mutableStateOf(settings.mealPhotoEnabled) }
     val active = settings.aiEnabled && settings.aiApiKey.isNotBlank()
 
     Column(
@@ -71,7 +72,8 @@ fun AssistantScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit)
                 "🍽️" to "Compose une semaine de menus sur mesure",
                 "🛒" to "Range les courses restées dans « Divers »",
                 "📵" to "Propose un pacte d'écran tenable, fondé sur votre usage réel",
-                "😴" to "Lit votre semaine de sommeil en une phrase"
+                "😴" to "Lit votre semaine de sommeil en une phrase",
+                "📷" to "Estime un repas d'après une photo (à activer séparément, ci-dessous)"
             ).forEach { (emoji, text) ->
                 Row(modifier = Modifier.padding(vertical = 6.dp)) {
                     Text(text = emoji, style = MaterialTheme.typography.bodyLarge)
@@ -144,6 +146,61 @@ fun AssistantScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit)
                     modifier = Modifier.padding(top = 8.dp)
                 )
             }
+
+            // ----- L'image, décision à part -----
+            //
+            // Cet interrupteur est séparé de celui du dessus, et c'est délibéré :
+            // allumer l'assistant fait sortir du texte qu'on a tapé soi-même,
+            // allumer celui-ci fait sortir une photo de sa cuisine. Ce n'est pas
+            // la même décision, donc ce n'est pas le même bouton.
+            Spacer(Modifier.height(28.dp))
+            SectionLabel("ANALYSE PHOTO DES REPAS")
+            Text(
+                text = "Photographier une assiette pour que l'assistant reconnaisse le plat " +
+                    "et estime les calories.",
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Text(
+                text = "C'est la seule fonction de l'application qui envoie une image hors du " +
+                    "téléphone. La photo n'est ni enregistrée ni synchronisée : elle est " +
+                    "effacée dès la réponse reçue. Seul le résultat est conservé.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+            Text(
+                text = "À savoir : avec une clé Google gratuite, Google indique pouvoir " +
+                    "utiliser ce qui est envoyé pour améliorer ses modèles. Ce n'est pas le " +
+                    "cas des clés payantes. À vous de juger ce que vous photographiez.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+            Text(
+                text = "Les calories lues sur une photo sont un ordre de grandeur, à ±25 % " +
+                    "environ : la photo ne dit pas la taille de l'assiette. L'application " +
+                    "affiche donc une fourchette, jamais un compte exact — et ne note personne.",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Autoriser l'envoi de photos",
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.weight(1f)
+                )
+                Switch(
+                    checked = photo && enabled,
+                    enabled = enabled,
+                    onCheckedChange = { photo = it }
+                )
+            }
             Spacer(Modifier.height(20.dp))
         }
 
@@ -152,6 +209,9 @@ fun AssistantScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit)
             enabled = !enabled || key.isNotBlank(),
             onClick = {
                 vm.saveAiSettings(enabled, key)
+                // Sans assistant, l'analyse photo n'a plus de moyen de fonctionner :
+                // on l'éteint aussi, plutôt que de laisser un réglage qui ment.
+                vm.saveMealPhotoSetting(photo && enabled)
                 onBack()
             },
             modifier = Modifier.padding(bottom = 16.dp)

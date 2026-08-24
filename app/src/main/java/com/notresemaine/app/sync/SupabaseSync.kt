@@ -178,6 +178,23 @@ data class MealDto(
     @SerialName("updated_at") val updatedAt: Long
 )
 
+/** Ce qui a été réellement mangé — distinct du menu prévu, qui est [MealDto]. */
+@Serializable
+data class MealLogDto(
+    val id: String,
+    @SerialName("user_id") val userId: String,
+    val date: String,
+    val slot: String,
+    val title: String,
+    val detail: String = "",
+    val calories: Int = 0,
+    @SerialName("calories_low") val caloriesLow: Int = 0,
+    @SerialName("calories_high") val caloriesHigh: Int = 0,
+    val source: String = "manuel",
+    val deleted: Boolean = false,
+    @SerialName("updated_at") val updatedAt: Long
+)
+
 @Serializable
 data class HabitDto(
     val id: String,
@@ -459,6 +476,15 @@ class SyncManager(private val repo: Repository) {
                         it.quantities, it.calories, it.deleted, it.updatedAt)
                 }, MealDto.serializer())
 
+                // Le journal du réel suit le même chemin que le menu : il appartient
+                // au couple, mais chaque écran ne montre que ses propres lignes.
+                val mealLogs = db.mealLogs().modifiedSince(s.lastPushTs).filter { it.userId == myId }
+                api.upsert("meal_logs", token, mealLogs.map {
+                    MealLogDto(it.id, it.userId, it.date, it.slot, it.title, it.detail,
+                        it.calories, it.caloriesLow, it.caloriesHigh, it.source,
+                        it.deleted, it.updatedAt)
+                }, MealLogDto.serializer())
+
                 val habits = db.habits().modifiedSince(s.lastPushTs).filter { it.userId == myId }
                 api.upsert("habits", token, habits.map {
                     HabitDto(it.id, it.userId, it.title, it.source, it.enabled,
@@ -511,6 +537,7 @@ class SyncManager(private val repo: Repository) {
                         encouragements.map { it.updatedAt } + goals.map { it.updatedAt } +
                         ritualLogs.map { it.updatedAt } + usageDays.map { it.updatedAt } +
                         graces.map { it.updatedAt } + meals.map { it.updatedAt } +
+                        mealLogs.map { it.updatedAt } +
                         shopping.map { it.updatedAt } + healthDays.map { it.updatedAt } +
                         houseItems.map { it.updatedAt } + weights.map { it.updatedAt } +
                         habits.map { it.updatedAt } +
@@ -571,6 +598,19 @@ class SyncManager(private val repo: Repository) {
                         db.meals().upsert(MealEntity(dto.id, dto.userId, dto.date, dto.slot,
                             dto.title, dto.ingredients, dto.quantities, dto.calories,
                             dto.deleted, dto.updatedAt))
+                    }
+                }
+                api.select("meal_logs", token, s.lastPullTs, MealLogDto.serializer()).forEach { dto ->
+                    pullMark = maxOf(pullMark, dto.updatedAt)
+                    val local = db.mealLogs().byId(dto.id)
+                    if (local == null || dto.updatedAt > local.updatedAt) {
+                        db.mealLogs().upsert(
+                            com.notresemaine.app.data.MealLogEntity(
+                                dto.id, dto.userId, dto.date, dto.slot, dto.title, dto.detail,
+                                dto.calories, dto.caloriesLow, dto.caloriesHigh, dto.source,
+                                dto.deleted, dto.updatedAt
+                            )
+                        )
                     }
                 }
                 api.select("habits", token, s.lastPullTs, HabitDto.serializer()).forEach { dto ->
