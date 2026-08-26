@@ -1,6 +1,7 @@
 package com.notresemaine.app.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -112,10 +113,11 @@ fun HouseScreen(
                     TabChip(
                         label = "${cat.emoji} ${cat.label}" + if (count > 0) " ($count)" else "",
                         selected = tab == cat.key,
+                        accent = accent,
                         onClick = { tab = cat.key }
                     )
                 }
-                TabChip(label = "＋", selected = false, onClick = { newCategory = true })
+                TabChip(label = "＋", selected = false, accent = accent, onClick = { newCategory = true })
             }
 
             Spacer(Modifier.height(20.dp))
@@ -444,11 +446,18 @@ private fun CategoryTab(
     }
 }
 
-/** Onglet interne : un tap, un état visible, jamais de balayage. */
+/**
+ * Onglet interne : un tap, un état visible, jamais de balayage.
+ *
+ * Même correction que pour les créneaux de repas : deux gris sombres voisins ne
+ * se distinguent pas en plein jour. La catégorie ouverte porte donc un contour à
+ * la couleur de la personne, et son texte dans cette couleur.
+ */
 @Composable
 private fun TabChip(
     label: String,
     selected: Boolean,
+    accent: androidx.compose.ui.graphics.Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -459,6 +468,11 @@ private fun TabChip(
                 else MaterialTheme.colorScheme.surface,
                 RoundedCornerShape(12.dp)
             )
+            .border(
+                width = if (selected) 2.dp else 1.dp,
+                color = if (selected) accent else MaterialTheme.colorScheme.surfaceVariant,
+                shape = RoundedCornerShape(12.dp)
+            )
             .clickable(onClick = onClick)
             .defaultMinSize(minHeight = 48.dp)
             .padding(horizontal = 14.dp, vertical = 12.dp),
@@ -467,8 +481,7 @@ private fun TabChip(
         Text(
             text = label,
             style = MaterialTheme.typography.labelLarge,
-            color = if (selected) MaterialTheme.colorScheme.onSurface
-            else MaterialTheme.colorScheme.onSurfaceVariant
+            color = if (selected) accent else MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }

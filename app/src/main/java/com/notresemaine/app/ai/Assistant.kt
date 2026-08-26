@@ -815,7 +815,44 @@ object Assistant {
         }
         val line = cleanLines(Ai.askWithImage(apiKey, PHOTO_SYSTEM, prompt, imageBase64, mimeType))
             .firstOrNull { it.contains('|') } ?: return null
+        return parseReading(line)
+    }
 
+    // ----- 21. Estimer un repas décrit à la main -----
+
+    private const val TEXT_SYSTEM =
+        "Tu estimes les calories d'un repas décrit en français par la personne qui l'a mangé. " +
+            "Réponds UNIQUEMENT par une seule ligne au format exact :\n" +
+            "plat|aliments|kcal_min|kcal_max|fiabilite\n" +
+            "plat = le nom du plat, 5 mots maximum, repris de la description. " +
+            "aliments = ce que contient la portion, séparé par des virgules, avec la quantité " +
+            "quand elle est donnée ou déductible (ex. : 150 g de pâtes, 100 g de saumon). " +
+            "kcal_min et kcal_max = la fourchette de calories d'UNE portion, deux entiers " +
+            "seuls, sans unité. Si la description ne dit pas la quantité, prends une portion " +
+            "adulte ordinaire et élargis la fourchette en conséquence. " +
+            "fiabilite = haute si les quantités sont données, moyenne si le plat est clair " +
+            "mais les quantités devinées, faible si la description est trop vague. " +
+            "Si ce n'est pas de la nourriture, réponds exactement : aucun|||| " +
+            "Pas de commentaire, pas de puce, une seule ligne."
+
+    /**
+     * Envoie : **uniquement la phrase que vous avez écrite**, par exemple « pâtes
+     * bolognaise et un verre de vin ». Ni le menu, ni vos objectifs, ni votre poids.
+     *
+     * Contrairement à la photo, aucune image ne part : c'est du texte, comme tous
+     * les autres boutons ✨ de l'application. Elle marche donc même quand l'option
+     * « analyse photo » reste éteinte.
+     */
+    suspend fun estimateMeal(apiKey: String, description: String): PhotoMeal? {
+        if (description.isBlank()) return null
+        val line = cleanLines(
+            Ai.ask(apiKey, TEXT_SYSTEM, "Repas : ${description.trim()}.", maxTokens = 600)
+        ).firstOrNull { it.contains('|') } ?: return null
+        return parseReading(line)
+    }
+
+    /** Lecture commune à la photo et à la description écrite. */
+    private fun parseReading(line: String): PhotoMeal? {
         val parts = fields(line)
         val title = parts.getOrElse(0) { "" }
         if (title.isBlank() || title.equals("aucun", ignoreCase = true)) return null
@@ -838,4 +875,5 @@ object Assistant {
             confidence = parts.getOrElse(4) { "" }.lowercase().trim().ifBlank { "moyenne" }
         )
     }
+
 }

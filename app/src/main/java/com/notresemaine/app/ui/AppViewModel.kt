@@ -1028,6 +1028,41 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         aiPhotoMeal.value = null
     }
 
+    /**
+     * L'estimation de calories d'un repas décrit à la main, dès qu'on a fini d'écrire.
+     *
+     * Volontairement **hors de [runAi]** : cette estimation part toute seule pendant
+     * la frappe. Une panne de réseau ferait alors apparaître un bandeau d'erreur à
+     * chaque pause au clavier — insupportable pour un confort facultatif. Ici, un
+     * échec ne dit rien : le champ reste vide, et on tape le chiffre soi-même.
+     */
+    val aiMealEstimate = MutableStateFlow<com.notresemaine.app.ai.Assistant.PhotoMeal?>(null)
+    val aiMealEstimating = MutableStateFlow(false)
+    private var estimateJob: kotlinx.coroutines.Job? = null
+
+    fun estimateMealCalories(description: String) {
+        estimateJob?.cancel()
+        if (description.trim().length < 3) {
+            aiMealEstimate.value = null
+            return
+        }
+        estimateJob = viewModelScope.launch {
+            val s = repo.settings.current()
+            if (!s.aiEnabled || s.aiApiKey.isBlank()) return@launch
+            aiMealEstimating.value = true
+            aiMealEstimate.value = runCatching {
+                com.notresemaine.app.ai.Assistant.estimateMeal(s.aiApiKey, description)
+            }.getOrNull()
+            aiMealEstimating.value = false
+        }
+    }
+
+    fun clearMealEstimate() {
+        estimateJob?.cancel()
+        aiMealEstimate.value = null
+        aiMealEstimating.value = false
+    }
+
     /** « J'ai jeûné ce repas » : une ligne à zéro calorie, assumée — ou son retrait. */
     fun toggleFasted(date: String, slot: String) {
         viewModelScope.launch {

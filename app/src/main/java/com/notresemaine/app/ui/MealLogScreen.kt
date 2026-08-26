@@ -5,6 +5,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -226,6 +227,7 @@ fun MealLogScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
                     SlotChip(
                         label = "${slotEmoji(key)}\n${label.take(9)}",
                         selected = slot == key,
+                        accent = accent,
                         onClick = { slot = key },
                         modifier = Modifier.weight(1f)
                     )
@@ -242,8 +244,18 @@ fun MealLogScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
                 )
             }
 
-            // ----- Le repas sauté, assumé -----
+            // ----- Les trois façons de noter ce repas -----
             //
+            // Elles sont maintenant côte à côte, juste sous le créneau choisi.
+            // « Noter à la main » vivait tout en bas, en petit texte, après la
+            // liste : c'est pourtant le seul moyen qui marche sans clé, sans
+            // réseau et sans photo. Il passe donc devant, en vrai bouton.
+            Spacer(Modifier.height(14.dp))
+            BigButton(
+                text = "✍️ Noter ce repas à la main",
+                onClick = { manual = true }
+            )
+
             // Sans cette touche, sauter un repas et oublier de le noter laissent
             // exactement la même trace : rien. C'est elle, et elle seule, qui
             // permet ensuite de parler de jeûne plutôt que de trou dans le journal.
@@ -312,11 +324,6 @@ fun MealLogScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
             mine.sortedBy { it.time }.forEach { log ->
                 MealLogRow(log, accent) { vm.deleteMealLog(log.id) }
             }
-
-            Spacer(Modifier.height(16.dp))
-            TextButton(onClick = { manual = true }, modifier = Modifier.height(48.dp)) {
-                Text("✍️ Noter un repas à la main")
-            }
             Spacer(Modifier.height(24.dp))
         }
 
@@ -350,7 +357,10 @@ fun MealLogScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
 
     if (manual) {
         ManualMealDialog(
+            vm = vm,
             slot = slot,
+            aiReady = aiReady,
+            accent = accent,
             onDismiss = { manual = false },
             onSave = { title, kcal, time ->
                 vm.logMeal(today, slot, title, "", kcal, kcal, "manuel", time)
@@ -491,37 +501,105 @@ private fun PhotoMealDialog(
     )
 }
 
+/**
+ * Noter un repas en l'écrivant — avec les calories estimées au fil de la frappe.
+ *
+ * Taper « pâtes bolognaise et un verre de vin » puis devoir chercher soi-même
+ * combien ça fait, c'est demander à l'utilisateur le travail que la machine sait
+ * faire. L'estimation part donc toute seule une seconde après la dernière lettre,
+ * remplit le champ, et **s'efface de la route dès qu'on y touche** : à partir de
+ * là, le chiffre est le vôtre et plus rien ne le réécrit.
+ *
+ * Aucune image ici : c'est du texte, comme les autres boutons ✨. Cela marche donc
+ * même quand l'option « analyse photo » est éteinte.
+ */
 @Composable
 private fun ManualMealDialog(
+    vm: AppViewModel,
     slot: String,
+    aiReady: Boolean,
+    accent: androidx.compose.ui.graphics.Color,
     onDismiss: () -> Unit,
     onSave: (String, Int, String) -> Unit
 ) {
     var title by remember { mutableStateOf("") }
     var kcal by remember { mutableStateOf("") }
     var time by remember { mutableStateOf(Fasting.defaultTime(slot)) }
+    // Dès que la personne écrit un chiffre, l'assistant se tait définitivement.
+    var kcalIsMine by remember { mutableStateOf(false) }
+
+    val estimate by vm.aiMealEstimate.collectAsState()
+    val estimating by vm.aiMealEstimating.collectAsState()
+
+    // Une seconde de silence au clavier vaut « j'ai fini d'écrire ». Sans cette
+    // pause, chaque lettre déclencherait une requête.
+    androidx.compose.runtime.LaunchedEffect(title, aiReady) {
+        if (!aiReady || kcalIsMine) return@LaunchedEffect
+        kotlinx.coroutines.delay(1000)
+        vm.estimateMealCalories(title)
+    }
+    androidx.compose.runtime.LaunchedEffect(estimate) {
+        val e = estimate ?: return@LaunchedEffect
+        if (!kcalIsMine && e.calories > 0) kcal = e.calories.toString()
+    }
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        onDispose { vm.clearMealEstimate() }
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("${slotEmoji(slot)} ${slotLabel(slot)}") },
         text = {
-            Column {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 VoiceField(
                     value = title,
                     onValueChange = { title = it },
                     label = "Qu'avez-vous mangé ?",
+                    placeholder = "Ex. : pâtes bolognaise et un verre de vin",
                     maxLines = 3,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
                     value = kcal,
-                    onValueChange = { kcal = it.filter { c -> c.isDigit() } },
-                    label = { Text("Calories environ (facultatif)") },
+                    onValueChange = {
+                        kcal = it.filter { c -> c.isDigit() }
+                        kcalIsMine = true
+                    },
+                    label = { Text("Calories environ") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     textStyle = MaterialTheme.typography.bodyLarge,
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                val e = estimate
+                Text(
+                    text = when {
+                        !aiReady -> "Assistant éteint : tapez le chiffre vous-même si vous " +
+                            "le connaissez, sinon laissez vide."
+                        estimating -> "L'assistant estime…"
+                        kcalIsMine -> "Votre chiffre — l'assistant ne le remplacera plus."
+                        e != null && e.caloriesHigh > 0 ->
+                            "Estimé entre ${e.caloriesLow} et ${e.caloriesHigh} kcal. " +
+                                "${e.confidenceLabel}. Corrigez si besoin."
+                        title.isBlank() -> "Décrivez le repas : les calories s'estiment toutes seules."
+                        else -> "Décrivez les quantités pour affiner (« 150 g de pâtes »)."
+                    },
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (e != null && !kcalIsMine) accent
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 6.dp)
+                )
+                if (e != null && e.items.isNotBlank() && !kcalIsMine) {
+                    Text(
+                        text = e.items,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+
                 Spacer(Modifier.height(12.dp))
                 TimeField(label = "À QUELLE HEURE ?", value = time, onChange = { time = it })
             }
@@ -650,11 +728,20 @@ private fun MealLogRow(
     }
 }
 
-/** Un créneau : quatre cases de même largeur, un tap, jamais de menu déroulant. */
+/**
+ * Un créneau : quatre cases de même largeur, un tap, jamais de menu déroulant.
+ *
+ * La sélection ne repose plus sur une nuance de gris. Deux fonds sombres voisins
+ * ne se distinguent pas sur un écran OLED en plein jour — c'est exactement ce
+ * qu'on nous a signalé. Elle passe donc par trois signaux à la fois : un contour
+ * à la couleur de la personne, le texte dans cette même couleur, et un fond plus
+ * clair. Un seul suffirait à la rigueur ; trois se voient à coup sûr.
+ */
 @Composable
 private fun SlotChip(
     label: String,
     selected: Boolean,
+    accent: androidx.compose.ui.graphics.Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -665,6 +752,11 @@ private fun SlotChip(
                 else MaterialTheme.colorScheme.surface,
                 RoundedCornerShape(14.dp)
             )
+            .border(
+                width = if (selected) 2.dp else 1.dp,
+                color = if (selected) accent else MaterialTheme.colorScheme.surfaceVariant,
+                shape = RoundedCornerShape(14.dp)
+            )
             .clickable(onClick = onClick)
             .defaultMinSize(minHeight = 64.dp)
             .padding(vertical = 10.dp, horizontal = 4.dp),
@@ -673,8 +765,7 @@ private fun SlotChip(
         Text(
             text = label,
             style = MaterialTheme.typography.labelMedium,
-            color = if (selected) MaterialTheme.colorScheme.onSurface
-            else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (selected) accent else MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )
     }
