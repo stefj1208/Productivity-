@@ -75,8 +75,9 @@ class BlockActivity : ComponentActivity() {
                         Spacer(Modifier.height(16.dp))
                         Text(
                             text = if (requested)
-                                "Demande envoyée. Elle sera reçue à la prochaine synchronisation " +
-                                    "du téléphone de ton binôme (à l'ouverture de son application)."
+                                "Demande envoyée. Son téléphone la regarde toutes les " +
+                                    "5 minutes, et le tien vérifie la réponse toutes les " +
+                                    "15 secondes tant qu'elle n'est pas arrivée."
                             else
                                 "C'était le pacte : seule l'autre moitié peut accorder une pause.",
                             style = MaterialTheme.typography.bodyLarge,

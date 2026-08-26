@@ -76,17 +76,35 @@ class BlockerService : Service() {
 
             val curfewOn = Curfew.isActive(s)
             val overLimit = s.dailyLimitMinutes > 0 && socialMinutes >= s.dailyLimitMinutes
-            if (overLimit || curfewOn) {
-                // Une pause accordée par le partenaire arrive par la synchronisation.
-                if (now - lastSync > 60_000) {
-                    lastSync = now
-                    sync.syncNow()
-                    val granted = repo.db.grace().lastGranted(s.myUserId, Dates.todayIso())
-                    if (granted != null) {
-                        val until = granted.updatedAt + granted.minutes * 60_000L
-                        if (until > s.graceUntil) repo.settings.setGraceUntil(until)
-                    }
+
+            // ----- À quelle cadence aller voir le serveur -----
+            //
+            // Une demande de pause est le seul moment où la synchronisation est
+            // *urgente* des deux côtés : l'un attend derrière un écran de blocage,
+            // l'autre doit répondre. Sans push (écarté avec Firebase), la seule
+            // réponse honnête est de regarder plus souvent — mais seulement
+            // pendant ces quelques minutes, pas toute la journée.
+            val iAmWaiting = s.myUserId.isNotBlank() &&
+                repo.db.grace().myPendingCount(s.myUserId, Dates.todayIso()) > 0
+            val interval = when {
+                iAmWaiting -> WAITING_SYNC_MS      // je suis bloqué, j'attends la réponse
+                overLimit || curfewOn -> 60_000L   // je peux l'être d'un instant à l'autre
+                else -> IDLE_SYNC_MS               // au cas où l'autre demanderait
+            }
+            if (now - lastSync > interval) {
+                lastSync = now
+                sync.syncNow()
+                // Une demande arrivée de l'autre téléphone s'annonce tout de suite,
+                // même si l'application n'a pas été ouverte depuis des heures.
+                com.notresemaine.app.notif.Announcements.afterSync(applicationContext, repo)
+                val granted = repo.db.grace().lastGranted(s.myUserId, Dates.todayIso())
+                if (granted != null) {
+                    val until = granted.updatedAt + granted.minutes * 60_000L
+                    if (until > s.graceUntil) repo.settings.setGraceUntil(until)
                 }
+            }
+
+            if (overLimit || curfewOn) {
                 val graceActive = repo.settings.current().graceUntil > now
                 if (!graceActive) {
                     val foreground = Usage.foregroundPackage(this)
@@ -237,6 +255,18 @@ class BlockerService : Service() {
 
         /** Les moments où l'on peut encore changer d'avis. */
         private val THRESHOLDS = listOf(25, 50, 75)
+
+        /**
+         * Cadences de synchronisation du service.
+         *
+         * [WAITING_SYNC_MS] ne s'applique que tant qu'une demande de pause est
+         * réellement en attente : quelques minutes par jour au pire. [IDLE_SYNC_MS]
+         * est le rythme de veille, qui sert à recevoir la demande de l'autre sans
+         * attendre l'heure du travail de fond. Le reste du temps, le service ne
+         * touche pas au réseau.
+         */
+        private const val WAITING_SYNC_MS = 15_000L
+        private const val IDLE_SYNC_MS = 5 * 60_000L
 
         /** Vrai tant que la surveillance tourne : affiché dans l'écran du Pacte. */
         @Volatile

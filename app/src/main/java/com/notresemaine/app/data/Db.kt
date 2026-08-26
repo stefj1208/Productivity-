@@ -538,6 +538,9 @@ interface GraceDao {
     @Query("SELECT * FROM grace_requests WHERE toUser = :userId AND status = 'pending' AND deleted = 0 ORDER BY updatedAt DESC LIMIT 3")
     suspend fun pendingForMe(userId: String): List<GraceRequestEntity>
 
+    @Query("SELECT COUNT(*) FROM grace_requests WHERE fromUser = :userId AND date = :date AND status = 'pending' AND deleted = 0")
+    suspend fun myPendingCount(userId: String, date: String): Int
+
     @Query("SELECT * FROM grace_requests WHERE id = :id")
     suspend fun byId(id: String): GraceRequestEntity?
 

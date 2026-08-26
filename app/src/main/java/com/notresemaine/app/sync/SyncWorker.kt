@@ -26,13 +26,19 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
 
     companion object {
         fun schedule(context: Context) {
-            val request = PeriodicWorkRequestBuilder<SyncWorker>(1, TimeUnit.HOURS)
+            // Un quart d'heure, le plus court qu'Android autorise pour un travail
+            // périodique. C'est ce qui borne l'attente quand le Pacte n'est pas
+            // actif sur le téléphone d'en face : dans ce cas aucun service ne
+            // tourne, et ceci est le seul chemin par lequel une demande arrive.
+            val request = PeriodicWorkRequestBuilder<SyncWorker>(15, TimeUnit.MINUTES)
                 .setConstraints(
                     Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
                 )
                 .build()
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-                "sync", ExistingPeriodicWorkPolicy.KEEP, request
+                // UPDATE et non KEEP : sinon l'ancienne cadence d'une heure,
+                // déjà enregistrée sur les téléphones, survivrait à la mise à jour.
+                "sync", ExistingPeriodicWorkPolicy.UPDATE, request
             )
         }
     }
