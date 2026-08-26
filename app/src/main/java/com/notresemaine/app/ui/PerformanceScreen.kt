@@ -56,6 +56,8 @@ fun PerformanceScreen(
     val mealLogs by remember(weekStart) {
         vm.repo.db.mealLogs().between(Dates.weekStartIsoOffset(-3), Dates.todayIso())
     }.collectAsState(initial = emptyList())
+    val weights by remember { vm.repo.db.weights().all() }
+        .collectAsState(initial = emptyList())
 
     val partner = profiles.firstOrNull { it.id != myId }
     val myTasks = weekTasks.filter { it.userId == myId }
@@ -149,19 +151,104 @@ fun PerformanceScreen(
             )
         }
 
+        // ----- Ce qu'on a vraiment mangé -----
+        //
+        // Les calories arrivent avant le jeûne : c'est le chiffre qu'on vient
+        // chercher. La courbe répond à « ça monte ou ça descend », que quatre
+        // tuiles de chiffres ne diraient jamais.
+        val myMeals = mealLogs.filter { it.userId == myId }
+        val weekMeals = myMeals.filter { it.date >= days.first() && it.date <= days.last() }
+        val eatenDays = weekMeals.map { it.date }.distinct()
+        val avgKcal = if (eatenDays.isEmpty()) 0
+        else weekMeals.sumOf { it.calories } / eatenDays.size
+        val plannedKcal = settings.dailyCalories
+
+        if (myMeals.isNotEmpty()) {
+            Spacer(Modifier.height(24.dp))
+            SectionLabel("CE QUE J'AI MANGÉ")
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                KpiTile(
+                    value = if (avgKcal == 0) "—" else "$avgKcal",
+                    label = "kcal / jour noté",
+                    accent = accent,
+                    modifier = Modifier.weight(1f)
+                )
+                KpiTile(
+                    value = "${eatenDays.size}/7",
+                    label = "jours notés",
+                    accent = accent,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            // Quatre semaines de calories : c'est la tendance qui parle, pas le
+            // chiffre d'un jour. Les jours sans rien de noté restent à zéro et
+            // sont ignorés par la courbe, qui ne relie que les vraies mesures.
+            val range = (0..27).map { java.time.LocalDate.now().minusDays((27 - it).toLong()).toString() }
+            val serie = com.notresemaine.app.data.Nutrition.caloriesPerDay(myMeals, range)
+            Spacer(Modifier.height(12.dp))
+            LineChart(
+                values = serie,
+                labels = listOf(Dates.shortLabel(range.first()), Dates.shortLabel(range.last())),
+                accent = accent,
+                valueLabel = { "${it.toInt()} kcal" },
+                target = if (plannedKcal > 0) plannedKcal.toFloat() else null
+            )
+            Text(
+                text = "Le trait horizontal est votre besoin quotidien ($plannedKcal kcal). " +
+                    "Un jour sans rien de noté n'est pas un jour à zéro : il est simplement absent.",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 6.dp)
+            )
+
+            val nutrition = com.notresemaine.app.data.Nutrition.summarize(weekMeals)
+            if (nutrition.hasData) {
+                Spacer(Modifier.height(20.dp))
+                SectionLabel("CE QU'IL Y AVAIT DEDANS")
+                MacroBar(nutrition, accent)
+            }
+        }
+
+        // ----- Le poids -----
+        val myWeights = weights.filter { it.userId == myId && !it.deleted }.sortedBy { it.date }
+        if (myWeights.size >= 2) {
+            Spacer(Modifier.height(24.dp))
+            SectionLabel("MON POIDS")
+            LineChart(
+                values = myWeights.map { it.kilos.toFloat() },
+                labels = listOf(
+                    Dates.shortLabel(myWeights.first().date),
+                    Dates.shortLabel(myWeights.last().date)
+                ),
+                accent = accent,
+                valueLabel = { String.format(java.util.Locale.FRANCE, "%.1f kg", it) },
+                target = settings.weightTarget.takeIf { it > 0 }?.toFloat()
+            )
+            val delta = myWeights.last().kilos - myWeights.first().kilos
+            Text(
+                text = String.format(
+                    java.util.Locale.FRANCE,
+                    "%+.1f kg depuis la première pesée, sur %d mesures.",
+                    delta, myWeights.size
+                ),
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(top = 6.dp)
+            )
+        }
+
         // ----- Le jeûne -----
         //
         // Rien n'est saisi à la main : ces chiffres se déduisent des heures de
         // repas notées. La section n'apparaît donc que si l'on a commencé à noter,
         // et jamais comme un objectif à tenir — c'est un constat, pas une cible.
-        val myMealLogs = mealLogs.filter { it.userId == myId }
-        val weekLogs = myMealLogs.filter { it.date >= days.first() && it.date <= days.last() }
-        val longestFast = com.notresemaine.app.data.Fasting.longest(myMealLogs)
-        val currentFast = com.notresemaine.app.data.Fasting.currentMinutes(myMealLogs)
+        val weekLogs = myMeals.filter { it.date >= days.first() && it.date <= days.last() }
+        val longestFast = com.notresemaine.app.data.Fasting.longest(myMeals)
+        val currentFast = com.notresemaine.app.data.Fasting.currentMinutes(myMeals)
         val fastDays = com.notresemaine.app.data.Fasting.fullDays(weekLogs, days).size
         val skipped = weekLogs.count { it.source == com.notresemaine.app.data.Fasting.SOURCE }
 
-        if (myMealLogs.isNotEmpty()) {
+        if (myMeals.isNotEmpty()) {
             Spacer(Modifier.height(24.dp))
             SectionLabel("JEÛNE")
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

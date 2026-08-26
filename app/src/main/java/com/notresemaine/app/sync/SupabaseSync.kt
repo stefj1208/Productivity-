@@ -174,6 +174,10 @@ data class MealDto(
     val ingredients: String,
     val quantities: String = "",
     val calories: Int = 0,
+    val protein: Int = 0,
+    val carbs: Int = 0,
+    val fat: Int = 0,
+    val fiber: Int = 0,
     val deleted: Boolean = false,
     @SerialName("updated_at") val updatedAt: Long
 )
@@ -192,6 +196,10 @@ data class MealLogDto(
     @SerialName("calories_high") val caloriesHigh: Int = 0,
     val source: String = "manuel",
     val time: String = "",
+    val protein: Int = 0,
+    val carbs: Int = 0,
+    val fat: Int = 0,
+    val fiber: Int = 0,
     val deleted: Boolean = false,
     @SerialName("updated_at") val updatedAt: Long
 )
@@ -474,17 +482,24 @@ class SyncManager(private val repo: Repository) {
                 val meals = db.meals().modifiedSince(s.lastPushTs)
                 api.upsert("meals", token, meals.map {
                     MealDto(it.id, myId, it.date, it.slot, it.title, it.ingredients,
-                        it.quantities, it.calories, it.deleted, it.updatedAt)
+                        it.quantities, it.calories, it.protein, it.carbs, it.fat, it.fiber,
+                        it.deleted, it.updatedAt)
                 }, MealDto.serializer())
 
-                // Le journal du réel suit le même chemin que le menu : il appartient
-                // au couple, mais chaque écran ne montre que ses propres lignes.
-                val mealLogs = db.mealLogs().modifiedSince(s.lastPushTs).filter { it.userId == myId }
-                api.upsert("meal_logs", token, mealLogs.map {
-                    MealLogDto(it.id, it.userId, it.date, it.slot, it.title, it.detail,
-                        it.calories, it.caloriesLow, it.caloriesHigh, it.source,
-                        it.time, it.deleted, it.updatedAt)
-                }, MealLogDto.serializer())
+                // Le menu est commun ; l'assiette réelle ne l'est pas. Sauter un
+                // repas ou se resservir relève du même registre que le poids : ça
+                // ne part que si son propriétaire a coché le partage.
+                val mealLogs = if (s.mealLogShared) {
+                    db.mealLogs().modifiedSince(s.lastPushTs).filter { it.userId == myId }
+                } else emptyList()
+                if (mealLogs.isNotEmpty()) {
+                    api.upsert("meal_logs", token, mealLogs.map {
+                        MealLogDto(it.id, it.userId, it.date, it.slot, it.title, it.detail,
+                            it.calories, it.caloriesLow, it.caloriesHigh, it.source,
+                            it.time, it.protein, it.carbs, it.fat, it.fiber,
+                            it.deleted, it.updatedAt)
+                    }, MealLogDto.serializer())
+                }
 
                 val habits = db.habits().modifiedSince(s.lastPushTs).filter { it.userId == myId }
                 api.upsert("habits", token, habits.map {
@@ -598,6 +613,7 @@ class SyncManager(private val repo: Repository) {
                     if (local == null || dto.updatedAt > local.updatedAt) {
                         db.meals().upsert(MealEntity(dto.id, dto.userId, dto.date, dto.slot,
                             dto.title, dto.ingredients, dto.quantities, dto.calories,
+                            dto.protein, dto.carbs, dto.fat, dto.fiber,
                             dto.deleted, dto.updatedAt))
                     }
                 }
@@ -609,7 +625,8 @@ class SyncManager(private val repo: Repository) {
                             com.notresemaine.app.data.MealLogEntity(
                                 dto.id, dto.userId, dto.date, dto.slot, dto.title, dto.detail,
                                 dto.calories, dto.caloriesLow, dto.caloriesHigh, dto.source,
-                                dto.time, dto.deleted, dto.updatedAt
+                                dto.time, dto.protein, dto.carbs, dto.fat, dto.fiber,
+                                dto.deleted, dto.updatedAt
                             )
                         )
                     }

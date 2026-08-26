@@ -26,6 +26,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -324,6 +325,43 @@ fun MealLogScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
             mine.sortedBy { it.time }.forEach { log ->
                 MealLogRow(log, accent) { vm.deleteMealLog(log.id) }
             }
+
+            // ----- Ce qu'il y avait dedans -----
+            val todayNutrition = com.notresemaine.app.data.Nutrition.summarize(mine)
+            if (todayNutrition.hasData) {
+                Spacer(Modifier.height(20.dp))
+                SectionLabel("CE QU'IL Y AVAIT DEDANS")
+                MacroBar(todayNutrition, accent)
+            }
+
+            // ----- Partager, ou pas -----
+            //
+            // Le menu se décide à deux ; l'assiette réelle non. Sauter un repas,
+            // se resservir, grignoter à 23 h : c'est du même ordre que le poids.
+            Spacer(Modifier.height(24.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Partager avec mon binôme",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = if (settings.mealLogShared)
+                            "Vos repas notés partent vers l'espace commun."
+                        else "Vos repas restent sur ce téléphone. Le menu, lui, reste " +
+                            "partagé — c'est ce qui est vraiment mangé qui ne l'est pas.",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = settings.mealLogShared,
+                    onCheckedChange = { vm.saveMealLogShared(it) }
+                )
+            }
             Spacer(Modifier.height(24.dp))
         }
 
@@ -348,7 +386,11 @@ fun MealLogScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
             proposal = p,
             accent = accent,
             onSave = { title, detail, low, high, time ->
-                vm.logMeal(p.date, p.slot, title, detail, low, high, "photo", time)
+                val r = p.reading
+                vm.logMeal(
+                    p.date, p.slot, title, detail, low, high, "photo", time,
+                    r.protein, r.carbs, r.fat, r.fiber
+                )
                 note = ""
             },
             onDismiss = { vm.clearPhotoMeal() }
@@ -362,8 +404,11 @@ fun MealLogScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
             aiReady = aiReady,
             accent = accent,
             onDismiss = { manual = false },
-            onSave = { title, kcal, time ->
-                vm.logMeal(today, slot, title, "", kcal, kcal, "manuel", time)
+            onSave = { title, kcal, time, macros ->
+                vm.logMeal(
+                    today, slot, title, "", kcal, kcal, "manuel", time,
+                    macros[0], macros[1], macros[2], macros[3]
+                )
                 manual = false
             }
         )
@@ -471,6 +516,16 @@ private fun PhotoMealDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 8.dp)
                 )
+                if (r.protein > 0 || r.carbs > 0 || r.fat > 0) {
+                    Text(
+                        text = "🥗 ${r.protein} g protéines · ${r.carbs} g glucides · " +
+                            "${r.fat} g lipides · ${r.fiber} g fibres",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+
                 Spacer(Modifier.height(12.dp))
                 // L'heure n'est pas un détail administratif : c'est elle qui rend
                 // le jeûne mesurable. Pré-remplie à l'heure habituelle du créneau.
@@ -520,7 +575,7 @@ private fun ManualMealDialog(
     aiReady: Boolean,
     accent: androidx.compose.ui.graphics.Color,
     onDismiss: () -> Unit,
-    onSave: (String, Int, String) -> Unit
+    onSave: (String, Int, String, List<Int>) -> Unit
 ) {
     var title by remember { mutableStateOf("") }
     var kcal by remember { mutableStateOf("") }
@@ -599,6 +654,15 @@ private fun ManualMealDialog(
                         modifier = Modifier.padding(top = 4.dp)
                     )
                 }
+                if (e != null && (e.protein > 0 || e.carbs > 0 || e.fat > 0)) {
+                    Text(
+                        text = "🥗 ${e.protein} g protéines · ${e.carbs} g glucides · " +
+                            "${e.fat} g lipides · ${e.fiber} g fibres",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
 
                 Spacer(Modifier.height(12.dp))
                 TimeField(label = "À QUELLE HEURE ?", value = time, onChange = { time = it })
@@ -606,7 +670,15 @@ private fun ManualMealDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { onSave(title, kcal.toIntOrNull() ?: 0, time) },
+                onClick = {
+                    val e = estimate
+                    // Les nutriments viennent de la même estimation que les calories.
+                    // Si la personne a corrigé le chiffre à la main, on les garde
+                    // quand même : elle a ajusté la quantité, pas la nature du plat.
+                    val macros = if (e == null) listOf(0, 0, 0, 0)
+                    else listOf(e.protein, e.carbs, e.fat, e.fiber)
+                    onSave(title, kcal.toIntOrNull() ?: 0, time, macros)
+                },
                 enabled = title.isNotBlank()
             ) { Text("Noter") }
         },

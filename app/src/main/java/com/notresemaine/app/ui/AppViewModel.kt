@@ -1012,11 +1012,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         caloriesLow: Int,
         caloriesHigh: Int,
         source: String,
-        time: String = ""
+        time: String = "",
+        protein: Int = 0,
+        carbs: Int = 0,
+        fat: Int = 0,
+        fiber: Int = 0
     ) {
         viewModelScope.launch {
             repo.saveMealLog(
-                myId(), date, slot, title, detail, caloriesLow, caloriesHigh, source, time
+                myId(), date, slot, title, detail, caloriesLow, caloriesHigh, source, time,
+                protein, carbs, fat, fiber
             )
             aiPhotoMeal.value = null
             requestSync()
@@ -1087,6 +1092,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             repo.deleteMealLog(id)
             requestSync()
+        }
+    }
+
+    /** Le journal du réel part-il vers l'espace commun ? Éteint par défaut. */
+    fun saveMealLogShared(shared: Boolean) {
+        viewModelScope.launch {
+            repo.settings.setMealLogShared(shared)
+            if (shared) requestSync()
+            toast(
+                if (shared) "Vos repas seront visibles par votre binôme"
+                else "Vos repas restent sur ce téléphone"
+            )
         }
     }
 

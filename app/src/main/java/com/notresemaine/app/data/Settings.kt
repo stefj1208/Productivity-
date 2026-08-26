@@ -59,6 +59,14 @@ data class AppSettings(
      * décision, donc ce n'est pas le même interrupteur.
      */
     val mealPhotoEnabled: Boolean = false,
+    /**
+     * Ce qu'on a réellement mangé part-il vers l'espace commun ?
+     *
+     * Le menu est décidé à deux, donc partagé — mais l'assiette réelle, non.
+     * Sauter un repas, se resservir, grignoter à 23 h : c'est du même ordre que
+     * le poids, et ça se partage seulement si on le décide. Éteint par défaut.
+     */
+    val mealLogShared: Boolean = false,
     // Rappels sonores : une alarme plein écran à chaque action à faire
     val alertsEnabled: Boolean = true,
     val alertSound: Boolean = true,
@@ -132,6 +140,7 @@ class SettingsStore(private val context: Context) {
         val aiEnabled = booleanPreferencesKey("aiEnabled")
         val aiApiKey = stringPreferencesKey("aiApiKey")
         val mealPhotoEnabled = booleanPreferencesKey("mealPhotoEnabled")
+        val mealLogShared = booleanPreferencesKey("mealLogShared")
         val alertsEnabled = booleanPreferencesKey("alertsEnabled")
         val alertSound = booleanPreferencesKey("alertSound")
         val weightTarget = doublePreferencesKey("weightTarget")
@@ -184,6 +193,7 @@ class SettingsStore(private val context: Context) {
             aiEnabled = p[K.aiEnabled] ?: false,
             aiApiKey = p[K.aiApiKey] ?: "",
             mealPhotoEnabled = p[K.mealPhotoEnabled] ?: false,
+            mealLogShared = p[K.mealLogShared] ?: false,
             alertsEnabled = p[K.alertsEnabled] ?: true,
             alertSound = p[K.alertSound] ?: true,
             weightTarget = p[K.weightTarget] ?: 0.0,
@@ -362,6 +372,10 @@ class SettingsStore(private val context: Context) {
             } else emptyList()
             p[K.usageAlertsDone] = "$date:" + (done + percent.toString()).distinct().joinToString(",")
         }
+    }
+
+    suspend fun setMealLogShared(shared: Boolean) {
+        context.dataStore.edit { p -> p[K.mealLogShared] = shared }
     }
 
     /** Éteindre l'assistant éteint aussi l'analyse photo : sans clé, elle n'a plus de sens. */

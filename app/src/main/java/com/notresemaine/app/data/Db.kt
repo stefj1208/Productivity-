@@ -189,6 +189,15 @@ data class MealEntity(
     val quantities: String = "",
     /** Calories par personne. 0 = non renseigné, jamais affiché comme un zéro. */
     val calories: Int = 0,
+    /**
+     * Macronutriments d'une portion, en grammes — renseignés par l'assistant quand
+     * il compose le menu. Ils suivent le plat lorsqu'on coche « j'ai mangé ça » :
+     * sans eux, le chemin le plus emprunté ne dirait rien de la nutrition.
+     */
+    val protein: Int = 0,
+    val carbs: Int = 0,
+    val fat: Int = 0,
+    val fiber: Int = 0,
     val deleted: Boolean = false,
     val updatedAt: Long
 )
@@ -229,6 +238,18 @@ data class MealLogEntity(
      * on saurait qu'on a sauté le déjeuner sans pouvoir dire combien de temps.
      */
     val time: String = "",
+    /**
+     * Les macronutriments d'une portion, en grammes.
+     *
+     * Les calories disent combien ; celles-ci disent quoi. Deux repas à 700 kcal
+     * n'ont rien à voir selon qu'ils apportent 40 g de protéines ou 3. Zéro
+     * signifie « inconnu », jamais « aucun » : les moyennes ne comptent donc que
+     * les repas renseignés.
+     */
+    val protein: Int = 0,
+    val carbs: Int = 0,
+    val fat: Int = 0,
+    val fiber: Int = 0,
     val deleted: Boolean = false,
     val updatedAt: Long
 )
@@ -666,7 +687,7 @@ interface HealthDao {
         HouseItemEntity::class, WeightEntity::class, HabitEntity::class,
         MealLogEntity::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = false
 )
 abstract class AppDb : RoomDatabase() {
@@ -732,6 +753,19 @@ abstract class AppDb : RoomDatabase() {
             object : Migration(9, 10) {
                 override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                     db.execSQL("ALTER TABLE meal_logs ADD COLUMN time TEXT NOT NULL DEFAULT ''")
+                }
+            },
+            // 10 → 11 : les macronutriments. Les calories disent combien, elles
+            // disent quoi — deux repas à 700 kcal n'ont rien à voir.
+            object : Migration(10, 11) {
+                override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                    listOf("meal_logs", "meals").forEach { table ->
+                        listOf("protein", "carbs", "fat", "fiber").forEach { column ->
+                            db.execSQL(
+                                "ALTER TABLE $table ADD COLUMN $column INTEGER NOT NULL DEFAULT 0"
+                            )
+                        }
+                    }
                 }
             }
         )

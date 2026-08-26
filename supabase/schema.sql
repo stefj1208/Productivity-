@@ -234,6 +234,17 @@ create table if not exists meal_logs (
 -- V16 : l'heure du repas, indispensable pour mesurer un jeûne.
 alter table meal_logs add column if not exists time text not null default '';
 
+-- V17 : les macronutriments. Les calories disent combien, ceux-ci disent quoi.
+-- 0 signifie « inconnu », jamais « aucun » : les moyennes ignorent ces lignes.
+alter table meal_logs add column if not exists protein int not null default 0;
+alter table meal_logs add column if not exists carbs int not null default 0;
+alter table meal_logs add column if not exists fat int not null default 0;
+alter table meal_logs add column if not exists fiber int not null default 0;
+alter table meals add column if not exists protein int not null default 0;
+alter table meals add column if not exists carbs int not null default 0;
+alter table meals add column if not exists fat int not null default 0;
+alter table meals add column if not exists fiber int not null default 0;
+
 alter table profiles add column if not exists pacte_enabled boolean not null default false;
 alter table profiles add column if not exists daily_limit_minutes int not null default 45;
 alter table profiles add column if not exists curfew_enabled boolean not null default false;

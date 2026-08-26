@@ -545,7 +545,11 @@ class Repository private constructor(context: Context) {
         title: String,
         ingredients: String,
         quantities: String = "",
-        calories: Int = 0
+        calories: Int = 0,
+        protein: Int = 0,
+        carbs: Int = 0,
+        fat: Int = 0,
+        fiber: Int = 0
     ) {
         db.meals().upsert(
             MealEntity(
@@ -557,6 +561,10 @@ class Repository private constructor(context: Context) {
                 ingredients = ingredients.trim(),
                 quantities = quantities.trim(),
                 calories = calories.coerceAtLeast(0),
+                protein = protein.coerceAtLeast(0),
+                carbs = carbs.coerceAtLeast(0),
+                fat = fat.coerceAtLeast(0),
+                fiber = fiber.coerceAtLeast(0),
                 deleted = title.isBlank() && ingredients.isBlank(),
                 updatedAt = now()
             )
@@ -573,7 +581,8 @@ class Repository private constructor(context: Context) {
         saveMeal(
             userId, date, slot,
             suggestion.title, suggestion.ingredients,
-            suggestion.quantities, suggestion.calories
+            suggestion.quantities, suggestion.calories,
+            suggestion.protein, suggestion.carbs, suggestion.fat, suggestion.fiber
         )
     }
 
@@ -596,6 +605,10 @@ class Repository private constructor(context: Context) {
         caloriesHigh: Int,
         source: String,
         time: String = "",
+        protein: Int = 0,
+        carbs: Int = 0,
+        fat: Int = 0,
+        fiber: Int = 0,
         id: String? = null
     ) {
         val low = caloriesLow.coerceAtLeast(0)
@@ -613,6 +626,10 @@ class Repository private constructor(context: Context) {
                 caloriesHigh = high,
                 source = source,
                 time = time.ifBlank { Fasting.defaultTime(slot) },
+                protein = protein.coerceAtLeast(0),
+                carbs = carbs.coerceAtLeast(0),
+                fat = fat.coerceAtLeast(0),
+                fiber = fiber.coerceAtLeast(0),
                 updatedAt = now()
             )
         )
@@ -696,6 +713,10 @@ class Repository private constructor(context: Context) {
                 caloriesHigh = planned.calories,
                 source = "menu",
                 time = Fasting.defaultTime(slot),
+                protein = planned.protein,
+                carbs = planned.carbs,
+                fat = planned.fat,
+                fiber = planned.fiber,
                 updatedAt = now()
             )
         )
@@ -767,6 +788,11 @@ class Repository private constructor(context: Context) {
                 if (fullDays.isNotEmpty()) append(" Jours de jeûne complet : ${fullDays.size}.")
             }
             Fasting.longest(all)?.let { append(" Plus longue période sans manger : ${it.label}.") }
+            val nutrition = Nutrition.forAi(Nutrition.summarize(all))
+            if (nutrition.isNotBlank()) {
+                if (isNotEmpty()) append(" ")
+                append(nutrition)
+            }
         }
     }
 
@@ -812,7 +838,10 @@ class Repository private constructor(context: Context) {
         suggestions.forEach { s ->
             val date = days.getOrNull(s.dayIndex) ?: return@forEach
             if ("$date:${s.slot}" in existing) return@forEach
-            saveMeal(userId, date, s.slot, s.title, s.ingredients, s.quantities, s.calories)
+            saveMeal(
+                userId, date, s.slot, s.title, s.ingredients, s.quantities, s.calories,
+                s.protein, s.carbs, s.fat, s.fiber
+            )
             applied++
         }
         return applied

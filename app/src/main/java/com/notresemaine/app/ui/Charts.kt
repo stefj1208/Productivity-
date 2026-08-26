@@ -233,6 +233,73 @@ fun Gauge(
     }
 }
 
+/**
+ * La répartition d'une journée entre protéines, glucides et lipides.
+ *
+ * Une seule barre en trois segments plutôt que trois jauges : la question n'est
+ * pas « combien de protéines » dans l'absolu, mais quelle place elles prennent
+ * par rapport au reste. Les trois nuances viennent de la couleur de la personne,
+ * et chaque segment est doublé de son intitulé écrit — une couleur seule ne se
+ * lit pas quand on distingue mal les teintes.
+ *
+ * Aucun seuil, aucune zone rouge : la barre décrit, elle ne corrige pas.
+ */
+@Composable
+fun MacroBar(
+    summary: com.notresemaine.app.data.Nutrition.Summary,
+    accent: Color,
+    modifier: Modifier = Modifier
+) {
+    val (p, c, f) = summary.split
+    if (p + c + f <= 0) return
+    val track = MaterialTheme.colorScheme.surfaceVariant
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(18.dp)
+        ) {
+            val r = 9f
+            drawRoundRect(
+                color = track, size = size,
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(r, r)
+            )
+            var x = 0f
+            listOf(p to 1f, c to 0.62f, f to 0.34f).forEach { (percent, alpha) ->
+                val w = size.width * percent / 100f
+                if (w > 0f) {
+                    drawRect(
+                        color = accent.copy(alpha = alpha),
+                        topLeft = Offset(x, 0f),
+                        size = Size(w, size.height)
+                    )
+                    x += w
+                }
+            }
+        }
+        Text(
+            text = "$p % protéines · $c % glucides · $f % lipides",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 6.dp)
+        )
+        Text(
+            text = "${summary.protein} g · ${summary.carbs} g · ${summary.fat} g · " +
+                "${summary.fiber} g de fibres, par jour noté",
+            style = MaterialTheme.typography.bodyLarge
+        )
+        val ignored = summary.mealsIgnored
+        Text(
+            text = com.notresemaine.app.data.Nutrition.observation(summary) +
+                if (ignored > 0) " ($ignored repas sans détail nutritionnel, non comptés.)" else "",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp)
+        )
+    }
+}
+
 /** Un grand chiffre et son intitulé : le chiffre d'abord, le mot ensuite. */
 @Composable
 fun BigStat(

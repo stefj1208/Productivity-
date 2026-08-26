@@ -41,18 +41,25 @@ object Assistant {
         val title: String,
         val ingredients: String,
         val quantities: String = "",
-        val calories: Int = 0
+        val calories: Int = 0,
+        /** Grammes par assiette. 0 = le modèle n'a rien dit, pas « aucun ». */
+        val protein: Int = 0,
+        val carbs: Int = 0,
+        val fat: Int = 0,
+        val fiber: Int = 0
     )
 
     private fun menuSystem(people: Int): String =
         "Tu proposes des menus familiaux français simples, pour $people personnes. " +
             "Réponds UNIQUEMENT par des lignes au format exact :\n" +
-            "jour|creneau|plat|ingredients|par_personne|kcal\n" +
+            "jour|creneau|plat|ingredients|par_personne|kcal|proteines|glucides|lipides|fibres\n" +
             "jour = 0 à 6 (0 = lundi). creneau = matin, midi ou soir. " +
             "ingredients = les courses pour $people personnes, séparées par des virgules, " +
             "chacune sous la forme « quantité unité nom » (ex. : 400 g pâtes, 3 œufs, 1 oignon). " +
             "par_personne = ce qu'il y a dans UNE assiette (ex. : 120 g pâtes, 1 œuf, 80 g sauce). " +
             "kcal = calories d'une assiette, nombre entier seul, sans unité. " +
+            "proteines, glucides, lipides et fibres = grammes dans UNE assiette, " +
+            "quatre nombres entiers seuls, sans unité. " +
             "Pas de titre, pas d'introduction, pas de commentaire, pas de puces."
 
     private fun parseMeal(line: String): MealSuggestion? {
@@ -67,9 +74,17 @@ object Assistant {
             title = parts[2],
             ingredients = parts[3],
             quantities = parts.getOrElse(4) { "" },
-            calories = parts.getOrElse(5) { "" }.filter { it.isDigit() }.toIntOrNull() ?: 0
+            calories = grams(parts.getOrElse(5) { "" }),
+            protein = grams(parts.getOrElse(6) { "" }),
+            carbs = grams(parts.getOrElse(7) { "" }),
+            fat = grams(parts.getOrElse(8) { "" }),
+            fiber = grams(parts.getOrElse(9) { "" })
         )
     }
+
+    /** Un nombre entier au milieu d'un champ, sans son unité. 0 si rien de lisible. */
+    private fun grams(field: String): Int =
+        field.filter { it.isDigit() }.toIntOrNull() ?: 0
 
     /** Envoie : uniquement vos contraintes de repas et le nombre de couverts. */
     suspend fun suggestWeekMenus(apiKey: String, constraints: String, people: Int = 2): List<MealSuggestion> {
@@ -101,10 +116,11 @@ object Assistant {
         val system =
             "Tu réécris UN repas pour $people personnes. " +
                 "Réponds UNIQUEMENT par une seule ligne au format exact :\n" +
-                "0|$slot|plat|ingredients|par_personne|kcal\n" +
+                "0|$slot|plat|ingredients|par_personne|kcal|proteines|glucides|lipides|fibres\n" +
                 "ingredients = les courses pour $people personnes. " +
                 "par_personne = ce qu'il y a dans une assiette. " +
                 "kcal = calories d'une assiette, nombre entier seul. " +
+                "proteines, glucides, lipides, fibres = grammes par assiette, entiers seuls. " +
                 "Pas de commentaire, pas de puce, une seule ligne."
         val prompt = buildString {
             append("Repas actuel ($slot) : ")
@@ -769,7 +785,12 @@ object Assistant {
         val items: String,
         val caloriesLow: Int,
         val caloriesHigh: Int,
-        val confidence: String   // haute | moyenne | faible
+        val confidence: String,  // haute | moyenne | faible
+        /** Grammes dans la portion. 0 = inconnu, jamais « aucun ». */
+        val protein: Int = 0,
+        val carbs: Int = 0,
+        val fat: Int = 0,
+        val fiber: Int = 0
     ) {
         /** Le milieu de la fourchette : c'est lui qu'on additionne, faute de mieux. */
         val calories: Int get() = (caloriesLow + caloriesHigh) / 2
@@ -784,7 +805,7 @@ object Assistant {
     private const val PHOTO_SYSTEM =
         "Tu regardes la photo d'un repas et tu estimes ce qu'il y a dans UNE assiette. " +
             "Réponds UNIQUEMENT par une seule ligne au format exact :\n" +
-            "plat|aliments|kcal_min|kcal_max|fiabilite\n" +
+            "plat|aliments|kcal_min|kcal_max|fiabilite|proteines|glucides|lipides|fibres\n" +
             "plat = le nom du plat en français, 5 mots maximum. " +
             "aliments = ce que tu identifies, séparé par des virgules, avec la portion estimée " +
             "quand elle se devine (ex. : 150 g de pâtes, 100 g de saumon, salade verte). " +
@@ -792,6 +813,8 @@ object Assistant {
             "deux nombres entiers seuls, sans unité ; garde un écart honnête " +
             "(au moins 20 % entre les deux) car une photo ne donne pas l'échelle. " +
             "fiabilite = haute, moyenne ou faible. " +
+            "proteines, glucides, lipides, fibres = grammes dans la portion visible, " +
+            "quatre entiers seuls, sans unité. " +
             "Si la photo ne montre pas de nourriture, réponds exactement : aucun|||| " +
             "Pas de commentaire, pas de puce, pas d'introduction, une seule ligne."
 
@@ -823,7 +846,7 @@ object Assistant {
     private const val TEXT_SYSTEM =
         "Tu estimes les calories d'un repas décrit en français par la personne qui l'a mangé. " +
             "Réponds UNIQUEMENT par une seule ligne au format exact :\n" +
-            "plat|aliments|kcal_min|kcal_max|fiabilite\n" +
+            "plat|aliments|kcal_min|kcal_max|fiabilite|proteines|glucides|lipides|fibres\n" +
             "plat = le nom du plat, 5 mots maximum, repris de la description. " +
             "aliments = ce que contient la portion, séparé par des virgules, avec la quantité " +
             "quand elle est donnée ou déductible (ex. : 150 g de pâtes, 100 g de saumon). " +
@@ -832,6 +855,8 @@ object Assistant {
             "adulte ordinaire et élargis la fourchette en conséquence. " +
             "fiabilite = haute si les quantités sont données, moyenne si le plat est clair " +
             "mais les quantités devinées, faible si la description est trop vague. " +
+            "proteines, glucides, lipides, fibres = grammes dans la portion, quatre " +
+            "entiers seuls, sans unité. " +
             "Si ce n'est pas de la nourriture, réponds exactement : aucun|||| " +
             "Pas de commentaire, pas de puce, une seule ligne."
 
@@ -872,7 +897,11 @@ object Assistant {
             items = parts.getOrElse(1) { "" },
             caloriesLow = lowOk,
             caloriesHigh = highOk,
-            confidence = parts.getOrElse(4) { "" }.lowercase().trim().ifBlank { "moyenne" }
+            confidence = parts.getOrElse(4) { "" }.lowercase().trim().ifBlank { "moyenne" },
+            protein = grams(parts.getOrElse(5) { "" }),
+            carbs = grams(parts.getOrElse(6) { "" }),
+            fat = grams(parts.getOrElse(7) { "" }),
+            fiber = grams(parts.getOrElse(8) { "" })
         )
     }
 
