@@ -1,10 +1,5 @@
 package com.notresemaine.app.ui
 
-import android.app.Activity
-import android.content.Intent
-import android.speech.RecognizerIntent
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -18,7 +13,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -27,11 +21,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.notresemaine.app.data.AppSettings
-import java.util.Locale
 
 private val EXAMPLES = listOf(
     "Qu'est-ce que j'oublie cette semaine ?",
@@ -54,15 +46,6 @@ fun AskScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
     val busy by vm.aiBusy.collectAsState()
     val conversation by vm.aiConversation.collectAsState()
     var question by remember { mutableStateOf("") }
-
-    val listen = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode != Activity.RESULT_OK) return@rememberLauncherForActivityResult
-        result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
-            ?.firstOrNull()
-            ?.let { question = it }
-    }
 
     Column(
         modifier = Modifier
@@ -146,29 +129,16 @@ fun AskScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
         }
 
         if (ready) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    value = question,
-                    onValueChange = { question = it },
-                    placeholder = { Text("Votre question…") },
-                    textStyle = MaterialTheme.typography.bodyLarge,
-                    maxLines = 3,
-                    modifier = Modifier.weight(1f)
-                )
-                TextButton(onClick = {
-                    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                        putExtra(
-                            RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                            RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
-                        )
-                        putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.FRANCE.toLanguageTag())
-                        putExtra(RecognizerIntent.EXTRA_PROMPT, "Posez votre question")
-                    }
-                    runCatching { listen.launch(intent) }.onFailure {
-                        vm.messages.tryEmit("Aucune dictée vocale disponible sur ce téléphone.")
-                    }
-                }) { Text("🎤") }
-            }
+            // Le micro est maintenant dans le champ lui-même : le bouton séparé
+            // qui vivait à côté faisait doublon.
+            VoiceField(
+                value = question,
+                onValueChange = { question = it },
+                placeholder = "Votre question…",
+                prompt = "Posez votre question",
+                maxLines = 3,
+                modifier = Modifier.fillMaxWidth()
+            )
             BigButton(
                 text = if (busy) "…" else "Demander",
                 enabled = question.isNotBlank() && !busy,

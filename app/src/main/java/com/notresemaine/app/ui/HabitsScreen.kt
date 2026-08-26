@@ -138,11 +138,10 @@ fun HabitsScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
             if (aiReady) {
                 Spacer(Modifier.height(20.dp))
                 SectionLabel("EN TROUVER D'AUTRES")
-                OutlinedTextField(
+                VoiceField(
                     value = focus,
                     onValueChange = { focus = it },
-                    placeholder = { Text("Thème : concentration, alimentation, écrans…") },
-                    textStyle = MaterialTheme.typography.bodyLarge,
+                    placeholder = "Thème : concentration, alimentation, écrans…",
                     maxLines = 2,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -245,21 +244,19 @@ private fun HabitDialog(
         title = { Text(if (existing == null) "Nouvelle habitude" else "Modifier") },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                OutlinedTextField(
+                VoiceField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("La consigne") },
-                    placeholder = { Text("Ex. : une seule chose à la fois") },
-                    textStyle = MaterialTheme.typography.bodyLarge,
+                    label = "La consigne",
+                    placeholder = "Ex. : une seule chose à la fois",
                     maxLines = 2,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(8.dp))
-                OutlinedTextField(
+                VoiceField(
                     value = source,
                     onValueChange = { source = it },
-                    label = { Text("Pourquoi (facultatif)") },
-                    textStyle = MaterialTheme.typography.bodyLarge,
+                    label = "Pourquoi (facultatif)",
                     maxLines = 2,
                     modifier = Modifier.fillMaxWidth()
                 )

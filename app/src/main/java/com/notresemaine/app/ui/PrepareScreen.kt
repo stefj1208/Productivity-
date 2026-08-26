@@ -85,14 +85,13 @@ fun PrepareScreen(vm: AppViewModel, settings: AppSettings, dateIso: String, onDo
 
             Spacer(Modifier.height(24.dp))
             SectionLabel("LA PRIORITÉ (une seule)")
-            OutlinedTextField(
+            VoiceField(
                 value = priority,
                 onValueChange = { priority = it },
-                placeholder = { Text("La chose qui rend le reste plus simple") },
-                textStyle = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.fillMaxWidth(),
+                placeholder = "La chose qui rend le reste plus simple",
                 maxLines = 3,
-                enabled = loaded
+                enabled = loaded,
+                modifier = Modifier.fillMaxWidth()
             )
 
             if (aiAvailable) {
@@ -114,24 +113,22 @@ fun PrepareScreen(vm: AppViewModel, settings: AppSettings, dateIso: String, onDo
 
             Spacer(Modifier.height(16.dp))
             SectionLabel("ENSUITE (2 maximum)")
-            OutlinedTextField(
+            VoiceField(
                 value = task1,
                 onValueChange = { task1 = it },
-                placeholder = { Text("Tâche secondaire 1") },
-                textStyle = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.fillMaxWidth(),
+                placeholder = "Tâche secondaire 1",
                 maxLines = 3,
-                enabled = loaded
+                enabled = loaded,
+                modifier = Modifier.fillMaxWidth()
             )
             Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
+            VoiceField(
                 value = task2,
                 onValueChange = { task2 = it },
-                placeholder = { Text("Tâche secondaire 2") },
-                textStyle = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.fillMaxWidth(),
+                placeholder = "Tâche secondaire 2",
                 maxLines = 3,
-                enabled = loaded
+                enabled = loaded,
+                modifier = Modifier.fillMaxWidth()
             )
 
             Spacer(Modifier.height(16.dp))
@@ -152,13 +149,12 @@ fun PrepareScreen(vm: AppViewModel, settings: AppSettings, dateIso: String, onDo
 
             Spacer(Modifier.height(16.dp))
             SectionLabel("BLOC DE CONCENTRATION À PROTÉGER")
-            OutlinedTextField(
+            VoiceField(
                 value = focus,
                 onValueChange = { focus = it },
-                placeholder = { Text("Ex. : 9h–11h dossier client") },
-                textStyle = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.fillMaxWidth(),
-                maxLines = 2
+                placeholder = "Ex. : 9h–11h dossier client",
+                maxLines = 2,
+                modifier = Modifier.fillMaxWidth()
             )
             Spacer(Modifier.height(20.dp))
         }

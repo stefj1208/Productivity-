@@ -62,11 +62,10 @@ fun InboxScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
 
         Spacer(Modifier.height(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
+            VoiceField(
                 value = note,
                 onValueChange = { note = it },
-                placeholder = { Text("Ex. : rappeler le plombier mardi") },
-                textStyle = MaterialTheme.typography.bodyLarge,
+                placeholder = "Ex. : rappeler le plombier mardi",
                 maxLines = 3,
                 modifier = Modifier.weight(1f)
             )

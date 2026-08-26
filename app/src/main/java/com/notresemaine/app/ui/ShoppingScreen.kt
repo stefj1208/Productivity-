@@ -80,11 +80,10 @@ fun ShoppingScreen(
 
             Spacer(Modifier.height(16.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
+                VoiceField(
                     value = newItem,
                     onValueChange = { newItem = it },
-                    placeholder = { Text("Ajouter un article") },
-                    textStyle = MaterialTheme.typography.bodyLarge,
+                    placeholder = "Ajouter un article",
                     singleLine = true,
                     modifier = Modifier.weight(1f)
                 )

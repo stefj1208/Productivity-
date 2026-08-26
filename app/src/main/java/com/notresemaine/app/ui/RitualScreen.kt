@@ -362,21 +362,19 @@ fun RitualScreen(
             title = { Text("Personnaliser l'étape") },
             text = {
                 Column {
-                    OutlinedTextField(
+                    VoiceField(
                         value = name,
                         onValueChange = { name = it },
-                        label = { Text("Nom de l'étape") },
-                        textStyle = MaterialTheme.typography.bodyLarge,
+                        label = "Nom de l'étape",
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(Modifier.height(10.dp))
-                    OutlinedTextField(
+                    VoiceField(
                         value = detail,
                         onValueChange = { detail = it },
-                        label = { Text("Quoi faire pendant ce temps") },
-                        placeholder = { Text("Ex. : 10 respirations lentes, puis relire ma priorité") },
-                        textStyle = MaterialTheme.typography.bodyLarge,
+                        label = "Quoi faire pendant ce temps",
+                        placeholder = "Ex. : 10 respirations lentes, puis relire ma priorité",
                         maxLines = 4,
                         modifier = Modifier.fillMaxWidth()
                     )

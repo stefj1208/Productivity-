@@ -220,7 +220,15 @@ data class MealLogEntity(
     val calories: Int = 0,
     val caloriesLow: Int = 0,
     val caloriesHigh: Int = 0,
-    val source: String = "manuel", // photo | manuel
+    val source: String = "manuel", // photo | manuel | menu | jeune
+    /**
+     * L'heure du repas, « HH:mm ».
+     *
+     * Elle n'est pas décorative : c'est elle, et rien d'autre, qui permet de dire
+     * combien d'heures séparent deux repas — donc de mesurer un jeûne. Sans elle,
+     * on saurait qu'on a sauté le déjeuner sans pouvoir dire combien de temps.
+     */
+    val time: String = "",
     val deleted: Boolean = false,
     val updatedAt: Long
 )
@@ -658,7 +666,7 @@ interface HealthDao {
         HouseItemEntity::class, WeightEntity::class, HabitEntity::class,
         MealLogEntity::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = false
 )
 abstract class AppDb : RoomDatabase() {
@@ -718,6 +726,12 @@ abstract class AppDb : RoomDatabase() {
                             "deleted INTEGER NOT NULL DEFAULT 0, " +
                             "updatedAt INTEGER NOT NULL)"
                     )
+                }
+            },
+            // 9 → 10 : l'heure du repas, sans laquelle aucun jeûne n'est mesurable.
+            object : Migration(9, 10) {
+                override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE meal_logs ADD COLUMN time TEXT NOT NULL DEFAULT ''")
                 }
             }
         )

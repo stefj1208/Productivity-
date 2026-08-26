@@ -595,6 +595,7 @@ class Repository private constructor(context: Context) {
         caloriesLow: Int,
         caloriesHigh: Int,
         source: String,
+        time: String = "",
         id: String? = null
     ) {
         val low = caloriesLow.coerceAtLeast(0)
@@ -611,9 +612,48 @@ class Repository private constructor(context: Context) {
                 caloriesLow = low,
                 caloriesHigh = high,
                 source = source,
+                time = time.ifBlank { Fasting.defaultTime(slot) },
                 updatedAt = now()
             )
         )
+    }
+
+    /**
+     * « J'ai jeûné ce repas » : une ligne à zéro calorie, qui dit explicitement
+     * qu'on a sauté ce moment-là.
+     *
+     * Sans elle, sauter un repas et oublier de le noter donneraient exactement la
+     * même trace : rien. C'est toute la différence entre un jeûne et un trou dans
+     * le journal, et c'est ce que cette touche enregistre.
+     *
+     * Comme pour le menu coché, l'identifiant est déterministe — on peut se
+     * raviser sans empiler les lignes.
+     */
+    suspend fun toggleFasted(userId: String, date: String, slot: String): Boolean {
+        val id = "jeune:$userId:$date:$slot"
+        val existing = db.mealLogs().byId(id)
+        if (existing != null && !existing.deleted) {
+            db.mealLogs().upsert(existing.copy(deleted = true, updatedAt = now()))
+            return false
+        }
+        clearOpposite(userId, date, slot, "menu")
+        db.mealLogs().upsert(
+            MealLogEntity(
+                id = id,
+                userId = userId,
+                date = date,
+                slot = slot,
+                title = "Jeûne",
+                detail = "",
+                calories = 0,
+                caloriesLow = 0,
+                caloriesHigh = 0,
+                source = Fasting.SOURCE,
+                time = Fasting.defaultTime(slot),
+                updatedAt = now()
+            )
+        )
+        return true
     }
 
     /**
@@ -638,6 +678,9 @@ class Repository private constructor(context: Context) {
         }
         val planned = db.meals().byId("$date:$slot")
         if (planned == null || planned.title.isBlank() || planned.deleted) return null
+        // On ne peut pas avoir jeûné ET mangé au même moment : la dernière
+        // affirmation gagne, sinon le journal se contredirait tout seul.
+        clearOpposite(userId, date, slot, "jeune")
         db.mealLogs().upsert(
             MealLogEntity(
                 id = id,
@@ -652,10 +695,18 @@ class Repository private constructor(context: Context) {
                 caloriesLow = planned.calories,
                 caloriesHigh = planned.calories,
                 source = "menu",
+                time = Fasting.defaultTime(slot),
                 updatedAt = now()
             )
         )
         return true
+    }
+
+    /** Retire l'affirmation contraire posée sur le même créneau, si elle existe. */
+    private suspend fun clearOpposite(userId: String, date: String, slot: String, prefix: String) {
+        val other = db.mealLogs().byId("$prefix:$userId:$date:$slot") ?: return
+        if (other.deleted) return
+        db.mealLogs().upsert(other.copy(deleted = true, updatedAt = now()))
     }
 
     suspend fun deleteMealLog(id: String) {
@@ -672,14 +723,19 @@ class Repository private constructor(context: Context) {
      */
     suspend fun menuGapForWeek(userId: String, weekStart: String): String {
         val days = Dates.daysOfWeek(weekStart)
-        val logs = db.mealLogs().betweenOnce(userId, days.first(), days.last())
+        val all = db.mealLogs().betweenOnce(userId, days.first(), days.last())
             .filter { !it.deleted }
-        if (logs.isEmpty()) return ""
+        if (all.isEmpty()) return ""
+        // Un jeûne noté est une ligne, mais pas un repas : le compter dans la
+        // moyenne tirerait les calories vers le bas sans que personne n'ait
+        // mangé moins pour autant.
+        val logs = all.filter { it.source != Fasting.SOURCE }
         val planned = db.meals().betweenOnce(days.first(), days.last())
             .filter { it.title.isNotBlank() && !it.deleted }
 
         val daysLogged = logs.map { it.date }.distinct()
-        val avg = daysLogged.sumOf { day -> logs.filter { it.date == day }.sumOf { it.calories } } /
+        val avg = if (daysLogged.isEmpty()) 0
+        else daysLogged.sumOf { day -> logs.filter { it.date == day }.sumOf { it.calories } } /
             daysLogged.size
 
         // Un repas est « suivi » si le plat noté reprend au moins un mot marquant
@@ -695,12 +751,22 @@ class Repository private constructor(context: Context) {
         }
 
         return buildString {
-            append("Repas réellement notés : ${logs.size} sur ${daysLogged.size} jour")
-            if (daysLogged.size > 1) append("s")
-            append(", $avg kcal par jour noté en moyenne.")
-            if (comparable > 0) {
-                append(" Le menu prévu a été suivi $followed fois sur $comparable.")
+            if (daysLogged.isNotEmpty()) {
+                append("Repas réellement notés : ${logs.size} sur ${daysLogged.size} jour")
+                if (daysLogged.size > 1) append("s")
+                append(", $avg kcal par jour noté en moyenne.")
+                if (comparable > 0) {
+                    append(" Le menu prévu a été suivi $followed fois sur $comparable.")
+                }
             }
+            val fasted = all.count { it.source == Fasting.SOURCE }
+            if (fasted > 0) {
+                if (isNotEmpty()) append(" ")
+                append("Repas volontairement sautés : $fasted.")
+                val fullDays = Fasting.fullDays(all, days)
+                if (fullDays.isNotEmpty()) append(" Jours de jeûne complet : ${fullDays.size}.")
+            }
+            Fasting.longest(all)?.let { append(" Plus longue période sans manger : ${it.label}.") }
         }
     }
 

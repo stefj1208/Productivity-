@@ -116,11 +116,10 @@ fun SportScreen(vm: AppViewModel, settings: AppSettings, onGoals: () -> Unit, on
         Spacer(Modifier.height(20.dp))
         SectionLabel("MES SÉANCES DE LA SEMAINE")
         Row(verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
+            VoiceField(
                 value = newSession,
                 onValueChange = { newSession = it },
-                placeholder = { Text("Ex. : course 30 min") },
-                textStyle = MaterialTheme.typography.bodyLarge,
+                placeholder = "Ex. : course 30 min",
                 singleLine = true,
                 modifier = Modifier.weight(1f)
             )
@@ -182,6 +181,8 @@ fun SportScreen(vm: AppViewModel, settings: AppSettings, onGoals: () -> Unit, on
             Spacer(Modifier.height(24.dp))
             SectionLabel("UN PROGRAMME SUR MESURE")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Pas de micro ici : le champ est étroit, et « débutant » se tape
+                // plus vite qu'il ne se dicte.
                 OutlinedTextField(
                     value = level,
                     onValueChange = { level = it },
@@ -201,12 +202,11 @@ fun SportScreen(vm: AppViewModel, settings: AppSettings, onGoals: () -> Unit, on
                     modifier = Modifier.weight(1f)
                 )
             }
-            OutlinedTextField(
+            VoiceField(
                 value = aim,
                 onValueChange = { aim = it },
-                label = { Text("Mon but") },
-                placeholder = { Text("Ex. : tenir 30 min de course sans m'arrêter") },
-                textStyle = MaterialTheme.typography.bodyLarge,
+                label = "Mon but",
+                placeholder = "Ex. : tenir 30 min de course sans m'arrêter",
                 maxLines = 2,
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
             )

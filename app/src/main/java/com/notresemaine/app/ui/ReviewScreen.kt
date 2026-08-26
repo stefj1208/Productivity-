@@ -397,11 +397,10 @@ fun ReviewScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(16.dp))
-                    OutlinedTextField(
+                    VoiceField(
                         value = abandon,
                         onValueChange = { abandon = it },
-                        placeholder = { Text("Ex. : les réunions sans ordre du jour") },
-                        textStyle = MaterialTheme.typography.bodyLarge,
+                        placeholder = "Ex. : les réunions sans ordre du jour",
                         maxLines = 3,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -445,11 +444,10 @@ fun ReviewScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(16.dp))
-                    OutlinedTextField(
+                    VoiceField(
                         value = priority,
                         onValueChange = { priority = it },
-                        placeholder = { Text("Ma priorité de la semaine") },
-                        textStyle = MaterialTheme.typography.bodyLarge,
+                        placeholder = "Ma priorité de la semaine",
                         maxLines = 3,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -528,11 +526,10 @@ fun ReviewScreen(
                     Spacer(Modifier.height(16.dp))
                     var newTask by remember { mutableStateOf("") }
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedTextField(
+                        VoiceField(
                             value = newTask,
                             onValueChange = { newTask = it },
-                            placeholder = { Text("Nouvelle tâche") },
-                            textStyle = MaterialTheme.typography.bodyLarge,
+                            placeholder = "Nouvelle tâche",
                             singleLine = true,
                             modifier = Modifier.weight(1f)
                         )
@@ -579,11 +576,10 @@ fun ReviewScreen(
                     )
                     Spacer(Modifier.height(12.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedTextField(
+                        VoiceField(
                             value = newSport,
                             onValueChange = { newSport = it },
-                            placeholder = { Text("Ex. : course, yoga…") },
-                            textStyle = MaterialTheme.typography.bodyLarge,
+                            placeholder = "Ex. : course, yoga…",
                             singleLine = true,
                             modifier = Modifier.weight(1f)
                         )

@@ -16,6 +16,9 @@ data class DayUsage(val totalMinutes: Int, val socialMinutes: Int, val unlocks: 
 
 data class InstalledApp(val packageName: String, val label: String)
 
+/** Une application et le temps qu'elle a pris aujourd'hui. */
+data class AppMinutes(val label: String, val minutes: Int)
+
 /** Lecture du temps d'écran via UsageStatsManager (permission « Accès aux données d'utilisation »). */
 object Usage {
 
@@ -60,6 +63,39 @@ object Usage {
             if (event.eventType == UsageEvents.Event.KEYGUARD_HIDDEN) unlocks++
         }
         return DayUsage((totalMs / 60_000).toInt(), (socialMs / 60_000).toInt(), unlocks)
+    }
+
+    /**
+     * Les applications qui ont pris le plus de temps aujourd'hui, du pire au moins pire.
+     *
+     * C'est ce qui manquait aux avertissements : « 22 minutes sur 45 » ne dit rien
+     * qu'on ne sache déjà. « Instagram 14, YouTube 5, WhatsApp 3 » dit où est parti
+     * le temps — et c'est la seule information sur laquelle on peut agir.
+     */
+    fun topApps(
+        context: Context,
+        packages: Set<String>,
+        limit: Int = 5
+    ): List<AppMinutes> {
+        if (packages.isEmpty()) return emptyList()
+        val usm = context.getSystemService(UsageStatsManager::class.java)
+        val stats = usm.queryAndAggregateUsageStats(startOfToday(), System.currentTimeMillis())
+        val pm = context.packageManager
+        return stats.asSequence()
+            .filter { it.key in packages }
+            .map { (pkg, s) -> pkg to (s.totalTimeInForeground / 60_000).toInt() }
+            .filter { it.second > 0 }
+            .sortedByDescending { it.second }
+            .take(limit)
+            .map { (pkg, minutes) ->
+                // Le nom lisible si on le trouve, le nom de paquet sinon : mieux
+                // vaut « com.zhiliaoapp.musically » qu'une ligne manquante.
+                val label = runCatching {
+                    pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
+                }.getOrDefault(pkg.substringAfterLast('.'))
+                AppMinutes(label, minutes)
+            }
+            .toList()
     }
 
     /**

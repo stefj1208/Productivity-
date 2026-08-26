@@ -40,8 +40,14 @@ fun RemindersScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit)
     var eveningOn by remember(settings.eveningEnabled) { mutableStateOf(settings.eveningEnabled) }
     var sunday by remember(settings.sundayReminder) { mutableStateOf(settings.sundayReminder) }
     var sundayOn by remember(settings.sundayEnabled) { mutableStateOf(settings.sundayEnabled) }
+    var mealsOn by remember(settings.mealRemindersEnabled) { mutableStateOf(settings.mealRemindersEnabled) }
+    var mealMorning by remember(settings.mealReminderMorning) { mutableStateOf(settings.mealReminderMorning) }
+    var mealNoon by remember(settings.mealReminderNoon) { mutableStateOf(settings.mealReminderNoon) }
+    var mealEvening by remember(settings.mealReminderEvening) { mutableStateOf(settings.mealReminderEvening) }
 
-    val timesOk = Dates.isValidTime(evening) && Dates.isValidTime(sunday)
+    val timesOk = Dates.isValidTime(evening) && Dates.isValidTime(sunday) &&
+        Dates.isValidTime(mealMorning) && Dates.isValidTime(mealNoon) &&
+        Dates.isValidTime(mealEvening)
 
     Column(
         modifier = Modifier
@@ -68,7 +74,10 @@ fun RemindersScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit)
                 "🌙" to "Préparer demain, à $evening",
                 "🗓️" to "La revue du dimanche, à $sunday",
                 "📵" to if (settings.curfewEnabled) "15 minutes avant le couvre-feu de ${settings.curfewStart}"
-                else "15 minutes avant le couvre-feu (désactivé pour l'instant)"
+                else "15 minutes avant le couvre-feu (désactivé pour l'instant)",
+                "🍽️" to if (mealsOn) "Noter les repas, à $mealMorning, $mealNoon et $mealEvening"
+                else "Noter les repas (désactivé pour l'instant)",
+                "📱" to "Aux quarts de la limite d'écran, avec le détail par application"
             ).forEach { (emoji, text) ->
                 Row(modifier = Modifier.padding(vertical = 6.dp)) {
                     Text(text = emoji, style = MaterialTheme.typography.bodyLarge)
@@ -128,6 +137,22 @@ fun RemindersScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit)
                 onTime = { evening = it }, onToggle = { eveningOn = it })
             ReminderRow("Revue du dimanche", sunday, sundayOn,
                 onTime = { sunday = it }, onToggle = { sundayOn = it })
+
+            Spacer(Modifier.height(20.dp))
+            SectionLabel("NOTER LES REPAS")
+            Text(
+                text = "Trois rendez-vous fixes. On note ce qu'on a mangé pendant qu'on s'en " +
+                    "souvient : une heure plus tard, la moitié de l'assiette a déjà disparu " +
+                    "de la mémoire.",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            ReminderRow("Petit-déjeuner", mealMorning, mealsOn,
+                onTime = { mealMorning = it }, onToggle = { mealsOn = it })
+            ReminderRow("Déjeuner", mealNoon, mealsOn,
+                onTime = { mealNoon = it }, onToggle = { mealsOn = it })
+            ReminderRow("Dîner", mealEvening, mealsOn,
+                onTime = { mealEvening = it }, onToggle = { mealsOn = it })
             if (!timesOk) {
                 Text(
                     "Format d'heure attendu : HH:MM",
@@ -196,6 +221,7 @@ fun RemindersScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit)
             onClick = {
                 vm.saveReminders(evening, eveningOn, sunday, sundayOn)
                 vm.saveAlerts(alertsOn, alertSound)
+                vm.saveMealReminders(mealsOn, mealMorning, mealNoon, mealEvening)
                 onBack()
             },
             modifier = Modifier.padding(bottom = 16.dp)

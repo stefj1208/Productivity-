@@ -40,6 +40,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.notresemaine.app.data.AppSettings
 import com.notresemaine.app.data.Dates
+import com.notresemaine.app.data.Fasting
 import com.notresemaine.app.data.MealLogEntity
 import com.notresemaine.app.data.Photo
 import com.notresemaine.app.ui.theme.NeutralGray
@@ -104,6 +105,12 @@ fun MealLogScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
         .collectAsState(initial = emptyList())
     val meals by remember { vm.repo.db.meals().between(today, today) }
         .collectAsState(initial = emptyList())
+    // Un jeûne enjambe la nuit : le calculer sur la seule journée d'aujourd'hui
+    // afficherait « 8 h » à midi pour quelqu'un qui n'a rien mangé depuis la veille.
+    // Trois jours en arrière suffisent, et couvrent un jeûne de deux jours pleins.
+    val recentLogs by remember(today) {
+        vm.repo.db.mealLogs().between(java.time.LocalDate.now().minusDays(3).toString(), today)
+    }.collectAsState(initial = emptyList())
 
     val mine = logs.filter { it.userId == myId }
     val eaten = mine.sumOf { it.calories }
@@ -154,6 +161,26 @@ fun MealLogScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
                     accent = accent,
                     caption = if (eaten == 0) "Rien de noté pour l'instant"
                     else "≈ $eaten kcal notées sur ${settings.dailyCalories} — estimation"
+                )
+            }
+
+            // ----- Le jeûne en cours -----
+            //
+            // Personne ne déclare « je commence mon jeûne » : on note ses repas, et
+            // l'écart se lit tout seul. C'est pour ça que ce chiffre apparaît sans
+            // qu'on ait rien eu à démarrer.
+            val fastingMinutes = Fasting.currentMinutes(recentLogs.filter { it.userId == myId })
+            if (fastingMinutes != null && fastingMinutes >= 4 * 60) {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = "⏳ ${Fasting.label(fastingMinutes)} sans manger",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = accent
+                )
+                Text(
+                    text = "Depuis le dernier repas noté. Notez le suivant et le compteur repart.",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -215,14 +242,32 @@ fun MealLogScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
                 )
             }
 
+            // ----- Le repas sauté, assumé -----
+            //
+            // Sans cette touche, sauter un repas et oublier de le noter laissent
+            // exactement la même trace : rien. C'est elle, et elle seule, qui
+            // permet ensuite de parler de jeûne plutôt que de trou dans le journal.
+            val fasted = mine.any { it.slot == slot && it.source == "jeune" }
+            OutlinedButton(
+                onClick = { vm.toggleFasted(today, slot) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .padding(top = 10.dp)
+            ) {
+                Text(
+                    if (fasted) "✓ ${slotLabel(slot)} jeûné — annuler"
+                    else "🚫 J'ai jeûné ce repas (0 kcal)"
+                )
+            }
+
             if (photoReady) {
                 Spacer(Modifier.height(12.dp))
-                OutlinedTextField(
+                VoiceField(
                     value = note,
                     onValueChange = { note = it },
-                    label = { Text("Précision (facultatif)") },
-                    placeholder = { Text("Ex. : il y avait aussi du pain et un verre de vin") },
-                    textStyle = MaterialTheme.typography.bodyLarge,
+                    label = "Précision (facultatif)",
+                    placeholder = "Ex. : il y avait aussi du pain et un verre de vin",
                     maxLines = 2,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -264,7 +309,7 @@ fun MealLogScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            mine.forEach { log ->
+            mine.sortedBy { it.time }.forEach { log ->
                 MealLogRow(log, accent) { vm.deleteMealLog(log.id) }
             }
 
@@ -295,8 +340,8 @@ fun MealLogScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
         PhotoMealDialog(
             proposal = p,
             accent = accent,
-            onSave = { title, detail, low, high ->
-                vm.logMeal(p.date, p.slot, title, detail, low, high, "photo")
+            onSave = { title, detail, low, high, time ->
+                vm.logMeal(p.date, p.slot, title, detail, low, high, "photo", time)
                 note = ""
             },
             onDismiss = { vm.clearPhotoMeal() }
@@ -307,8 +352,8 @@ fun MealLogScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
         ManualMealDialog(
             slot = slot,
             onDismiss = { manual = false },
-            onSave = { title, kcal ->
-                vm.logMeal(today, slot, title, "", kcal, kcal, "manuel")
+            onSave = { title, kcal, time ->
+                vm.logMeal(today, slot, title, "", kcal, kcal, "manuel", time)
                 manual = false
             }
         )
@@ -326,7 +371,7 @@ fun MealLogScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
 private fun PhotoMealDialog(
     proposal: AppViewModel.PhotoMealProposal,
     accent: androidx.compose.ui.graphics.Color,
-    onSave: (String, String, Int, Int) -> Unit,
+    onSave: (String, String, Int, Int, String) -> Unit,
     onDismiss: () -> Unit
 ) {
     val r = proposal.reading
@@ -334,6 +379,7 @@ private fun PhotoMealDialog(
     var detail by remember { mutableStateOf(r.items) }
     var low by remember { mutableStateOf(r.caloriesLow.toString()) }
     var high by remember { mutableStateOf(r.caloriesHigh.toString()) }
+    var time by remember { mutableStateOf(Fasting.defaultTime(proposal.slot)) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -362,20 +408,18 @@ private fun PhotoMealDialog(
                 }
 
                 Spacer(Modifier.height(12.dp))
-                OutlinedTextField(
+                VoiceField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Le plat") },
-                    textStyle = MaterialTheme.typography.bodyLarge,
+                    label = "Le plat",
                     maxLines = 2,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(8.dp))
-                OutlinedTextField(
+                VoiceField(
                     value = detail,
                     onValueChange = { detail = it },
-                    label = { Text("Ce qu'il y avait") },
-                    textStyle = MaterialTheme.typography.bodyLarge,
+                    label = "Ce qu'il y avait",
                     maxLines = 4,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -417,6 +461,11 @@ private fun PhotoMealDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 8.dp)
                 )
+                Spacer(Modifier.height(12.dp))
+                // L'heure n'est pas un détail administratif : c'est elle qui rend
+                // le jeûne mesurable. Pré-remplie à l'heure habituelle du créneau.
+                TimeField(label = "À QUELLE HEURE ?", value = time, onChange = { time = it })
+
                 Text(
                     text = "La photo a déjà été effacée du téléphone.",
                     style = MaterialTheme.typography.labelMedium,
@@ -431,7 +480,8 @@ private fun PhotoMealDialog(
                     onSave(
                         title, detail,
                         low.toIntOrNull() ?: 0,
-                        high.toIntOrNull() ?: (low.toIntOrNull() ?: 0)
+                        high.toIntOrNull() ?: (low.toIntOrNull() ?: 0),
+                        time
                     )
                 },
                 enabled = title.isNotBlank()
@@ -445,20 +495,20 @@ private fun PhotoMealDialog(
 private fun ManualMealDialog(
     slot: String,
     onDismiss: () -> Unit,
-    onSave: (String, Int) -> Unit
+    onSave: (String, Int, String) -> Unit
 ) {
     var title by remember { mutableStateOf("") }
     var kcal by remember { mutableStateOf("") }
+    var time by remember { mutableStateOf(Fasting.defaultTime(slot)) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("${slotEmoji(slot)} ${slotLabel(slot)}") },
         text = {
             Column {
-                OutlinedTextField(
+                VoiceField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Qu'avez-vous mangé ?") },
-                    textStyle = MaterialTheme.typography.bodyLarge,
+                    label = "Qu'avez-vous mangé ?",
                     maxLines = 3,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -472,11 +522,13 @@ private fun ManualMealDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+                Spacer(Modifier.height(12.dp))
+                TimeField(label = "À QUELLE HEURE ?", value = time, onChange = { time = it })
             }
         },
         confirmButton = {
             TextButton(
-                onClick = { onSave(title, kcal.toIntOrNull() ?: 0) },
+                onClick = { onSave(title, kcal.toIntOrNull() ?: 0, time) },
                 enabled = title.isNotBlank()
             ) { Text("Noter") }
         },
@@ -561,7 +613,7 @@ private fun MealLogRow(
         ) {
             Text(log.title, style = MaterialTheme.typography.bodyLarge)
             val line = buildList {
-                add(slotLabel(log.slot))
+                add(if (log.time.isBlank()) slotLabel(log.slot) else "${log.time} · ${slotLabel(log.slot)}")
                 // Le chiffre du menu vient d'une recette : il n'a pas de fourchette,
                 // et l'afficher en « 507–507 » ferait passer une valeur simple pour
                 // une estimation bancale.
@@ -573,6 +625,7 @@ private fun MealLogRow(
                 when (log.source) {
                     "photo" -> add("📷")
                     "menu" -> add("🍽️ au menu")
+                    "jeune" -> add("🚫 sauté")
                 }
             }
             Text(

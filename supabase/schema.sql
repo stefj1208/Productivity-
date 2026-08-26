@@ -226,9 +226,13 @@ create table if not exists meal_logs (
   calories_low int not null default 0,
   calories_high int not null default 0,
   source text not null default 'manuel',
+  time text not null default '',
   deleted boolean not null default false,
   updated_at bigint not null default 0
 );
+
+-- V16 : l'heure du repas, indispensable pour mesurer un jeûne.
+alter table meal_logs add column if not exists time text not null default '';
 
 alter table profiles add column if not exists pacte_enabled boolean not null default false;
 alter table profiles add column if not exists daily_limit_minutes int not null default 45;

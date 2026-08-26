@@ -552,20 +552,18 @@ private fun CategoryItemDialog(
         },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                OutlinedTextField(
+                VoiceField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Quoi ?") },
-                    textStyle = MaterialTheme.typography.bodyLarge,
+                    label = "Quoi ?",
                     maxLines = 2,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(8.dp))
-                OutlinedTextField(
+                VoiceField(
                     value = detail,
                     onValueChange = { detail = it },
-                    label = { Text("En deux mots (facultatif)") },
-                    textStyle = MaterialTheme.typography.bodyLarge,
+                    label = "En deux mots (facultatif)",
                     maxLines = 3,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -671,11 +669,10 @@ private fun NewCategoryDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit)
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(10.dp))
-                OutlinedTextField(
+                VoiceField(
                     value = label,
                     onValueChange = { label = it },
-                    placeholder = { Text("Ex. : voiture, voyages, animaux") },
-                    textStyle = MaterialTheme.typography.bodyLarge,
+                    placeholder = "Ex. : voiture, voyages, animaux",
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -813,11 +810,10 @@ private fun MealRework(
                 shortcuts.forEach { s ->
                     TextButton(onClick = { instruction = s }) { Text(s) }
                 }
-                OutlinedTextField(
+                VoiceField(
                     value = instruction,
                     onValueChange = { instruction = it },
-                    placeholder = { Text("Ex. : il me reste du poulet et des courgettes") },
-                    textStyle = MaterialTheme.typography.bodyLarge,
+                    placeholder = "Ex. : il me reste du poulet et des courgettes",
                     maxLines = 3,
                     modifier = Modifier.fillMaxWidth()
                 )

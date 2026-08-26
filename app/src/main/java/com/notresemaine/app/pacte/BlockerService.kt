@@ -71,6 +71,7 @@ class BlockerService : Service() {
                 if (s.myUserId.isNotBlank()) {
                     repo.saveUsageDay(s.myUserId, Dates.todayIso(), usage.totalMinutes, usage.socialMinutes, usage.unlocks)
                 }
+                warnAtThresholds(repo, s, social, socialMinutes)
             }
 
             val curfewOn = Curfew.isActive(s)
@@ -105,6 +106,55 @@ class BlockerService : Service() {
             }
             delay(if (overLimit || curfewOn) 2_000 else 4_000)
         }
+    }
+
+    /**
+     * Prévient à un quart, à la moitié et aux trois quarts de la limite.
+     *
+     * Le blocage arrive trop tard pour changer quoi que ce soit : quand il tombe,
+     * la journée est déjà consommée. Ces trois avertissements sont les seuls
+     * moments où l'on peut encore décider de poser le téléphone.
+     *
+     * Chacun ne part qu'une fois par jour, et **avec le détail par application** :
+     * « 22 min sur 45 » n'apprend rien, « Instagram 14, YouTube 5 » dit où
+     * regarder. C'est un coup de coude — pas de son, pas d'écran réveillé : il ne
+     * s'agit pas de sanctionner, seulement de rendre visible.
+     */
+    private suspend fun warnAtThresholds(
+        repo: com.notresemaine.app.data.Repository,
+        s: com.notresemaine.app.data.AppSettings,
+        social: Set<String>,
+        minutes: Int
+    ) {
+        if (s.dailyLimitMinutes <= 0) return
+        val today = Dates.todayIso()
+        val percent = minutes * 100 / s.dailyLimitMinutes
+        // On n'annonce que le palier le plus haut atteint : franchir 25 % et 50 %
+        // dans la même minute ne doit pas produire deux écrans à la suite.
+        val reached = THRESHOLDS.filter { percent >= it && !s.usageAlertDone(today, it) }
+        val step = reached.maxOrNull() ?: return
+        // Les paliers plus bas sont marqués sans être annoncés.
+        reached.forEach { repo.settings.markUsageAlert(today, it) }
+
+        val top = Usage.topApps(this, social)
+        val detail = if (top.isEmpty()) "" else
+            top.joinToString(" · ") { "${it.label} ${it.minutes} min" }
+
+        com.notresemaine.app.notif.Alarms.fire(
+            context = this,
+            emoji = "📵",
+            title = when (step) {
+                25 -> "Un quart de ton temps d'écran"
+                50 -> "La moitié de ton temps d'écran"
+                else -> "Trois quarts de ton temps d'écran"
+            },
+            text = "$minutes min sur ${s.dailyLimitMinutes}" +
+                if (detail.isBlank()) "." else ".\n$detail",
+            sound = false,
+            nudge = true,
+            actionRoute = "screentime",
+            actionLabel = "Voir le détail"
+        )
     }
 
     /**
@@ -178,6 +228,9 @@ class BlockerService : Service() {
         private const val NOTIF_ID = 10
         private const val BLOCK_CHANNEL_ID = "pacte_blocage"
         private const val BLOCK_NOTIF_ID = 11
+
+        /** Les moments où l'on peut encore changer d'avis. */
+        private val THRESHOLDS = listOf(25, 50, 75)
 
         /** Vrai tant que la surveillance tourne : affiché dans l'écran du Pacte. */
         @Volatile

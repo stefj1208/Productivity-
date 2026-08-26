@@ -111,11 +111,10 @@ fun MenusScreen(
             if (settings.aiEnabled && settings.aiApiKey.isNotBlank()) {
                 Spacer(Modifier.height(10.dp))
                 var constraints by remember { mutableStateOf("") }
-                OutlinedTextField(
+                VoiceField(
                     value = constraints,
                     onValueChange = { constraints = it },
-                    placeholder = { Text("Contraintes : végétarien, rapide le soir…") },
-                    textStyle = MaterialTheme.typography.bodyLarge,
+                    placeholder = "Contraintes : végétarien, rapide le soir…",
                     maxLines = 2,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -208,30 +207,27 @@ private fun MealEditor(
                 }
             }
         }
-        OutlinedTextField(
+        VoiceField(
             value = titleText,
             onValueChange = { titleText = it },
-            placeholder = { Text("Ex. : pâtes bolognaise") },
-            textStyle = MaterialTheme.typography.bodyLarge,
+            placeholder = "Ex. : pâtes bolognaise",
             maxLines = 2,
             modifier = Modifier.fillMaxWidth()
         )
         if (titleText.isNotBlank()) {
-            OutlinedTextField(
+            VoiceField(
                 value = ingredientsText,
                 onValueChange = { ingredientsText = it },
-                placeholder = { Text("Courses : 400 g pâtes, 500 g bœuf haché, 1 oignon") },
-                textStyle = MaterialTheme.typography.bodyLarge,
+                placeholder = "Courses : 400 g pâtes, 500 g bœuf haché, 1 oignon",
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 6.dp)
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
+                VoiceField(
                     value = quantitiesText,
                     onValueChange = { quantitiesText = it },
-                    placeholder = { Text("Par personne : 120 g pâtes…") },
-                    textStyle = MaterialTheme.typography.bodyLarge,
+                    placeholder = "Par personne : 120 g pâtes…",
                     modifier = Modifier
                         .weight(2f)
                         .padding(top = 6.dp)

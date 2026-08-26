@@ -148,11 +148,10 @@ fun EditDeleteDialog(
         title = { Text(title) },
         text = {
             Column {
-                androidx.compose.material3.OutlinedTextField(
+                VoiceField(
                     value = text,
                     onValueChange = { text = it },
-                    label = { Text(label) },
-                    textStyle = MaterialTheme.typography.bodyLarge,
+                    label = label,
                     maxLines = 3,
                     modifier = Modifier.fillMaxWidth()
                 )

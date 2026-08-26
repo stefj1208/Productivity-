@@ -53,6 +53,9 @@ fun PerformanceScreen(
         .collectAsState(initial = emptyList())
     val profiles by remember { vm.repo.db.profiles().all() }
         .collectAsState(initial = emptyList())
+    val mealLogs by remember(weekStart) {
+        vm.repo.db.mealLogs().between(Dates.weekStartIsoOffset(-3), Dates.todayIso())
+    }.collectAsState(initial = emptyList())
 
     val partner = profiles.firstOrNull { it.id != myId }
     val myTasks = weekTasks.filter { it.userId == myId }
@@ -143,6 +146,62 @@ fun PerformanceScreen(
                 label = "réseaux / jour",
                 accent = accent,
                 modifier = Modifier.weight(1f)
+            )
+        }
+
+        // ----- Le jeûne -----
+        //
+        // Rien n'est saisi à la main : ces chiffres se déduisent des heures de
+        // repas notées. La section n'apparaît donc que si l'on a commencé à noter,
+        // et jamais comme un objectif à tenir — c'est un constat, pas une cible.
+        val myMealLogs = mealLogs.filter { it.userId == myId }
+        val weekLogs = myMealLogs.filter { it.date >= days.first() && it.date <= days.last() }
+        val longestFast = com.notresemaine.app.data.Fasting.longest(myMealLogs)
+        val currentFast = com.notresemaine.app.data.Fasting.currentMinutes(myMealLogs)
+        val fastDays = com.notresemaine.app.data.Fasting.fullDays(weekLogs, days).size
+        val skipped = weekLogs.count { it.source == com.notresemaine.app.data.Fasting.SOURCE }
+
+        if (myMealLogs.isNotEmpty()) {
+            Spacer(Modifier.height(24.dp))
+            SectionLabel("JEÛNE")
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                KpiTile(
+                    value = currentFast?.let { com.notresemaine.app.data.Fasting.label(it) } ?: "—",
+                    label = "sans manger, là",
+                    accent = accent,
+                    modifier = Modifier.weight(1f)
+                )
+                KpiTile(
+                    value = longestFast?.label ?: "—",
+                    label = "le plus long",
+                    accent = accent,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.padding(top = 10.dp)
+            ) {
+                KpiTile(
+                    value = if (skipped == 0) "—" else "$skipped",
+                    label = "repas sautés",
+                    accent = accent,
+                    modifier = Modifier.weight(1f)
+                )
+                KpiTile(
+                    value = if (fastDays == 0) "—" else "$fastDays",
+                    label = "jours complets",
+                    accent = accent,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            Text(
+                text = "Calculé à partir des heures de repas notées — une fenêtre ne compte " +
+                    "qu'au-delà de 12 heures. Aucun objectif, aucun palier : seulement ce " +
+                    "qui s'est passé.",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp)
             )
         }
 

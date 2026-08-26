@@ -191,6 +191,7 @@ data class MealLogDto(
     @SerialName("calories_low") val caloriesLow: Int = 0,
     @SerialName("calories_high") val caloriesHigh: Int = 0,
     val source: String = "manuel",
+    val time: String = "",
     val deleted: Boolean = false,
     @SerialName("updated_at") val updatedAt: Long
 )
@@ -482,7 +483,7 @@ class SyncManager(private val repo: Repository) {
                 api.upsert("meal_logs", token, mealLogs.map {
                     MealLogDto(it.id, it.userId, it.date, it.slot, it.title, it.detail,
                         it.calories, it.caloriesLow, it.caloriesHigh, it.source,
-                        it.deleted, it.updatedAt)
+                        it.time, it.deleted, it.updatedAt)
                 }, MealLogDto.serializer())
 
                 val habits = db.habits().modifiedSince(s.lastPushTs).filter { it.userId == myId }
@@ -608,7 +609,7 @@ class SyncManager(private val repo: Repository) {
                             com.notresemaine.app.data.MealLogEntity(
                                 dto.id, dto.userId, dto.date, dto.slot, dto.title, dto.detail,
                                 dto.calories, dto.caloriesLow, dto.caloriesHigh, dto.source,
-                                dto.deleted, dto.updatedAt
+                                dto.time, dto.deleted, dto.updatedAt
                             )
                         )
                     }

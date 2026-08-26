@@ -73,8 +73,28 @@ data class AppSettings(
     val calendarId: Long = -1L,
     val calendarName: String = "",
     /** Tâches confiées déjà annoncées : sert à ne pas sonner deux fois. */
-    val alertedTaskIds: String = ""
-)
+    val alertedTaskIds: String = "",
+    /**
+     * Rappels de repas. Trois moments fixes, parce qu'on note ce qu'on a mangé
+     * pendant qu'on s'en souvient — une heure plus tard, on a déjà oublié la
+     * moitié de l'assiette.
+     */
+    val mealRemindersEnabled: Boolean = false,
+    val mealReminderMorning: String = "07:30",
+    val mealReminderNoon: String = "13:00",
+    val mealReminderEvening: String = "21:00",
+    /**
+     * Paliers d'écran déjà annoncés, sous la forme « 2026-08-25:25,50 ».
+     * La date en tête fait que tout repart à zéro chaque matin, sans ménage.
+     */
+    val usageAlertsDone: String = ""
+) {
+    /** Ce palier d'écran a-t-il déjà été annoncé aujourd'hui ? */
+    fun usageAlertDone(date: String, percent: Int): Boolean {
+        if (usageAlertsDone.substringBefore(':') != date) return false
+        return percent.toString() in usageAlertsDone.substringAfter(':', "").split(",")
+    }
+}
 
 class SettingsStore(private val context: Context) {
 
@@ -122,6 +142,11 @@ class SettingsStore(private val context: Context) {
         val calendarId = longPreferencesKey("calendarId")
         val calendarName = stringPreferencesKey("calendarName")
         val alertedTaskIds = stringPreferencesKey("alertedTaskIds")
+        val mealRemindersEnabled = booleanPreferencesKey("mealRemindersEnabled")
+        val mealReminderMorning = stringPreferencesKey("mealReminderMorning")
+        val mealReminderNoon = stringPreferencesKey("mealReminderNoon")
+        val mealReminderEvening = stringPreferencesKey("mealReminderEvening")
+        val usageAlertsDone = stringPreferencesKey("usageAlertsDone")
     }
 
     val flow: Flow<AppSettings> = context.dataStore.data.map { p ->
@@ -168,7 +193,12 @@ class SettingsStore(private val context: Context) {
             calendarEnabled = p[K.calendarEnabled] ?: false,
             calendarId = p[K.calendarId] ?: -1L,
             calendarName = p[K.calendarName] ?: "",
-            alertedTaskIds = p[K.alertedTaskIds] ?: ""
+            alertedTaskIds = p[K.alertedTaskIds] ?: "",
+            mealRemindersEnabled = p[K.mealRemindersEnabled] ?: false,
+            mealReminderMorning = p[K.mealReminderMorning] ?: "07:30",
+            mealReminderNoon = p[K.mealReminderNoon] ?: "13:00",
+            mealReminderEvening = p[K.mealReminderEvening] ?: "21:00",
+            usageAlertsDone = p[K.usageAlertsDone] ?: ""
         )
     }
 
@@ -300,6 +330,37 @@ class SettingsStore(private val context: Context) {
         context.dataStore.edit { p ->
             p[K.aiEnabled] = enabled
             p[K.aiApiKey] = apiKey.trim()
+        }
+    }
+
+    suspend fun setMealReminders(
+        enabled: Boolean,
+        morning: String,
+        noon: String,
+        evening: String
+    ) {
+        context.dataStore.edit { p ->
+            p[K.mealRemindersEnabled] = enabled
+            if (Dates.isValidTime(morning)) p[K.mealReminderMorning] = morning
+            if (Dates.isValidTime(noon)) p[K.mealReminderNoon] = noon
+            if (Dates.isValidTime(evening)) p[K.mealReminderEvening] = evening
+        }
+    }
+
+    /**
+     * Note qu'un palier d'écran a été annoncé aujourd'hui.
+     *
+     * La date est stockée avec les paliers plutôt que remise à zéro par une tâche
+     * de minuit : si la date enregistrée n'est pas celle du jour, la liste est
+     * simplement ignorée. Un oubli de ménage ne peut donc pas faire taire l'alerte.
+     */
+    suspend fun markUsageAlert(date: String, percent: Int) {
+        context.dataStore.edit { p ->
+            val stored = p[K.usageAlertsDone] ?: ""
+            val done = if (stored.substringBefore(':') == date) {
+                stored.substringAfter(':', "").split(",").filter { it.isNotBlank() }
+            } else emptyList()
+            p[K.usageAlertsDone] = "$date:" + (done + percent.toString()).distinct().joinToString(",")
         }
     }
 

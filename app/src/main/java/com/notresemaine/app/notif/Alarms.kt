@@ -47,7 +47,9 @@ object Alarms {
     const val EXTRA_ACTION = "action"
 
     private const val FIRST_REQUEST_CODE = 1000
-    private const val MAX_SCHEDULED = 16
+    // Trois rappels de repas se sont ajoutés aux séances, tâches et habitudes :
+    // à 16, les derniers moments de la journée passaient à la trappe.
+    private const val MAX_SCHEDULED = 24
     private const val NOTIFICATION_ID = 4242
 
     /** Un rappel à venir : quand, et quoi dire. */
@@ -61,7 +63,10 @@ object Alarms {
          * mais sans sonner ni allumer l'écran. Réveiller quelqu'un pour lui dire
          * « une seule chose à la fois » serait absurde.
          */
-        val nudge: Boolean = false
+        val nudge: Boolean = false,
+        /** Où mène le bouton de l'écran de rappel, et comment il s'appelle. */
+        val route: String = "",
+        val action: String = ""
     )
 
     fun createChannel(context: Context) {
@@ -159,11 +164,20 @@ object Alarms {
     ): List<Alert> {
         val alerts = mutableListOf<Alert>()
 
-        fun add(day: LocalDate, time: LocalTime?, emoji: String, title: String, text: String) {
+        fun add(
+            day: LocalDate,
+            time: LocalTime?,
+            emoji: String,
+            title: String,
+            text: String,
+            route: String = "",
+            action: String = "",
+            nudge: Boolean = false
+        ) {
             if (time == null) return
             val at = LocalDateTime.of(day, time)
             if (at.isAfter(now) && at.isBefore(now.plusHours(24))) {
-                alerts += Alert(at, emoji, title, text)
+                alerts += Alert(at, emoji, title, text, nudge, route, action)
             }
         }
 
@@ -183,6 +197,26 @@ object Alarms {
                 add(
                     day, parseTime(settings.sundayReminder), "🗓️", "Revue de la semaine",
                     "10 minutes à deux pour préparer la semaine."
+                )
+            }
+            // Les repas : on note ce qu'on a mangé pendant qu'on s'en souvient.
+            // Une heure plus tard, la moitié de l'assiette a déjà disparu de la
+            // mémoire — d'où trois rendez-vous fixes plutôt qu'un rappel du soir.
+            if (settings.mealRemindersEnabled) {
+                add(
+                    day, parseTime(settings.mealReminderMorning), "🥐",
+                    "Petit-déjeuner", "Notez ce que vous avez mangé, ou dites que vous avez jeûné.",
+                    route = "meallog", action = "Noter mon repas", nudge = true
+                )
+                add(
+                    day, parseTime(settings.mealReminderNoon), "🍽️",
+                    "Déjeuner", "Une photo suffit, ou cochez le menu prévu.",
+                    route = "meallog", action = "Noter mon repas", nudge = true
+                )
+                add(
+                    day, parseTime(settings.mealReminderEvening), "🌙",
+                    "Dîner", "Dernier repas de la journée : notez-le avant d'oublier.",
+                    route = "meallog", action = "Noter mon repas", nudge = true
                 )
             }
             if (settings.curfewEnabled) {
@@ -235,6 +269,8 @@ object Alarms {
             .putExtra(EXTRA_TEXT, alert.text)
             .putExtra(EXTRA_SOUND, sound)
             .putExtra(EXTRA_NUDGE, alert.nudge)
+            .putExtra(EXTRA_ROUTE, alert.route)
+            .putExtra(EXTRA_ACTION, alert.action)
         val pending = PendingIntent.getBroadcast(
             context, requestCode, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -351,7 +387,9 @@ class AlarmReceiver : BroadcastReceiver() {
             title = intent.getStringExtra(Alarms.EXTRA_TITLE) ?: "Rappel",
             text = intent.getStringExtra(Alarms.EXTRA_TEXT).orEmpty(),
             sound = intent.getBooleanExtra(Alarms.EXTRA_SOUND, true),
-            nudge = intent.getBooleanExtra(Alarms.EXTRA_NUDGE, false)
+            nudge = intent.getBooleanExtra(Alarms.EXTRA_NUDGE, false),
+            actionRoute = intent.getStringExtra(Alarms.EXTRA_ROUTE).orEmpty(),
+            actionLabel = intent.getStringExtra(Alarms.EXTRA_ACTION).orEmpty()
         )
         // Un rappel vient de partir : on recalcule la suite des 24 heures.
         Alarms.rescheduleAsync(context)

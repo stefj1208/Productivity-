@@ -302,11 +302,10 @@ private fun GoalWizard(
 
             Spacer(Modifier.height(16.dp))
             SectionLabel("1 · QUOI, PRÉCISÉMENT ?")
-            OutlinedTextField(
+            VoiceField(
                 value = title,
                 onValueChange = { title = it },
-                placeholder = { Text("Ex. : apprendre l'espagnol") },
-                textStyle = MaterialTheme.typography.bodyLarge,
+                placeholder = "Ex. : apprendre l'espagnol",
                 maxLines = 3,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -407,11 +406,10 @@ private fun GoalWizard(
 
             Spacer(Modifier.height(16.dp))
             SectionLabel("LA PROCHAINE ACTION (une seule)")
-            OutlinedTextField(
+            VoiceField(
                 value = nextAction,
                 onValueChange = { nextAction = it },
-                placeholder = { Text("Le tout premier pas, concret") },
-                textStyle = MaterialTheme.typography.bodyLarge,
+                placeholder = "Le tout premier pas, concret",
                 maxLines = 3,
                 modifier = Modifier.fillMaxWidth()
             )

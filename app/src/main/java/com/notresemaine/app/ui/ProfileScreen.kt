@@ -57,11 +57,10 @@ fun ProfileScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
 
             Spacer(Modifier.height(12.dp))
             SectionLabel("MON PRÉNOM")
-            OutlinedTextField(
+            VoiceField(
                 value = name,
                 onValueChange = { name = it },
-                label = { Text("Prénom") },
-                textStyle = MaterialTheme.typography.bodyLarge,
+                label = "Prénom",
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )

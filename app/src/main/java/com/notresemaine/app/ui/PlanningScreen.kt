@@ -484,11 +484,10 @@ fun PlanningScreen(
             title = { Text("Ajouter — aujourd'hui") },
             text = {
                 Column {
-                    OutlinedTextField(
+                    VoiceField(
                         value = title,
                         onValueChange = { title = it },
-                        placeholder = { Text("Quoi ?") },
-                        textStyle = MaterialTheme.typography.bodyLarge,
+                        placeholder = "Quoi ?",
                         maxLines = 3,
                         modifier = Modifier.fillMaxWidth()
                     )

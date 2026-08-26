@@ -51,11 +51,10 @@ fun OnboardingScreen(vm: AppViewModel) {
 
         Spacer(Modifier.height(32.dp))
         SectionLabel("TON PRÉNOM")
-        OutlinedTextField(
+        VoiceField(
             value = name,
             onValueChange = { name = it },
-            placeholder = { Text("Prénom") },
-            textStyle = MaterialTheme.typography.bodyLarge,
+            placeholder = "Prénom",
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )

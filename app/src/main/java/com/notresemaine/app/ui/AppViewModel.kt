@@ -1011,10 +1011,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         detail: String,
         caloriesLow: Int,
         caloriesHigh: Int,
-        source: String
+        source: String,
+        time: String = ""
     ) {
         viewModelScope.launch {
-            repo.saveMealLog(myId(), date, slot, title, detail, caloriesLow, caloriesHigh, source)
+            repo.saveMealLog(
+                myId(), date, slot, title, detail, caloriesLow, caloriesHigh, source, time
+            )
             aiPhotoMeal.value = null
             requestSync()
             toast("Repas noté ✓")
@@ -1023,6 +1026,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun clearPhotoMeal() {
         aiPhotoMeal.value = null
+    }
+
+    /** « J'ai jeûné ce repas » : une ligne à zéro calorie, assumée — ou son retrait. */
+    fun toggleFasted(date: String, slot: String) {
+        viewModelScope.launch {
+            val added = repo.toggleFasted(myId(), date, slot)
+            requestSync()
+            toast(if (added) "Repas sauté, noté ✓" else "Jeûne annulé")
+        }
     }
 
     /** Cocher un repas du menu comme réellement mangé — ou le décocher. */
@@ -1287,6 +1299,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             repo.settings.setReminders(evening, eveningOn, sunday, sundayOn)
             Alarms.rescheduleAll(getApplication())
             toast("Rappels enregistrés ✓")
+        }
+    }
+
+    /** Les trois rendez-vous fixes pour noter ce qu'on a vraiment mangé. */
+    fun saveMealReminders(enabled: Boolean, morning: String, noon: String, evening: String) {
+        viewModelScope.launch {
+            repo.settings.setMealReminders(enabled, morning, noon, evening)
+            Alarms.rescheduleAll(getApplication())
         }
     }
 
