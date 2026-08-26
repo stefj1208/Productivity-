@@ -266,7 +266,15 @@ data class AuthSession(
     val user: AuthUser? = null
 )
 
-class SupabaseException(message: String) : IOException(message)
+/**
+ * Une erreur venue du serveur, avec son code HTTP.
+ *
+ * Le code n'est pas décoratif : c'est lui qui distingue « jeton expiré » (401),
+ * qu'il faut renouveler, de « cette colonne n'existe pas » (400), qu'il faut
+ * corriger. Sans lui, l'application renouvelait son jeton pour rien puis
+ * affichait « hors ligne » — cachant la seule phrase utile.
+ */
+class SupabaseException(message: String, val code: Int = 0) : IOException(message)
 
 // ---------- Client REST minimal pour Supabase (auth + données) ----------
 
@@ -289,7 +297,7 @@ class SupabaseApi(private val baseUrl: String, private val anonKey: String) {
                     (obj?.get("msg") ?: obj?.get("message") ?: obj?.get("error_description"))
                         ?.jsonPrimitive?.content
                 } catch (_: Exception) { null }
-                throw SupabaseException(msg ?: "Erreur ${resp.code}")
+                throw SupabaseException(msg ?: "Erreur ${resp.code}", resp.code)
             }
             return body
         }
@@ -412,6 +420,10 @@ class SyncManager(private val repo: Repository) {
         return try {
             block(api, s.accessToken)
         } catch (e: SupabaseException) {
+            // Seul un jeton refusé mérite d'être renouvelé. Réessayer sur une
+            // erreur de schéma masquait le message du serveur derrière un
+            // « hors ligne » qui n'expliquait rien.
+            if (e.code != 401 && e.code != 403) throw e
             val session = api.refresh(s.refreshToken)
             repo.settings.setTokens(session.accessToken, session.refreshToken)
             block(api, session.accessToken)

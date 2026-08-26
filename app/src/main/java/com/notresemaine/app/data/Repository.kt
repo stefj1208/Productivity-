@@ -1035,6 +1035,10 @@ class Repository private constructor(context: Context) {
         if (ids.isNotEmpty()) settings.rememberAlertedTasks(ids)
     }
 
+    suspend fun markGraceAnnounced(ids: List<String>) {
+        if (ids.isNotEmpty()) settings.rememberAlertedGraces(ids)
+    }
+
     // ----- Habitudes -----
 
     suspend fun saveHabit(

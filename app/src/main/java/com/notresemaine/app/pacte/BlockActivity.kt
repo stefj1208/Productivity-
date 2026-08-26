@@ -4,15 +4,21 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -76,6 +82,41 @@ class BlockActivity : ComponentActivity() {
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        // ----- Les trois sorties de secours -----
+                        //
+                        // Un couvre-feu qui empêche de répondre à un appel n'est
+                        // pas un couvre-feu, c'est un piège. Ces trois portes
+                        // s'ouvrent nommément et pour dix minutes seulement : de
+                        // quoi répondre, pas de quoi faire défiler un fil.
+                        if (isCurfew) {
+                            Spacer(Modifier.height(20.dp))
+                            Text(
+                                text = "URGENCES",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                            ) {
+                                EscapeButton("📞", "Appels", Modifier.weight(1f)) {
+                                    openEscape(ESCAPE_PHONE)
+                                }
+                                EscapeButton("💬", "SMS", Modifier.weight(1f)) {
+                                    openEscape(ESCAPE_SMS)
+                                }
+                                EscapeButton("🟢", "WhatsApp", Modifier.weight(1f)) {
+                                    openEscape(ESCAPE_WHATSAPP)
+                                }
+                            }
+                            Text(
+                                text = "Dix minutes, cette application seulement.",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 6.dp)
+                            )
+                        }
+
                         Spacer(Modifier.weight(1f))
                         if (!requested && s != null) {
                             BigButton(
@@ -103,6 +144,52 @@ class BlockActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Ouvre l'application demandée après lui avoir accordé un laissez-passer.
+     *
+     * L'ordre compte : on enregistre l'autorisation *avant* de lancer, sinon le
+     * service de surveillance rebloque dans la seconde qui suit.
+     */
+    private fun openEscape(kind: String) {
+        val repo = Repository.get(applicationContext)
+        lifecycleScope.launch {
+            val pkg = resolveEscape(kind)
+            if (pkg == null) {
+                android.widget.Toast.makeText(
+                    this@BlockActivity,
+                    "Application introuvable sur ce téléphone.",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+                return@launch
+            }
+            repo.settings.allowPackage(pkg, ESCAPE_MINUTES)
+            val launch = packageManager.getLaunchIntentForPackage(pkg)
+            if (launch != null) {
+                launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                runCatching { startActivity(launch) }
+            }
+            finish()
+        }
+    }
+
+    /** Le nom de paquet réel sur CE téléphone : Samsung et Honor n'ont pas les mêmes. */
+    private fun resolveEscape(kind: String): String? {
+        val candidates = when (kind) {
+            ESCAPE_PHONE -> listOf(
+                "com.samsung.android.dialer", "com.google.android.dialer",
+                "com.hihonor.contacts", "com.android.dialer", "com.android.contacts"
+            )
+            ESCAPE_SMS -> listOf(
+                "com.samsung.android.messaging", "com.google.android.apps.messaging",
+                "com.hihonor.message", "com.android.messaging", "com.android.mms"
+            )
+            else -> listOf("com.whatsapp", "com.whatsapp.w4b")
+        }
+        return candidates.firstOrNull { pkg ->
+            runCatching { packageManager.getLaunchIntentForPackage(pkg) != null }.getOrDefault(false)
+        }
+    }
+
     override fun onStart() {
         super.onStart()
         visible = true
@@ -123,6 +210,13 @@ class BlockActivity : ComponentActivity() {
     }
 
     companion object {
+        const val ESCAPE_PHONE = "phone"
+        const val ESCAPE_SMS = "sms"
+        const val ESCAPE_WHATSAPP = "whatsapp"
+
+        /** Assez pour répondre, trop court pour s'y perdre. */
+        const val ESCAPE_MINUTES = 10
+
         /** Évite de relancer l'écran toutes les deux secondes s'il est déjà là. */
         @Volatile
         var visible: Boolean = false
@@ -134,5 +228,21 @@ class BlockActivity : ComponentActivity() {
                 .putExtra("minutes", minutes)
                 .putExtra("curfew", curfew)
                 .putExtra("curfewLabel", curfewLabel)
+    }
+}
+
+/** Une porte de sortie : gros emoji, un mot, 56 dp de haut. */
+@Composable
+private fun EscapeButton(
+    emoji: String,
+    label: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier.defaultMinSize(minHeight = 56.dp)
+    ) {
+        Text("$emoji $label", style = MaterialTheme.typography.labelLarge)
     }
 }

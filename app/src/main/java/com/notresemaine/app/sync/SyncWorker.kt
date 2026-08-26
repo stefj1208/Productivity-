@@ -14,8 +14,14 @@ import java.util.concurrent.TimeUnit
 class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        val manager = SyncManager(Repository.get(applicationContext))
-        return if (manager.syncNow().isSuccess) Result.success() else Result.retry()
+        val repo = Repository.get(applicationContext)
+        val manager = SyncManager(repo)
+        if (manager.syncNow().isFailure) return Result.retry()
+        // Une tâche confiée ou une demande de pause arrivées ici doivent
+        // s'annoncer, même application fermée : c'est tout l'intérêt du
+        // travail de fond.
+        com.notresemaine.app.notif.Announcements.afterSync(applicationContext, repo)
+        return Result.success()
     }
 
     companion object {

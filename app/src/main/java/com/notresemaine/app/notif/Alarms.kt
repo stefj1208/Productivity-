@@ -45,6 +45,12 @@ object Alarms {
     /** Où mène le bouton principal de l'écran de rappel, et comment il s'appelle. */
     const val EXTRA_ROUTE = "route"
     const val EXTRA_ACTION = "action"
+    /**
+     * Une demande de pause à trancher depuis l'écran de rappel lui-même.
+     * Sa présence transforme les deux boutons en « Accorder » et « Refuser ».
+     */
+    const val EXTRA_GRACE_ID = "graceId"
+    const val EXTRA_GRACE_MINUTES = "graceMinutes"
 
     private const val FIRST_REQUEST_CODE = 1000
     // Trois rappels de repas se sont ajoutés aux séances, tâches et habitudes :
@@ -336,7 +342,9 @@ object Alarms {
         sound: Boolean,
         nudge: Boolean = false,
         actionRoute: String = "",
-        actionLabel: String = ""
+        actionLabel: String = "",
+        graceId: String = "",
+        graceMinutes: Int = 0
     ) {
         val full = Intent(context, AlertActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
@@ -347,6 +355,8 @@ object Alarms {
             .putExtra(EXTRA_NUDGE, nudge)
             .putExtra(EXTRA_ROUTE, actionRoute)
             .putExtra(EXTRA_ACTION, actionLabel)
+            .putExtra(EXTRA_GRACE_ID, graceId)
+            .putExtra(EXTRA_GRACE_MINUTES, graceMinutes)
 
         if (android.provider.Settings.canDrawOverlays(context)) {
             runCatching { context.startActivity(full) }
@@ -370,8 +380,10 @@ object Alarms {
             .setFullScreenIntent(pending, true)
             .setAutoCancel(true)
             .build()
-        context.getSystemService(NotificationManager::class.java)
-            .notify(NOTIFICATION_ID, notification)
+        // Une demande de pause ne doit pas écraser un rappel en cours, ni
+        // l'inverse : deux messages différents, deux emplacements.
+        val id = if (graceId.isNotBlank()) NOTIFICATION_ID + 1 else NOTIFICATION_ID
+        context.getSystemService(NotificationManager::class.java).notify(id, notification)
     }
 
     fun dismissNotification(context: Context) {

@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.notresemaine.app.notif.Alarms
 import com.notresemaine.app.ui.theme.AppTheme
+import kotlinx.coroutines.launch
 
 /**
  * L'écran de rappel : il s'allume par-dessus tout, même téléphone verrouillé.
@@ -44,6 +45,10 @@ class AlertActivity : ComponentActivity() {
         val nudge = intent.getBooleanExtra(Alarms.EXTRA_NUDGE, false)
         val route = intent.getStringExtra(Alarms.EXTRA_ROUTE).orEmpty()
         val actionLabel = intent.getStringExtra(Alarms.EXTRA_ACTION).orEmpty()
+        // Une demande de pause se tranche ici même : l'envoyer chercher un menu
+        // ferait attendre quelqu'un qui est bloqué à l'instant.
+        val graceId = intent.getStringExtra(Alarms.EXTRA_GRACE_ID).orEmpty()
+        val graceMinutes = intent.getIntExtra(Alarms.EXTRA_GRACE_MINUTES, 15)
         val sound = intent.getBooleanExtra(Alarms.EXTRA_SOUND, true) && !nudge
 
         // Une habitude s'affiche par-dessus tout, mais n'allume pas l'écran :
@@ -87,6 +92,7 @@ class AlertActivity : ComponentActivity() {
                             },
                             onClick = {
                                 when {
+                                    graceId.isNotBlank() -> answerGrace(graceId, true, graceMinutes)
                                     // Un bouton qui mène quelque part ouvre l'application
                                     // à l'endroit exact où l'on peut agir.
                                     route.isNotBlank() -> finishAndOpenApp(route)
@@ -97,20 +103,56 @@ class AlertActivity : ComponentActivity() {
                         )
                         OutlinedButton(
                             onClick = {
-                                if (nudge) finishAndOpenApp()
-                                else {
-                                    Alarms.snooze(this@AlertActivity, 10, emoji, title, text, sound)
-                                    finishAlert()
+                                when {
+                                    graceId.isNotBlank() -> answerGrace(graceId, false, graceMinutes)
+                                    nudge -> finishAndOpenApp()
+                                    else -> {
+                                        Alarms.snooze(this@AlertActivity, 10, emoji, title, text, sound)
+                                        finishAlert()
+                                    }
                                 }
                             },
                             modifier = Modifier
                                 .padding(top = 12.dp)
                                 .height(56.dp)
-                        ) { Text(if (nudge) "Ouvrir l'application" else "Dans 10 minutes") }
+                        ) {
+                            Text(
+                                when {
+                                    // « C'était le pacte » : refuser doit être aussi
+                                    // simple qu'accorder, sinon ce n'est plus un choix.
+                                    graceId.isNotBlank() -> "Non, c'était le pacte"
+                                    nudge -> "Ouvrir l'application"
+                                    else -> "Dans 10 minutes"
+                                }
+                            )
+                        }
                     }
                 }
             }
         }
+    }
+
+    /**
+     * Accorde ou refuse la pause, puis pousse la réponse tout de suite.
+     *
+     * La synchronisation immédiate n'est pas un luxe : l'autre est devant un
+     * écran de blocage en ce moment même, et sa délivrance ne peut pas attendre
+     * le prochain réveil du travail de fond.
+     */
+    private fun answerGrace(requestId: String, granted: Boolean, minutes: Int) {
+        val repo = com.notresemaine.app.data.Repository.get(applicationContext)
+        // Le traitement continue au-delà de cet écran : on l'attache donc au
+        // processus, pas à l'activité qu'on est en train de fermer.
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            repo.answerGrace(requestId, granted)
+            com.notresemaine.app.sync.SyncManager(repo).syncNow()
+        }
+        android.widget.Toast.makeText(
+            this,
+            if (granted) "$minutes minutes accordées ✓" else "Demande refusée",
+            android.widget.Toast.LENGTH_SHORT
+        ).show()
+        finishAlert()
     }
 
     private fun finishAndOpenApp(route: String = "") {

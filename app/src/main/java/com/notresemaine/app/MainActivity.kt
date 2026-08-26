@@ -37,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -162,7 +163,26 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings, openRoute: Str
                             }
                         },
                         icon = { Icon(tab.icon, contentDescription = tab.label) },
-                        label = { Text(tab.label, style = MaterialTheme.typography.labelMedium) }
+                        label = {
+                            // Sur un écran étroit — un Honor, par exemple — le
+                            // « s » de « Planning » et d'« Objectifs » basculait
+                            // seul à la ligne.
+                            //
+                            // 12 sp au lieu de 14 : c'est la seule entorse de
+                            // l'application à sa règle des 14 sp, et elle est
+                            // assumée ici. C'est aussi la taille standard d'Android
+                            // pour une barre de navigation, l'icône porte déjà le
+                            // sens, et un mot coupé en deux se lit bien plus mal
+                            // qu'un mot un peu plus petit.
+                            Text(
+                                text = tab.label,
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontSize = 12.sp
+                                ),
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                        }
                     )
                 }
             }

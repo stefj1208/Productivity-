@@ -89,37 +89,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             syncRequests.debounce(3_000).collect {
                 sync.syncNow()
-                announceAssignedTasks()
+                com.notresemaine.app.notif.Announcements.afterSync(getApplication(), repo)
             }
         }
-    }
-
-    /**
-     * Une tâche confiée par l'autre s'annonce en plein écran, comme un rappel.
-     *
-     * Avant, elle apparaissait en silence dans la liste : on la découvrait le
-     * lendemain, ou jamais. Confier quelque chose à quelqu'un sans qu'il le
-     * sache, ce n'est pas le lui confier.
-     */
-    private suspend fun announceAssignedTasks() {
-        val s = repo.settings.current()
-        if (!s.alertsEnabled) return
-        val fresh = repo.unannouncedAssignedTasks(s.myUserId)
-        if (fresh.isEmpty()) return
-        val partner = repo.db.profiles().partnerOf(s.myUserId)?.name ?: "Ton binôme"
-        fresh.forEach { task ->
-            Alarms.fire(
-                context = getApplication(),
-                emoji = "🤝",
-                title = task.title,
-                text = "$partner vient de te confier cette tâche.",
-                sound = false,
-                nudge = true,
-                actionRoute = "day/${task.date ?: com.notresemaine.app.data.Dates.todayIso()}",
-                actionLabel = "Bloquer un créneau"
-            )
-        }
-        repo.markAssignedAnnounced(fresh.map { it.id })
     }
 
     /** Réserve le rituel dans le planning : une intention sans heure n'arrive pas. */
@@ -1433,8 +1405,33 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             syncStatus.value = "Synchronisation…"
             sync.syncNow().fold(
                 onSuccess = { syncStatus.value = "À jour ✓" },
-                onFailure = { syncStatus.value = "Hors ligne — nouvelle tentative plus tard" }
+                onFailure = { syncStatus.value = syncErrorText(it) }
             )
         }
+    }
+
+    /**
+     * Ce qui a réellement échoué, en une phrase.
+     *
+     * « Hors ligne — nouvelle tentative plus tard » était affiché pour *toutes*
+     * les pannes : adresse fautive, colonne manquante, mot de passe changé. Un
+     * message qui recouvre tout n'aide à rien — on ne peut pas corriger ce qu'on
+     * ne voit pas.
+     */
+    private fun syncErrorText(t: Throwable): String = when {
+        t is java.net.UnknownHostException ->
+            "Adresse introuvable. Vérifiez l'adresse du projet dans « Modifier l'adresse et la clé »."
+        t is java.net.SocketTimeoutException ->
+            "Le serveur ne répond pas. Réessayez dans un instant."
+        t is javax.net.ssl.SSLException ->
+            "Connexion sécurisée refusée. Vérifiez la date et l'heure du téléphone."
+        t is java.net.ConnectException ->
+            "Connexion impossible. Vérifiez le réseau du téléphone."
+        // Une colonne absente est le symptôme d'un schéma non mis à jour : c'est
+        // la panne la plus fréquente après une livraison, et la plus vite réglée.
+        t.message?.contains("column", ignoreCase = true) == true ->
+            "Base incomplète : repassez le fichier supabase/schema.sql dans le SQL " +
+                "Editor. (${t.message?.take(120)})"
+        else -> t.message?.take(160) ?: "Échec de la synchronisation."
     }
 }

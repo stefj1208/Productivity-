@@ -39,6 +39,14 @@ data class AppSettings(
     val socialApps: String = "",        // noms de paquets séparés par des virgules
     val dailyLimitMinutes: Int = 45,
     val graceUntil: Long = 0L,          // pause accordée par le partenaire (horodatage local)
+    /**
+     * Laissez-passer accordé depuis l'écran de blocage : une application, et
+     * jusqu'à quand. Sert aux trois sorties de secours du couvre-feu (téléphone,
+     * SMS, WhatsApp) — bloquer quelqu'un qui doit répondre à un appel serait
+     * absurde, mais l'ouverture doit rester courte et nominative.
+     */
+    val allowedPackage: String = "",
+    val allowedUntil: Long = 0L,
     // Couvre-feu : plus de réseaux (ou plus rien) entre ces deux heures
     val curfewEnabled: Boolean = false,
     val curfewStart: String = "22:30",
@@ -82,6 +90,8 @@ data class AppSettings(
     val calendarName: String = "",
     /** Tâches confiées déjà annoncées : sert à ne pas sonner deux fois. */
     val alertedTaskIds: String = "",
+    /** Demandes de pause déjà annoncées : une demande ne sonne qu'une fois. */
+    val alertedGraceIds: String = "",
     /**
      * Rappels de repas. Trois moments fixes, parce qu'on note ce qu'on a mangé
      * pendant qu'on s'en souvient — une heure plus tard, on a déjà oublié la
@@ -129,6 +139,8 @@ class SettingsStore(private val context: Context) {
         val socialApps = stringPreferencesKey("socialApps")
         val dailyLimitMinutes = intPreferencesKey("dailyLimitMinutes")
         val graceUntil = longPreferencesKey("graceUntil")
+        val allowedPackage = stringPreferencesKey("allowedPackage")
+        val allowedUntil = longPreferencesKey("allowedUntil")
         val curfewEnabled = booleanPreferencesKey("curfewEnabled")
         val curfewStart = stringPreferencesKey("curfewStart")
         val curfewEnd = stringPreferencesKey("curfewEnd")
@@ -151,6 +163,7 @@ class SettingsStore(private val context: Context) {
         val calendarId = longPreferencesKey("calendarId")
         val calendarName = stringPreferencesKey("calendarName")
         val alertedTaskIds = stringPreferencesKey("alertedTaskIds")
+        val alertedGraceIds = stringPreferencesKey("alertedGraceIds")
         val mealRemindersEnabled = booleanPreferencesKey("mealRemindersEnabled")
         val mealReminderMorning = stringPreferencesKey("mealReminderMorning")
         val mealReminderNoon = stringPreferencesKey("mealReminderNoon")
@@ -182,6 +195,8 @@ class SettingsStore(private val context: Context) {
             socialApps = p[K.socialApps] ?: "",
             dailyLimitMinutes = p[K.dailyLimitMinutes] ?: 45,
             graceUntil = p[K.graceUntil] ?: 0L,
+            allowedPackage = p[K.allowedPackage] ?: "",
+            allowedUntil = p[K.allowedUntil] ?: 0L,
             curfewEnabled = p[K.curfewEnabled] ?: false,
             curfewStart = p[K.curfewStart] ?: "22:30",
             curfewEnd = p[K.curfewEnd] ?: "06:30",
@@ -204,6 +219,7 @@ class SettingsStore(private val context: Context) {
             calendarId = p[K.calendarId] ?: -1L,
             calendarName = p[K.calendarName] ?: "",
             alertedTaskIds = p[K.alertedTaskIds] ?: "",
+            alertedGraceIds = p[K.alertedGraceIds] ?: "",
             mealRemindersEnabled = p[K.mealRemindersEnabled] ?: false,
             mealReminderMorning = p[K.mealReminderMorning] ?: "07:30",
             mealReminderNoon = p[K.mealReminderNoon] ?: "13:00",
@@ -301,6 +317,14 @@ class SettingsStore(private val context: Context) {
             p[K.pacteEnabled] = enabled
             p[K.socialApps] = socialApps
             p[K.dailyLimitMinutes] = limitMinutes
+        }
+    }
+
+    /** Ouvre une application nommément, pour quelques minutes seulement. */
+    suspend fun allowPackage(packageName: String, minutes: Int) {
+        context.dataStore.edit { p ->
+            p[K.allowedPackage] = packageName
+            p[K.allowedUntil] = System.currentTimeMillis() + minutes * 60_000L
         }
     }
 
@@ -417,6 +441,13 @@ class SettingsStore(private val context: Context) {
         context.dataStore.edit { p ->
             val existing = (p[K.alertedTaskIds] ?: "").split(",").filter { it.isNotBlank() }
             p[K.alertedTaskIds] = (existing + ids).distinct().takeLast(60).joinToString(",")
+        }
+    }
+
+    suspend fun rememberAlertedGraces(ids: List<String>) {
+        context.dataStore.edit { p ->
+            val existing = (p[K.alertedGraceIds] ?: "").split(",").filter { it.isNotBlank() }
+            p[K.alertedGraceIds] = (existing + ids).distinct().takeLast(30).joinToString(",")
         }
     }
 

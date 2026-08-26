@@ -346,6 +346,14 @@ fun PerformanceScreen(
             val d = myUsage.filter { weekOf(it.date) == key }
             if (d.isEmpty()) 0f else d.sumOf { it.socialMinutes }.toFloat() / d.size
         }
+        // Les calories par semaine se calculent sur les jours réellement notés :
+        // diviser par sept ferait passer une semaine notée trois jours pour un
+        // régime, alors que ce n'est qu'un oubli de saisie.
+        val kcalPerWeek = weekKeys.map { key ->
+            val ofWeek = myMeals.filter { weekOf(it.date) == key }
+            val noted = ofWeek.map { it.date }.distinct()
+            if (noted.isEmpty()) 0f else ofWeek.sumOf { it.calories }.toFloat() / noted.size
+        }
         val tasksPerWeek = weekKeys.map { key ->
             weekTasks.filter { it.userId == myId && it.weekStart == key && it.done }.size.toFloat()
         }
@@ -371,6 +379,14 @@ fun PerformanceScreen(
         MiniBarChart(
             values = sportPerWeek, labels = weekLabels, accent = accent,
             valueLabel = { "${it.toInt()} min" },
+            modifier = Modifier.padding(top = 6.dp)
+        )
+
+        Spacer(Modifier.height(20.dp))
+        Text("🍽️ Calories — moyenne par jour noté", style = MaterialTheme.typography.bodyLarge)
+        MiniBarChart(
+            values = kcalPerWeek, labels = weekLabels, accent = accent,
+            valueLabel = { "${it.toInt()}" },
             modifier = Modifier.padding(top = 6.dp)
         )
 

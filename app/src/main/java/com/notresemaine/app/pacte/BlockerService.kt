@@ -90,8 +90,14 @@ class BlockerService : Service() {
                 val graceActive = repo.settings.current().graceUntil > now
                 if (!graceActive) {
                     val foreground = Usage.foregroundPackage(this)
+                    // Un laissez-passer pris depuis l'écran de blocage : nominatif
+                    // et daté. Sans cette exception, appuyer sur « WhatsApp » pour
+                    // répondre à un message rouvrirait le blocage deux secondes après.
+                    val current = repo.settings.current()
+                    val passOk = current.allowedPackage.isNotBlank() &&
+                        current.allowedUntil > now && foreground == current.allowedPackage
                     // Couvre-feu strict : tout est bloqué sauf le strict nécessaire.
-                    val blocked = foreground != null && foreground !in ALWAYS_ALLOWED &&
+                    val blocked = !passOk && foreground != null && foreground !in ALWAYS_ALLOWED &&
                         (foreground in social || (curfewOn && s.curfewStrict))
                     if (blocked) {
                         showBlock(socialMinutes, curfewOn, Curfew.label(s))
