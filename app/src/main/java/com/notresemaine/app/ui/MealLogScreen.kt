@@ -77,7 +77,12 @@ private fun slotEmoji(slot: String): String = when (slot) {
  * ce qu'on mange sert à voir l'écart avec ce qui était prévu, pas à se noter.
  */
 @Composable
-fun MealLogScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
+fun MealLogScreen(
+    vm: AppViewModel,
+    settings: AppSettings,
+    onMenus: (String) -> Unit,
+    onBack: () -> Unit
+) {
     val context = LocalContext.current
     val today = Dates.todayIso()
     val myId = settings.myUserId
@@ -103,9 +108,9 @@ fun MealLogScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
     val busy by vm.aiBusy.collectAsState()
     val proposal by vm.aiPhotoMeal.collectAsState()
 
-    val logs by remember { vm.repo.db.mealLogs().between(today, today) }
+    val logs by remember(today) { vm.repo.db.mealLogs().between(today, today) }
         .collectAsState(initial = emptyList())
-    val meals by remember { vm.repo.db.meals().between(today, today) }
+    val meals by remember(today) { vm.repo.db.meals().between(today, today) }
         .collectAsState(initial = emptyList())
     // Un jeûne enjambe la nuit : le calculer sur la seule journée d'aujourd'hui
     // afficherait « 8 h » à midi pour quelqu'un qui n'a rien mangé depuis la veille.
@@ -192,10 +197,29 @@ fun MealLogScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
             // alors, et la photo ne sert plus qu'aux jours où l'assiette s'écarte
             // du plan. Mettre ceci avant l'appareil photo, c'est mettre le geste
             // le plus fréquent en premier.
+            //
+            // La section reste visible même sans menu. Quand elle disparaissait,
+            // on croyait la fonction perdue alors qu'il manquait simplement le
+            // menu du jour — exactement le genre de silence qui fait douter de
+            // l'application plutôt que de ses données.
             val plannedMeals = meals.filter { it.title.isNotBlank() }
-            if (plannedMeals.isNotEmpty()) {
-                Spacer(Modifier.height(24.dp))
-                SectionLabel("J'AI MANGÉ CE QUI ÉTAIT PRÉVU")
+            Spacer(Modifier.height(24.dp))
+            SectionLabel("J'AI MANGÉ CE QUI ÉTAIT PRÉVU")
+            if (plannedMeals.isEmpty()) {
+                Text(
+                    text = "Rien au menu pour ${Dates.longLabel(today)}. Remplissez-le et " +
+                        "chaque repas s'affichera ici, à cocher en un appui.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedButton(
+                    onClick = { onMenus(Dates.weekStartIso()) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .padding(top = 10.dp)
+                ) { Text("🍽️ Remplir les menus de la semaine") }
+            } else {
                 plannedMeals.forEach { meal ->
                     val ticked = mine.any { it.slot == meal.slot && it.source == "menu" }
                     PlannedMealRow(

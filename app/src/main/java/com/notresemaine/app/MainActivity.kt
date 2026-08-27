@@ -278,7 +278,11 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings, openRoute: Str
                 AskScreen(vm, settings, onBack = { navController.popBackStack() })
             }
             composable("meallog") {
-                MealLogScreen(vm, settings, onBack = { navController.popBackStack() })
+                MealLogScreen(
+                    vm, settings,
+                    onMenus = { week -> navController.navigate("menus/$week") },
+                    onBack = { navController.popBackStack() }
+                )
             }
             composable("habits") {
                 HabitsScreen(vm, settings, onBack = { navController.popBackStack() })
