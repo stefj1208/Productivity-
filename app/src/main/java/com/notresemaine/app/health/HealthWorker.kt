@@ -20,13 +20,20 @@ class HealthWorker(context: Context, params: WorkerParameters) : CoroutineWorker
     }
 
     companion object {
-        /** Relève aujourd'hui et les 2 jours précédents (une source peut écrire en retard). */
+        /**
+         * Relève aujourd'hui et les 7 jours précédents.
+         *
+         * Deux raisons de remonter aussi loin : une source écrit parfois en
+         * retard, et surtout une correction de calcul doit pouvoir réparer la
+         * semaine déjà affichée. Avec trois jours seulement, un mauvais chiffre
+         * enregistré lundi restait faux jusqu'au dimanche suivant.
+         */
         suspend fun collect(context: Context) {
             if (!Health.hasPermissions(context)) return
             val repo = Repository.get(context)
             val userId = repo.settings.current().myUserId
             if (userId.isBlank()) return
-            (0L..2L).forEach { back ->
+            (0L..7L).forEach { back ->
                 val date = LocalDate.now().minusDays(back)
                 val day = Health.readDay(context, date) ?: return@forEach
                 if (day.sleepMinutes == 0 && day.steps == 0 && day.exerciseMinutes == 0) return@forEach

@@ -113,7 +113,18 @@ fun HealthScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
                 granted -> {
                     Text("Autorisé ✓ Les données sont relevées plusieurs fois par jour.",
                         style = MaterialTheme.typography.bodyLarge)
-                    TextButton(onClick = { vm.refreshHealth() }) { Text("Relever maintenant") }
+                    Text(
+                        text = "Quand plusieurs applications ont noté la même nuit (montre, " +
+                            "téléphone, Samsung Health…), les périodes qui se recouvrent ne " +
+                            "sont comptées qu'une fois. Un écart avec Google Fit peut aussi " +
+                            "venir de là : les deux ne lisent pas les mêmes sources.",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                    TextButton(onClick = { vm.refreshHealth() }) {
+                        Text("Relever et recalculer les 8 derniers jours")
+                    }
                 }
                 checked -> {
                     Text(

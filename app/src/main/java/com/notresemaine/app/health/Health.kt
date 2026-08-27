@@ -70,24 +70,83 @@ object Health {
                 )
             )[StepsRecord.COUNT_TOTAL]?.toInt() ?: 0
 
-            val exerciseMinutes = client.readRecords(
-                ReadRecordsRequest(
-                    recordType = ExerciseSessionRecord::class,
-                    timeRangeFilter = TimeRangeFilter.between(dayStart, dayEnd)
-                )
-            ).records.sumOf { Duration.between(it.startTime, it.endTime).toMinutes() }.toInt()
+            val exerciseMinutes = mergedMinutes(
+                client.readRecords(
+                    ReadRecordsRequest(
+                        recordType = ExerciseSessionRecord::class,
+                        timeRangeFilter = TimeRangeFilter.between(dayStart, dayEnd)
+                    )
+                ).records.map { it.startTime to it.endTime },
+                dayStart, dayEnd
+            )
 
             val nightStart = LocalDateTime.of(date.minusDays(1), LocalTime.of(18, 0))
             val nightEnd = LocalDateTime.of(date, LocalTime.NOON)
-            val sleepMinutes = client.readRecords(
-                ReadRecordsRequest(
-                    recordType = SleepSessionRecord::class,
-                    timeRangeFilter = TimeRangeFilter.between(nightStart, nightEnd)
-                )
-            ).records.sumOf { Duration.between(it.startTime, it.endTime).toMinutes() }.toInt()
+            val sleepMinutes = mergedMinutes(
+                client.readRecords(
+                    ReadRecordsRequest(
+                        recordType = SleepSessionRecord::class,
+                        timeRangeFilter = TimeRangeFilter.between(nightStart, nightEnd)
+                    )
+                ).records.map { it.startTime to it.endTime },
+                nightStart, nightEnd
+            )
 
             HealthDay(sleepMinutes, steps, exerciseMinutes)
         }.getOrNull()
+    }
+
+    /**
+     * Le temps réellement couvert par une liste de périodes — et non leur somme.
+     *
+     * C'est la correction d'un vrai faux chiffre. Health Connect est un carrefour :
+     * la montre y écrit la nuit, le téléphone aussi, et parfois une troisième
+     * application par-dessus. Additionner leurs durées comptait donc la même nuit
+     * deux ou trois fois — d'où un « 16 h 45 par nuit » qui n'était que 8 h 22
+     * enregistrées en double.
+     *
+     * Deux règles, dans cet ordre :
+     *
+     *  1. **Découper.** Une période est ramenée à sa seule partie comprise dans la
+     *     fenêtre demandée. Une sieste commencée à 17 h et finie à 19 h ne compte
+     *     qu'à partir de 18 h dans la nuit qui suit.
+     *  2. **Fusionner.** Deux périodes qui se chevauchent n'en font qu'une. On ne
+     *     dort pas deux fois entre 23 h et 7 h, quel que soit le nombre
+     *     d'applications qui l'ont noté.
+     */
+    private fun mergedMinutes(
+        periods: List<Pair<java.time.Instant, java.time.Instant>>,
+        from: LocalDateTime,
+        to: LocalDateTime
+    ): Int {
+        val zone = java.time.ZoneId.systemDefault()
+        val windowStart = from.atZone(zone).toInstant()
+        val windowEnd = to.atZone(zone).toInstant()
+
+        val clipped = periods
+            .map { (start, end) ->
+                maxOf(start, windowStart) to minOf(end, windowEnd)
+            }
+            .filter { (start, end) -> end.isAfter(start) }
+            .sortedBy { it.first }
+        if (clipped.isEmpty()) return 0
+
+        var total = 0L
+        var blockStart = clipped.first().first
+        var blockEnd = clipped.first().second
+        clipped.drop(1).forEach { (start, end) ->
+            if (start.isAfter(blockEnd)) {
+                // Un vrai trou : le bloc précédent est clos, on en ouvre un autre.
+                total += Duration.between(blockStart, blockEnd).toMinutes()
+                blockStart = start
+                blockEnd = end
+            } else if (end.isAfter(blockEnd)) {
+                // Chevauchement : on étire le bloc au lieu d'ajouter une durée.
+                blockEnd = end
+            }
+        }
+        total += Duration.between(blockStart, blockEnd).toMinutes()
+        return total.toInt()
     }
 
     /**
