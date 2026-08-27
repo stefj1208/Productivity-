@@ -16,8 +16,8 @@ android {
         targetSdk = 35
         // À incrémenter à chaque livraison : c'est ce que Réglages affiche,
         // et le seul moyen de vérifier quelle version est réellement installée.
-        versionCode = 28
-        versionName = "17.3"
+        versionCode = 29
+        versionName = "17.4"
     }
 
     /**

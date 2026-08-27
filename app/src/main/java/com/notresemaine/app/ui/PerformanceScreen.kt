@@ -60,7 +60,16 @@ fun PerformanceScreen(
         .collectAsState(initial = emptyList())
 
     val partner = profiles.firstOrNull { it.id != myId }
-    val myTasks = weekTasks.filter { it.userId == myId }
+    val days = Dates.daysOfWeek(weekStart)
+
+    // Une tâche appartient à la semaine si elle y est rangée OU si elle est posée
+    // sur l'un de ses jours. Ne regarder que la colonne « semaine » laissait de
+    // côté les tâches datées dont ce rangement n'avait pas suivi — elles
+    // existaient, mais le compteur affichait « — ».
+    val myTasks = weekTasks.filter {
+        it.userId == myId && !it.deleted &&
+            (it.weekStart == weekStart || (it.date != null && it.date in days))
+    }
     val doneTasks = myTasks.count { it.done }
 
     val myGoals = goals.filter { it.userId == myId && it.active }
@@ -69,17 +78,26 @@ fun PerformanceScreen(
 
     val streak = vm.repo.ritualStreak(ritualLogs, myId)
 
-    val days = Dates.daysOfWeek(weekStart)
     val myHealth = healthDays.filter { it.userId == myId }
-    val thisWeekHealth = myHealth.filter { it.date >= days.first() && it.date <= days.last() }
+    val thisWeekHealth = myHealth.filter { it.date in days }
     val nights = thisWeekHealth.filter { it.sleepMinutes > 0 }
     val avgSleep = if (nights.isEmpty()) 0 else nights.sumOf { it.sleepMinutes } / nights.size
+    // Les séances de sport, et RIEN d'autre : marcher toute la journée ne fait
+    // pas une séance, et une séance de 30 minutes ne fait pas 8 000 pas. Les
+    // deux ont donc chacun leur case, plus bas.
     val sportMinutes = thisWeekHealth.sumOf { it.exerciseMinutes }
+    val stepDays = thisWeekHealth.filter { it.steps > 0 }
+    val avgSteps = if (stepDays.isEmpty()) 0 else stepDays.sumOf { it.steps } / stepDays.size
 
     val myUsage = usageDays.filter { it.userId == myId }
-    val thisWeekUsage = myUsage.filter { it.date >= days.first() && it.date <= days.last() }
+    // Une journée sans mesure n'est pas une journée à zéro : on ne divise que
+    // par les jours réellement mesurés, sinon la moyenne s'effondre dès qu'on
+    // installe l'application en milieu de semaine.
+    val thisWeekUsage = myUsage.filter { it.date in days && it.socialMinutes > 0 }
     val avgSocial = if (thisWeekUsage.isEmpty()) 0
     else thisWeekUsage.sumOf { it.socialMinutes } / thisWeekUsage.size
+
+    val myWeights = weights.filter { it.userId == myId && !it.deleted }.sortedBy { it.date }
 
     // Tâches échangées : ce que j'ai confié, ce que j'ai reçu.
     val given = if (partner == null) 0
@@ -139,16 +157,71 @@ fun PerformanceScreen(
         ) {
             KpiTile(
                 value = if (sportMinutes == 0) "—" else "$sportMinutes min",
-                label = "sport",
+                label = "séances de sport",
                 accent = accent,
                 modifier = Modifier.weight(1f)
             )
+            KpiTile(
+                value = if (avgSteps == 0) "—" else "%,d".format(avgSteps),
+                label = "pas / jour",
+                accent = accent,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(top = 10.dp)
+        ) {
             KpiTile(
                 value = if (avgSocial == 0) "—" else "$avgSocial min",
                 label = "réseaux / jour",
                 accent = accent,
                 modifier = Modifier.weight(1f)
             )
+            KpiTile(
+                value = if (myWeights.isEmpty()) "—"
+                else String.format(java.util.Locale.FRANCE, "%.1f kg", myWeights.last().kilos),
+                label = "dernière pesée",
+                accent = accent,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        // ----- Pourquoi tel chiffre manque -----
+        //
+        // Un tiret ne dit pas s'il n'y a rien à mesurer ou si la mesure n'a pas
+        // eu lieu. Ces lignes-là ne s'affichent que pour les cases vides, et
+        // nomment à chaque fois l'endroit où l'on peut y remédier.
+        val missing = buildList {
+            if (myTasks.isEmpty()) add("Tâches : aucune tâche rangée dans cette semaine (Planning).")
+            if (plannedSessions == 0) add("Séances : aucun objectif actif (Objectifs).")
+            if (avgSleep == 0 || avgSteps == 0) {
+                add("Sommeil et pas : viennent de Health Connect (Moi → Sommeil & sport).")
+            }
+            if (sportMinutes == 0) {
+                add("Séances de sport : ce sont les séances enregistrées, pas la marche " +
+                    "quotidienne — celle-ci est comptée dans les pas.")
+            }
+            if (avgSocial == 0) {
+                add(
+                    if (!settings.pacteEnabled)
+                        "Réseaux : la mesure ne tourne que si le Pacte d'écran est activé (Moi → Pacte)."
+                    else "Réseaux : aucune mesure cette semaine — l'autorisation « Accès aux " +
+                        "données d'utilisation » a peut-être été retirée (Moi → Pacte)."
+                )
+            }
+            if (myWeights.isEmpty()) add("Poids : aucune pesée enregistrée (Moi → Mon poids).")
+        }
+        if (missing.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            missing.forEach { line ->
+                Text(
+                    text = "· $line",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 2.dp)
+                )
+            }
         }
 
         // ----- Ce qu'on a vraiment mangé -----
@@ -211,10 +284,22 @@ fun PerformanceScreen(
         }
 
         // ----- Le poids -----
-        val myWeights = weights.filter { it.userId == myId && !it.deleted }.sortedBy { it.date }
-        if (myWeights.size >= 2) {
-            Spacer(Modifier.height(24.dp))
-            SectionLabel("MON POIDS")
+        //
+        // La section reste visible même sans courbe traçable : invisible, elle
+        // donnait l'impression que le suivi du poids n'existait pas.
+        Spacer(Modifier.height(24.dp))
+        SectionLabel("MON POIDS")
+        if (myWeights.size < 2) {
+            Text(
+                text = if (myWeights.isEmpty())
+                    "Aucune pesée. La courbe apparaît dès la deuxième — allez dans " +
+                        "Moi → Mon poids pour la première."
+                else "Une seule pesée (${String.format(java.util.Locale.FRANCE, "%.1f kg", myWeights.first().kilos)}). " +
+                    "Il en faut deux pour tracer une tendance.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
             LineChart(
                 values = myWeights.map { it.kilos.toFloat() },
                 labels = listOf(
@@ -339,6 +424,10 @@ fun PerformanceScreen(
             val n = myHealth.filter { weekOf(it.date) == key && it.sleepMinutes > 0 }
             if (n.isEmpty()) 0f else n.sumOf { it.sleepMinutes }.toFloat() / n.size / 60f
         }
+        val stepsPerWeek = weekKeys.map { key ->
+            val d = myHealth.filter { weekOf(it.date) == key && it.steps > 0 }
+            if (d.isEmpty()) 0f else d.sumOf { it.steps }.toFloat() / d.size
+        }
         val sportPerWeek = weekKeys.map { key ->
             myHealth.filter { weekOf(it.date) == key }.sumOf { it.exerciseMinutes }.toFloat()
         }
@@ -375,7 +464,15 @@ fun PerformanceScreen(
         )
 
         Spacer(Modifier.height(20.dp))
-        Text("🏃 Sport — total de la semaine", style = MaterialTheme.typography.bodyLarge)
+        Text("👟 Pas — moyenne par jour", style = MaterialTheme.typography.bodyLarge)
+        MiniBarChart(
+            values = stepsPerWeek, labels = weekLabels, accent = accent,
+            valueLabel = { "%,d".format(it.toInt()) },
+            modifier = Modifier.padding(top = 6.dp)
+        )
+
+        Spacer(Modifier.height(20.dp))
+        Text("🏃 Sport — séances de la semaine", style = MaterialTheme.typography.bodyLarge)
         MiniBarChart(
             values = sportPerWeek, labels = weekLabels, accent = accent,
             valueLabel = { "${it.toInt()} min" },
