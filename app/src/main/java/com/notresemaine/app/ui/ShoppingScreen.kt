@@ -2,6 +2,7 @@ package com.notresemaine.app.ui
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
@@ -17,6 +18,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -44,6 +46,10 @@ fun ShoppingScreen(
     onBack: () -> Unit
 ) {
     val accent = accentFor(settings.myColor)
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val clipboard = remember(context) {
+        context.getSystemService(android.content.ClipboardManager::class.java)
+    }
     // Les courses suivent les menus : si l'on prépare la semaine prochaine, la
     // liste doit pouvoir se lire pour la semaine prochaine.
     var offset by remember(weekStart) {
@@ -163,6 +169,45 @@ fun ShoppingScreen(
             Spacer(Modifier.height(20.dp))
         }
 
+        // ----- Sortir la liste de l'application -----
+        //
+        // Une liste de courses se lit souvent ailleurs : dans un message envoyé
+        // à l'autre, ou collée dans une note quand on fait les courses à deux
+        // depuis deux rayons différents. Copier et partager sont donc deux
+        // gestes distincts, et tous deux à un tap.
+        val toBuy = items.filter { !it.checked }
+        if (toBuy.isNotEmpty()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(
+                    onClick = {
+                        clipboard.setPrimaryClip(
+                            android.content.ClipData.newPlainText(
+                                "Courses", shoppingText(toBuy, week)
+                            )
+                        )
+                        vm.messages.tryEmit("${'$'}{toBuy.size} articles copiés ✓")
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                ) { Text("📋 Copier") }
+                OutlinedButton(
+                    onClick = {
+                        val send = android.content.Intent(android.content.Intent.ACTION_SEND)
+                            .setType("text/plain")
+                            .putExtra(android.content.Intent.EXTRA_TEXT, shoppingText(toBuy, week))
+                        runCatching {
+                            context.startActivity(
+                                android.content.Intent.createChooser(send, "Envoyer la liste")
+                            )
+                        }
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                ) { Text("📤 Envoyer") }
+            }
+        }
         if (items.any { it.checked }) {
             TextButton(onClick = { vm.clearCheckedShopping(week) }) {
                 Text("Retirer les articles pris")
@@ -173,5 +218,25 @@ fun ShoppingScreen(
             onClick = { vm.generateShoppingList(week) },
             modifier = Modifier.padding(bottom = 16.dp)
         )
+    }
+}
+
+
+/**
+ * La liste sous forme de texte, rangée par rayon.
+ *
+ * Les rayons sont conservés : c'est ce qui rend une liste utilisable dans un
+ * magasin, et ce qui la rend lisible dans un message. Seuls les articles non
+ * cochés partent — envoyer ce qu'on a déjà pris n'aiderait personne.
+ */
+private fun shoppingText(
+    items: List<com.notresemaine.app.data.ShoppingItemEntity>,
+    week: String
+): String = buildString {
+    appendLine("🛒 Courses — ${Dates.weekRangeLabel(week)}")
+    items.groupBy { it.aisle }.forEach { (aisle, ofAisle) ->
+        appendLine()
+        appendLine(aisle.uppercase())
+        ofAisle.forEach { appendLine("- ${it.label}") }
     }
 }

@@ -427,6 +427,10 @@ interface EncouragementDao {
     @Query("SELECT * FROM encouragements WHERE toUser = :userId AND date = :date AND deleted = 0")
     fun forDate(userId: String, date: String): Flow<List<EncouragementEntity>>
 
+    /** Les mots échangés dans les deux sens, sur une période. */
+    @Query("SELECT * FROM encouragements WHERE date >= :from AND date <= :to AND deleted = 0 ORDER BY updatedAt DESC")
+    fun between(from: String, to: String): Flow<List<EncouragementEntity>>
+
     @Query("SELECT * FROM encouragements WHERE updatedAt > :ts")
     suspend fun modifiedSince(ts: Long): List<EncouragementEntity>
 

@@ -1321,11 +1321,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ----- Nous -----
 
-    fun sendBravo(toUser: String) {
+    /**
+     * Un mot à l'autre. Le message est libre : « bravo » tout seul finit par ne
+     * plus rien vouloir dire, alors qu'une phrase précise se relit.
+     */
+    fun sendBravo(toUser: String, message: String = "👏 Bravo !") {
         viewModelScope.launch {
-            repo.sendBravo(myId(), toUser, "👏 Bravo !")
+            repo.sendBravo(myId(), toUser, message.ifBlank { "👏 Bravo !" })
             requestSync()
-            toast("Bravo envoyé 👏")
+            toast("Message envoyé ✓")
         }
     }
 
