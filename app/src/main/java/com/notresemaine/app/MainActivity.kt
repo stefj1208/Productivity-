@@ -215,7 +215,6 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings, openRoute: Str
                     onInbox = { navController.navigate("inbox") },
                     onHabits = { navController.navigate("habits") },
                     onSport = { navController.navigate("sport") },
-                    onGoals = { navController.navigate("goals") },
                     onAsk = { navController.navigate("ask") },
                     onMealLog = { navController.navigate("meallog") },
                     onMethod = { navController.navigate("method") }

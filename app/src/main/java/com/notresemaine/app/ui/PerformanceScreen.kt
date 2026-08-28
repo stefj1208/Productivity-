@@ -35,7 +35,9 @@ import java.time.LocalDate
 fun PerformanceScreen(
     vm: AppViewModel,
     settings: AppSettings,
-    onBack: () -> Unit
+    // Nullable : « Progrès » est devenue une destination principale, et une
+    // destination principale ne porte pas de flèche de retour.
+    onBack: (() -> Unit)? = null
 ) {
     val myId = settings.myUserId
     val accent = accentFor(settings.myColor)
