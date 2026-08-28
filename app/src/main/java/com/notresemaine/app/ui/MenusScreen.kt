@@ -35,11 +35,17 @@ fun MenusScreen(
     vm: AppViewModel,
     settings: AppSettings,
     weekStart: String,
-    onShopping: () -> Unit,
+    onShopping: (String) -> Unit,
     onBack: () -> Unit
 ) {
-    val days = Dates.daysOfWeek(weekStart)
-    val meals by remember(weekStart) { vm.repo.db.meals().between(days.first(), days.last()) }
+    // La semaine d'arrivée n'est qu'un point de départ : on doit pouvoir préparer
+    // la suivante sans attendre dimanche. L'écran garde donc son propre décalage.
+    var offset by remember(weekStart) {
+        androidx.compose.runtime.mutableIntStateOf(Dates.weekOffsetOf(weekStart))
+    }
+    val week = Dates.weekStartIsoOffset(offset)
+    val days = Dates.daysOfWeek(week)
+    val meals by remember(week) { vm.repo.db.meals().between(days.first(), days.last()) }
         .collectAsState(initial = emptyList())
     val aiBusy by vm.aiBusy.collectAsState()
 
@@ -55,8 +61,14 @@ fun MenusScreen(
         ) {
             ScreenHeader(
                 title = "🍽️ Menus",
-                subtitle = Dates.weekRangeLabel(weekStart),
+                subtitle = Dates.weekRangeLabel(week),
                 onBack = onBack
+            )
+
+            Spacer(Modifier.height(8.dp))
+            WeekNavigator(
+                weekStartIso = week,
+                onOffsetChange = { delta -> offset += delta }
             )
 
             // Sans savoir pour combien de couverts, ni les quantités ni les
@@ -102,7 +114,7 @@ fun MenusScreen(
             Spacer(Modifier.height(16.dp))
             SectionLabel("PAS D'INSPIRATION ?")
             OutlinedButton(
-                onClick = { vm.fillMenusFromBank(weekStart) },
+                onClick = { vm.fillMenusFromBank(week) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp)
@@ -121,7 +133,7 @@ fun MenusScreen(
                 AiButton(
                     text = "Demander à l'assistant",
                     busy = aiBusy,
-                    onClick = { vm.suggestMenusWithAi(weekStart, constraints) },
+                    onClick = { vm.suggestMenusWithAi(week, constraints) },
                     modifier = Modifier.padding(top = 6.dp)
                 )
             } else {
@@ -161,8 +173,8 @@ fun MenusScreen(
         BigButton(
             text = "Générer la liste de courses",
             onClick = {
-                vm.generateShoppingList(weekStart)
-                onShopping()
+                vm.generateShoppingList(week)
+                onShopping(week)
             },
             modifier = Modifier.padding(bottom = 16.dp)
         )

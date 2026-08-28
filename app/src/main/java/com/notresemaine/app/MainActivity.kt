@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FloatingActionButton
@@ -114,13 +115,16 @@ class MainActivity : ComponentActivity() {
 private data class Tab(val route: String, val label: String, val icon: ImageVector)
 
 // Cinq destinations, une question chacune : qu'est-ce que je fais et quand
-// (Planning), où je vais (Objectifs), qu'est-ce qu'on mange (Maison),
+// (Planning), où j'en suis (Progrès), qu'est-ce qu'on mange (Maison),
 // où on en est à deux (Nous), et ce qui me concerne (Moi).
-// « Planning » récapitule le jour ET la semaine : c'est la même question à deux
-// échelles. « Moi » remplace la roue dentée : une fonction cachée est morte.
+//
+// « Progrès » a pris la place d'« Objectifs ». On crée un objectif deux ou
+// trois fois par an, on regarde où on en est toutes les semaines : la barre du
+// bas doit porter le geste fréquent, pas le geste rare. Les objectifs restent à
+// un tap, depuis les raccourcis du Planning et depuis « Moi ».
 private val tabs = listOf(
     Tab("planning", "Planning", Icons.Filled.WbSunny),
-    Tab("goals", "Objectifs", Icons.Filled.Flag),
+    Tab("performance", "Progrès", Icons.Filled.ShowChart),
     Tab("house", "Maison", Icons.Filled.Home),
     Tab("us", "Nous", Icons.Filled.Favorite),
     Tab("me", "Moi", Icons.Filled.Person)
@@ -211,13 +215,16 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings, openRoute: Str
                     onInbox = { navController.navigate("inbox") },
                     onHabits = { navController.navigate("habits") },
                     onSport = { navController.navigate("sport") },
+                    onGoals = { navController.navigate("goals") },
                     onAsk = { navController.navigate("ask") },
                     onMealLog = { navController.navigate("meallog") },
                     onMethod = { navController.navigate("method") }
                 )
             }
             composable("goals") {
-                GoalsScreen(vm, settings)
+                // Les objectifs ne sont plus une destination principale : la
+                // flèche de retour redevient nécessaire.
+                GoalsScreen(vm, settings, onBack = { navController.popBackStack() })
             }
             composable("goals_pushed") {
                 GoalsScreen(vm, settings, onBack = { navController.popBackStack() })
@@ -248,6 +255,7 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings, openRoute: Str
                     onWeight = { navController.navigate("weight") },
                     onHabits = { navController.navigate("habits") },
                     onSport = { navController.navigate("sport") },
+                    onGoals = { navController.navigate("goals") },
                     onAsk = { navController.navigate("ask") },
                     onMealLog = { navController.navigate("meallog") },
                     onCalendar = { navController.navigate("calendar") },
@@ -304,7 +312,9 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings, openRoute: Str
                 CalendarScreen(vm, settings, onBack = { navController.popBackStack() })
             }
             composable("performance") {
-                PerformanceScreen(vm, settings, onBack = { navController.popBackStack() })
+                // Destination principale : pas de flèche de retour, le bouton
+                // système du téléphone suffit — comme sur les quatre autres.
+                PerformanceScreen(vm, settings, onBack = null)
             }
             composable("assistant") {
                 AssistantScreen(vm, settings, onBack = { navController.popBackStack() })
@@ -352,7 +362,7 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings, openRoute: Str
                     ?: com.notresemaine.app.data.Dates.weekStartIso()
                 MenusScreen(
                     vm, settings, week,
-                    onShopping = { navController.navigate("shopping/$week") },
+                    onShopping = { shown -> navController.navigate("shopping/$shown") },
                     onBack = { navController.popBackStack() }
                 )
             }

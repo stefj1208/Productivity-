@@ -376,9 +376,21 @@ class Repository private constructor(context: Context) {
                 "midi" -> "le midi"
                 else -> "le soir"
             }
+            // Une séance sans heure n'est pas un rendez-vous, c'est un vœu : elle
+            // ne sonne pas, ne va pas dans l'agenda, et se fait donc rarement.
+            // Chaque séance posée porte désormais une vraie heure de début.
+            val startTime = when (goal.preferredTime) {
+                "matin" -> "07:30"
+                "midi" -> "12:30"
+                else -> "18:30"
+            }
             var toCreate = goal.sessionsPerWeek - already
+            // Poser une séance sur un jour déjà passé, c'est créer un retard le
+            // jour même de la création : on ne remplit que ce qui reste à venir.
+            val today = Dates.todayIso()
             for (day in ordered) {
                 if (toCreate <= 0) break
+                if (day < today) continue
                 if (existing.any { it.goalId == goal.id && it.date == day }) continue
                 db.tasks().upsert(
                     TaskEntity(
@@ -389,6 +401,8 @@ class Repository private constructor(context: Context) {
                         weekStart = weekStart,
                         isSport = goal.domain == "sante",
                         goalId = goal.id,
+                        startTime = startTime,
+                        durationMinutes = goal.minutesPerSession.coerceIn(5, 480),
                         updatedAt = now()
                     )
                 )

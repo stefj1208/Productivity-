@@ -44,7 +44,13 @@ fun ShoppingScreen(
     onBack: () -> Unit
 ) {
     val accent = accentFor(settings.myColor)
-    val items by remember(weekStart) { vm.repo.db.shopping().forWeek(weekStart) }
+    // Les courses suivent les menus : si l'on prépare la semaine prochaine, la
+    // liste doit pouvoir se lire pour la semaine prochaine.
+    var offset by remember(weekStart) {
+        androidx.compose.runtime.mutableIntStateOf(Dates.weekOffsetOf(weekStart))
+    }
+    val week = Dates.weekStartIsoOffset(offset)
+    val items by remember(week) { vm.repo.db.shopping().forWeek(week) }
         .collectAsState(initial = emptyList())
     var newItem by remember { mutableStateOf("") }
 
@@ -62,8 +68,14 @@ fun ShoppingScreen(
         ) {
             ScreenHeader(
                 title = "🛒 Courses",
-                subtitle = "$remaining article(s) à prendre",
+                subtitle = "${Dates.weekRangeLabel(week)} · $remaining article(s)",
                 onBack = onBack
+            )
+
+            Spacer(Modifier.height(8.dp))
+            WeekNavigator(
+                weekStartIso = week,
+                onOffsetChange = { delta -> offset += delta }
             )
 
             // Les articles que l'application ne reconnaît pas atterrissent dans « Divers ».
@@ -73,7 +85,7 @@ fun ShoppingScreen(
                 AiButton(
                     text = "Ranger les $unsorted articles de « Divers »",
                     busy = aiBusy,
-                    onClick = { vm.sortShoppingWithAi(weekStart) },
+                    onClick = { vm.sortShoppingWithAi(week) },
                     modifier = Modifier.padding(top = 12.dp)
                 )
             }
@@ -88,7 +100,7 @@ fun ShoppingScreen(
                     modifier = Modifier.weight(1f)
                 )
                 TextButton(onClick = {
-                    vm.addShoppingItem(weekStart, newItem)
+                    vm.addShoppingItem(week, newItem)
                     newItem = ""
                 }) { Text("Ajouter") }
             }
@@ -152,13 +164,13 @@ fun ShoppingScreen(
         }
 
         if (items.any { it.checked }) {
-            TextButton(onClick = { vm.clearCheckedShopping(weekStart) }) {
+            TextButton(onClick = { vm.clearCheckedShopping(week) }) {
                 Text("Retirer les articles pris")
             }
         }
         BigButton(
             text = "Régénérer depuis les menus",
-            onClick = { vm.generateShoppingList(weekStart) },
+            onClick = { vm.generateShoppingList(week) },
             modifier = Modifier.padding(bottom = 16.dp)
         )
     }

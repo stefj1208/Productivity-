@@ -263,10 +263,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val ok = repo.addGoal(myId(), title, domain, sessionsPerWeek, minutesPerSession, preferredTime, preferredDays, nextAction, isPrivate)
             if (ok) {
-                toast("Objectif créé ✓ Les séances seront planifiées avec la semaine.")
+                // Les séances sont posées TOUT DE SUITE, sur cette semaine et la
+                // suivante. Avant, elles attendaient le bilan du dimanche : on
+                // créait un objectif et il ne se passait rien, ce qui est la
+                // meilleure façon de ne jamais s'y mettre.
+                val thisWeek = com.notresemaine.app.data.Dates.weekStartIso()
+                val nextWeek = com.notresemaine.app.data.Dates.weekStartIsoOffset(1)
+                val placed = repo.planGoalSessions(myId(), thisWeek) +
+                    repo.planGoalSessions(myId(), nextWeek)
                 // Un objectif, ce sont des rendez-vous : ils entrent dans les rappels.
                 Alarms.rescheduleAll(getApplication())
+                // Et dans l'agenda du téléphone, si on l'a relié.
+                repo.pushWeekToCalendar(getApplication(), myId(), thisWeek)
                 requestSync()
+                toast(
+                    if (placed > 0) "Objectif créé ✓ $placed séances posées dans le planning"
+                    else "Objectif créé ✓"
+                )
             } else {
                 toast("Maximum ${GoalTemplates.MAX_ACTIVE_GOALS} objectifs actifs — moins mais mieux.")
             }
@@ -280,9 +293,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             repo.updateGoal(goalId, title, sessionsPerWeek, minutesPerSession,
                 preferredTime, preferredDays, nextAction, isPrivate)
+            // Changer le rythme doit changer le planning tout de suite, sinon on
+            // modifie un objectif sans qu'il se passe quoi que ce soit.
+            val thisWeek = com.notresemaine.app.data.Dates.weekStartIso()
+            val placed = repo.planGoalSessions(myId(), thisWeek) +
+                repo.planGoalSessions(myId(), com.notresemaine.app.data.Dates.weekStartIsoOffset(1))
             Alarms.rescheduleAll(getApplication())
+            repo.pushWeekToCalendar(getApplication(), myId(), thisWeek)
             requestSync()
-            toast("Objectif modifié ✓")
+            toast(
+                if (placed > 0) "Objectif modifié ✓ $placed séances ajoutées"
+                else "Objectif modifié ✓"
+            )
         }
     }
 

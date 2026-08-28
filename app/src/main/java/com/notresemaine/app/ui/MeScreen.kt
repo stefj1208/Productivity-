@@ -38,6 +38,7 @@ fun MeScreen(
     onWeight: () -> Unit,
     onHabits: () -> Unit,
     onSport: () -> Unit,
+    onGoals: () -> Unit,
     onAsk: () -> Unit,
     onMealLog: () -> Unit,
     onCalendar: () -> Unit,
@@ -154,6 +155,16 @@ fun MeScreen(
             else "$loggedToday repas noté(s) aujourd'hui",
             onClick = onMealLog,
             highlight = loggedToday > 0
+        )
+
+        // « Objectifs » a quitté la barre du bas au profit de « Progrès ».
+        // Il lui fallait donc une porte ici, sans quoi la fonction devenait
+        // dépendante d'un seul raccourci.
+        ShortcutTile(
+            emoji = "🎯",
+            title = "Mes objectifs",
+            subtitle = "Ce que je poursuis, et le rythme des séances",
+            onClick = onGoals
         )
 
         ShortcutTile(
