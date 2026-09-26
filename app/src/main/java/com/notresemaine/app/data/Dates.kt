@@ -29,17 +29,31 @@ object Dates {
     fun weekStartIsoOffset(offset: Int): String =
         weekStart().plusWeeks(offset.toLong()).format(ISO)
 
+    /**
+     * Le lundi que désigne cette chaîne — ou celui de cette semaine si elle est
+     * illisible.
+     *
+     * Aucune de ces fonctions ne doit plus lever d'exception. Une date mal formée
+     * a déjà rendu un onglet entier inaccessible : elle arrivait d'un champ libre,
+     * et c'est l'affichage qui s'arrêtait. Le principe retenu depuis : on dégrade,
+     * on ne casse pas. Ici, une semaine illisible devient la semaine courante —
+     * visiblement fausse, mais jamais fatale.
+     */
+    private fun weekStartOrCurrent(weekStartIso: String): LocalDate =
+        runCatching { LocalDate.parse(weekStartIso) }.getOrElse { weekStart() }
+
     /** Lundi de la semaine précédant [weekStartIso]. */
     fun weekBefore(weekStartIso: String): String =
-        LocalDate.parse(weekStartIso).minusWeeks(1).format(ISO)
+        weekStartOrCurrent(weekStartIso).minusWeeks(1).format(ISO)
 
     /** Nombre de semaines entre la semaine courante et [weekStartIso]. */
     fun weekOffsetOf(weekStartIso: String): Int =
-        java.time.temporal.ChronoUnit.WEEKS.between(weekStart(), LocalDate.parse(weekStartIso)).toInt()
+        java.time.temporal.ChronoUnit.WEEKS
+            .between(weekStart(), weekStartOrCurrent(weekStartIso)).toInt()
 
     /** "4 – 10 août" */
     fun weekRangeLabel(weekStartIso: String): String {
-        val start = LocalDate.parse(weekStartIso)
+        val start = weekStartOrCurrent(weekStartIso)
         val end = start.plusDays(6)
         val endMonth = end.month.getDisplayName(TextStyle.FULL, FR)
         return if (start.month == end.month) {
@@ -124,7 +138,7 @@ object Dates {
     }
 
     fun daysOfWeek(weekStartIso: String): List<String> {
-        val start = LocalDate.parse(weekStartIso)
+        val start = weekStartOrCurrent(weekStartIso)
         return (0..6L).map { start.plusDays(it).format(ISO) }
     }
 

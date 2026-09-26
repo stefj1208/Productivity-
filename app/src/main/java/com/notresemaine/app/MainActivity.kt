@@ -76,6 +76,7 @@ import com.notresemaine.app.ui.PlanningScreen
 import com.notresemaine.app.ui.UsScreen
 import com.notresemaine.app.ui.HouseScreen
 import com.notresemaine.app.ui.MealLogScreen
+import com.notresemaine.app.ui.StatusScreen
 import com.notresemaine.app.ui.theme.AppTheme
 
 class MainActivity : ComponentActivity() {
@@ -262,6 +263,7 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings, openRoute: Str
                     onReminders = { navController.navigate("reminders") },
                     onMethod = { navController.navigate("method") },
                     onSync = { navController.navigate("sync") },
+                    onStatus = { navController.navigate("status") },
                     onProfile = { navController.navigate("profile") }
                 )
             }
@@ -314,6 +316,18 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings, openRoute: Str
                 // Destination principale : pas de flèche de retour, le bouton
                 // système du téléphone suffit — comme sur les quatre autres.
                 PerformanceScreen(vm, settings, onBack = null)
+            }
+            composable("status") {
+                StatusScreen(
+                    vm, settings,
+                    onSync = { navController.navigate("sync") },
+                    onAssistant = { navController.navigate("assistant") },
+                    onScreenTime = { navController.navigate("screentime") },
+                    onHealth = { navController.navigate("health") },
+                    onReminders = { navController.navigate("reminders") },
+                    onCalendar = { navController.navigate("calendar") },
+                    onBack = { navController.popBackStack() }
+                )
             }
             composable("assistant") {
                 AssistantScreen(vm, settings, onBack = { navController.popBackStack() })

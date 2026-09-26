@@ -278,15 +278,25 @@ fun ScreenTimeScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit
                 )
             }
 
-            if (myToday != null) {
-                Spacer(Modifier.height(16.dp))
-                SectionLabel("AUJOURD'HUI")
-                Text(
-                    text = "Écran : ${myToday.totalMinutes} min · réseaux : ${myToday.socialMinutes} min · " +
-                        "${myToday.unlocks} déverrouillages",
-                    style = MaterialTheme.typography.bodyLarge
-                )
-            }
+            // La section reste visible sans relevé : absente, elle laissait croire
+            // que la mesure n'existait pas, alors qu'il manquait seulement une
+            // autorisation ou un premier passage.
+            Spacer(Modifier.height(16.dp))
+            SectionLabel("AUJOURD'HUI")
+            Text(
+                text = when {
+                    myToday != null ->
+                        "Écran : ${myToday.totalMinutes} min · réseaux : ${myToday.socialMinutes} min · " +
+                            "${myToday.unlocks} déverrouillages"
+                    !hasPermission ->
+                        "Aucun relevé : l'autorisation « Accès aux données d'utilisation » " +
+                            "manque, voyez l'étape ci-dessus."
+                    else -> "Aucun relevé pour l'instant. Touchez « Relever maintenant »."
+                },
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (myToday != null) MaterialTheme.colorScheme.onSurface
+                else MaterialTheme.colorScheme.onSurfaceVariant
+            )
             TextButton(onClick = { vm.refreshUsage() }, enabled = hasPermission) {
                 Text("Relever maintenant")
             }

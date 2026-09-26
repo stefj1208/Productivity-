@@ -46,6 +46,7 @@ fun MeScreen(
     onReminders: () -> Unit,
     onMethod: () -> Unit,
     onSync: () -> Unit,
+    onStatus: () -> Unit,
     onProfile: () -> Unit
 ) {
     val myId = settings.myUserId
@@ -218,6 +219,15 @@ fun MeScreen(
             },
             onClick = onSync,
             highlight = settings.coupleCode.isNotBlank()
+        )
+        // Une application qui dépend d'une dizaine d'autorisations doit pouvoir
+        // dire lesquelles tiennent. Sans cet écran, une mesure vide ne se
+        // distingue pas d'une panne.
+        ShortcutTile(
+            emoji = "🩺",
+            title = "Tout fonctionne ?",
+            subtitle = "Autorisations, synchronisation, mesures — en une page",
+            onClick = onStatus
         )
         ShortcutTile(
             emoji = "📖",

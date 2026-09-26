@@ -368,7 +368,15 @@ class Repository private constructor(context: Context) {
         var created = 0
         goals.forEach { goal ->
             val already = existing.count { it.goalId == goal.id }
-            val preferred = goal.preferredDays.split(",").mapNotNull { it.trim().toIntOrNull() }
+            // Le filtre sur 1..7 n'est pas cosmétique : « preferredDays » est une
+            // chaîne, elle peut arriver de la synchronisation ou d'une version
+            // plus ancienne avec un 0 ou un 8 dedans. Sans lui, days[it - 1] sort
+            // du tableau et l'application s'arrête net — au moment précis où l'on
+            // crée un objectif, depuis que les séances sont posées tout de suite.
+            val preferred = goal.preferredDays.split(",")
+                .mapNotNull { it.trim().toIntOrNull() }
+                .filter { it in 1..7 }
+                .distinct()
             // Jours préférés d'abord, puis les autres si l'objectif demande plus de séances.
             val ordered = (preferred + (1..7).filter { it !in preferred }).map { days[it - 1] }
             val moment = when (goal.preferredTime) {
