@@ -57,7 +57,10 @@ class BlockerService : Service() {
         while (scope.isActive) {
             repo.applyPendingPacteIfDue()
             val s = repo.settings.current()
-            if (!s.pacteEnabled || !Usage.hasPermission(this)) {
+            // Une séance de concentration garde le service en vie même sans Pacte :
+            // c'est elle qui tient les réseaux à distance pendant la séance.
+            val focusOn = s.focusActive()
+            if ((!s.pacteEnabled && !focusOn) || !Usage.hasPermission(this)) {
                 stopSelf()
                 return
             }
@@ -71,11 +74,11 @@ class BlockerService : Service() {
                 if (s.myUserId.isNotBlank()) {
                     repo.saveUsageDay(s.myUserId, Dates.todayIso(), usage.totalMinutes, usage.socialMinutes, usage.unlocks)
                 }
-                warnAtThresholds(repo, s, social, socialMinutes)
+                if (s.pacteEnabled) warnAtThresholds(repo, s, social, socialMinutes)
             }
 
-            val curfewOn = Curfew.isActive(s)
-            val overLimit = s.dailyLimitMinutes > 0 && socialMinutes >= s.dailyLimitMinutes
+            val curfewOn = s.pacteEnabled && Curfew.isActive(s)
+            val overLimit = s.pacteEnabled && s.dailyLimitMinutes > 0 && socialMinutes >= s.dailyLimitMinutes
 
             // ----- À quelle cadence aller voir le serveur -----
             //
@@ -102,6 +105,21 @@ class BlockerService : Service() {
                     val until = granted.updatedAt + granted.minutes * 60_000L
                     if (until > s.graceUntil) repo.settings.setGraceUntil(until)
                 }
+            }
+
+            // ----- Séance de concentration -----
+            //
+            // Choisie par soi, pour soi : pas besoin de l'autre pour en sortir.
+            // L'écran rappelle simplement ce qu'on s'était promis, avec un bouton
+            // pour revenir à la séance et un autre pour l'arrêter.
+            if (focusOn && !curfewOn) {
+                val foreground = Usage.foregroundPackage(this)
+                if (foreground != null && foreground in social && !BlockActivity.visible) {
+                    val left = ((s.focusUntil - now) / 60_000L).toInt() + 1
+                    runCatching { startActivity(BlockActivity.focusIntent(this, s.focusTitle, left)) }
+                }
+                delay(2_000)
+                continue
             }
 
             if (overLimit || curfewOn) {

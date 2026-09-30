@@ -105,8 +105,28 @@ data class AppSettings(
      * Paliers d'écran déjà annoncés, sous la forme « 2026-08-25:25,50 ».
      * La date en tête fait que tout repart à zéro chaque matin, sans ménage.
      */
-    val usageAlertsDone: String = ""
+    val usageAlertsDone: String = "",
+    /**
+     * Séance de concentration en cours (« Deep Work ») : jusqu'à quand, depuis
+     * quand, et sur quoi. 0 = aucune séance. Tout est local : c'est un moment à
+     * soi, pas une donnée à partager.
+     */
+    val focusUntil: Long = 0L,
+    val focusStartedAt: Long = 0L,
+    val focusTitle: String = "",
+    /** Minutes de concentration par jour, « 2026-09-30=50;2026-09-29=25 » (60 jours). */
+    val focusLog: String = ""
 ) {
+    /** Minutes de concentration notées pour chaque jour. */
+    fun focusMinutesByDay(): Map<String, Int> = focusLog.split(";")
+        .mapNotNull { entry ->
+            val day = entry.substringBefore('=', "")
+            val minutes = entry.substringAfter('=', "").toIntOrNull()
+            if (day.isBlank() || minutes == null) null else day to minutes
+        }.toMap()
+
+    fun focusActive(now: Long = System.currentTimeMillis()): Boolean = focusUntil > now
+
     /** Ce palier d'écran a-t-il déjà été annoncé aujourd'hui ? */
     fun usageAlertDone(date: String, percent: Int): Boolean {
         if (usageAlertsDone.substringBefore(':') != date) return false
@@ -169,6 +189,10 @@ class SettingsStore(private val context: Context) {
         val mealReminderNoon = stringPreferencesKey("mealReminderNoon")
         val mealReminderEvening = stringPreferencesKey("mealReminderEvening")
         val usageAlertsDone = stringPreferencesKey("usageAlertsDone")
+        val focusUntil = longPreferencesKey("focusUntil")
+        val focusStartedAt = longPreferencesKey("focusStartedAt")
+        val focusTitle = stringPreferencesKey("focusTitle")
+        val focusLog = stringPreferencesKey("focusLog")
     }
 
     val flow: Flow<AppSettings> = context.dataStore.data.map { p ->
@@ -224,7 +248,11 @@ class SettingsStore(private val context: Context) {
             mealReminderMorning = p[K.mealReminderMorning] ?: "07:30",
             mealReminderNoon = p[K.mealReminderNoon] ?: "13:00",
             mealReminderEvening = p[K.mealReminderEvening] ?: "21:00",
-            usageAlertsDone = p[K.usageAlertsDone] ?: ""
+            usageAlertsDone = p[K.usageAlertsDone] ?: "",
+            focusUntil = p[K.focusUntil] ?: 0L,
+            focusStartedAt = p[K.focusStartedAt] ?: 0L,
+            focusTitle = p[K.focusTitle] ?: "",
+            focusLog = p[K.focusLog] ?: ""
         )
     }
 
@@ -396,6 +424,46 @@ class SettingsStore(private val context: Context) {
             } else emptyList()
             p[K.usageAlertsDone] = "$date:" + (done + percent.toString()).distinct().joinToString(",")
         }
+    }
+
+    suspend fun startFocus(minutes: Int, title: String) {
+        val now = System.currentTimeMillis()
+        context.dataStore.edit { p ->
+            p[K.focusStartedAt] = now
+            p[K.focusUntil] = now + minutes * 60_000L
+            p[K.focusTitle] = title
+        }
+    }
+
+    /**
+     * Clôt la séance et ajoute au carnet le temps réellement passé — pas le
+     * temps prévu. Une séance arrêtée au bout de 12 minutes compte 12 minutes :
+     * le carnet décrit, il ne juge pas.
+     */
+    suspend fun endFocus(): Int {
+        var spent = 0
+        context.dataStore.edit { p ->
+            val started = p[K.focusStartedAt] ?: 0L
+            val until = p[K.focusUntil] ?: 0L
+            if (started > 0L) {
+                val end = minOf(System.currentTimeMillis(), until.takeIf { it > 0 } ?: Long.MAX_VALUE)
+                spent = ((end - started) / 60_000L).toInt().coerceIn(0, 240)
+            }
+            if (spent > 0) {
+                val today = Dates.todayIso()
+                val entries = (p[K.focusLog] ?: "").split(";")
+                    .filter { it.contains('=') }
+                    .associate { it.substringBefore('=') to (it.substringAfter('=').toIntOrNull() ?: 0) }
+                    .toMutableMap()
+                entries[today] = (entries[today] ?: 0) + spent
+                p[K.focusLog] = entries.entries.sortedByDescending { it.key }.take(60)
+                    .joinToString(";") { "${it.key}=${it.value}" }
+            }
+            p[K.focusUntil] = 0L
+            p[K.focusStartedAt] = 0L
+            p[K.focusTitle] = ""
+        }
+        return spent
     }
 
     suspend fun setMealLogShared(shared: Boolean) {

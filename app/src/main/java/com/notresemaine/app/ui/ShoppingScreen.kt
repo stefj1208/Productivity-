@@ -185,7 +185,7 @@ fun ShoppingScreen(
                                 "Courses", shoppingText(toBuy, week)
                             )
                         )
-                        vm.messages.tryEmit("${'$'}{toBuy.size} articles copiés ✓")
+                        vm.messages.tryEmit("${toBuy.size} articles copiés ✓")
                     },
                     modifier = Modifier
                         .weight(1f)

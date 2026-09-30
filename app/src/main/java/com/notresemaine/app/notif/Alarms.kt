@@ -57,6 +57,7 @@ object Alarms {
     // à 16, les derniers moments de la journée passaient à la trappe.
     private const val MAX_SCHEDULED = 24
     private const val NOTIFICATION_ID = 4242
+    private const val FOCUS_REQUEST_CODE = FIRST_REQUEST_CODE + MAX_SCHEDULED + 1
 
     /** Un rappel à venir : quand, et quoi dire. */
     data class Alert(
@@ -311,6 +312,35 @@ object Alarms {
             )
             alarm.cancel(pending)
         }
+    }
+
+    /**
+     * Fin d'une séance de concentration : une sonnerie à l'heure dite, même si
+     * l'application a été quittée entre-temps. Emplacement réservé, distinct des
+     * rappels ordinaires : recalculer la journée ne l'efface pas.
+     */
+    fun scheduleFocusEnd(context: Context, atMillis: Long, title: String, sound: Boolean) {
+        val at = java.time.Instant.ofEpochMilli(atMillis).atZone(ZoneId.systemDefault()).toLocalDateTime()
+        scheduleOne(
+            context,
+            FOCUS_REQUEST_CODE,
+            Alert(
+                at, "🎧", "Séance terminée",
+                if (title.isBlank()) "Le temps prévu est écoulé. Une pause avant la suite ?"
+                else "« $title » — le temps prévu est écoulé. Une pause avant la suite ?",
+                route = "focus", action = "Clore la séance"
+            ),
+            sound
+        )
+    }
+
+    fun cancelFocusEnd(context: Context) {
+        val pending = PendingIntent.getBroadcast(
+            context, FOCUS_REQUEST_CODE,
+            Intent(context, AlarmReceiver::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        context.getSystemService(AlarmManager::class.java).cancel(pending)
     }
 
     /** « Dans 10 minutes » : on repose exactement le même rappel, plus tard. */

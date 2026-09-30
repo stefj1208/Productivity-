@@ -88,8 +88,27 @@ class MainActivity : ComponentActivity() {
 
     private val vm: AppViewModel by viewModels()
 
+    /**
+     * Destination demandée de l'extérieur (rappel, widget, raccourci de l'icône).
+     *
+     * L'activité est en « singleTask » : quand elle tourne déjà, Android ne la
+     * recrée pas, il lui passe la nouvelle demande par [onNewIntent]. Avant,
+     * seule la toute première était lue — un raccourci pris application ouverte
+     * ne menait nulle part.
+     */
+    private val pendingRoute = androidx.compose.runtime.mutableStateOf("")
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pendingRoute.value = intent.getStringExtra(EXTRA_ROUTE).orEmpty()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (savedInstanceState == null) {
+            pendingRoute.value = intent?.getStringExtra(EXTRA_ROUTE).orEmpty()
+        }
         enableEdgeToEdge()
         setContent {
             val settings by vm.settings.collectAsState()
@@ -99,7 +118,11 @@ class MainActivity : ComponentActivity() {
                     when {
                         s == null -> {} // réglages en cours de lecture
                         !s.onboarded -> OnboardingScreen(vm)
-                        else -> MainScaffold(vm, s, intent?.getStringExtra(EXTRA_ROUTE).orEmpty())
+                        else -> MainScaffold(
+                            vm, s,
+                            openRoute = pendingRoute.value,
+                            onRouteOpened = { pendingRoute.value = "" }
+                        )
                     }
                 }
             }
@@ -132,15 +155,35 @@ private val tabs = listOf(
 )
 
 @Composable
-private fun MainScaffold(vm: AppViewModel, settings: AppSettings, openRoute: String = "") {
+private fun MainScaffold(
+    vm: AppViewModel,
+    settings: AppSettings,
+    openRoute: String = "",
+    onRouteOpened: () -> Unit = {}
+) {
     val navController = rememberNavController()
-
-    // Arrivée depuis un écran de rappel : on ouvre directement le bon endroit.
-    LaunchedEffect(openRoute) {
-        if (openRoute.isNotBlank()) runCatching { navController.navigate(openRoute) }
-    }
     val snackbarHost = remember { SnackbarHostState() }
     var capturing by remember { mutableStateOf(false) }
+
+    // Arrivée depuis un rappel, le widget ou un raccourci de l'icône : on ouvre
+    // directement le bon endroit. Quelques destinations sont symboliques, parce
+    // qu'un widget ne peut pas connaître la date du jour où on le touchera.
+    LaunchedEffect(openRoute) {
+        if (openRoute.isBlank()) return@LaunchedEffect
+        when (openRoute) {
+            "capture" -> capturing = true
+            "today" -> runCatching {
+                navController.navigate("day/${com.notresemaine.app.data.Dates.todayIso()}") {
+                    launchSingleTop = true
+                }
+            }
+            "tomorrow" -> runCatching {
+                navController.navigate("prepare/${com.notresemaine.app.data.Dates.tomorrowIso()}")
+            }
+            else -> runCatching { navController.navigate(openRoute) { launchSingleTop = true } }
+        }
+        onRouteOpened()
+    }
 
     LaunchedEffect(Unit) {
         vm.messages.collect { snackbarHost.showSnackbar(it) }
@@ -218,7 +261,8 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings, openRoute: Str
                     onSport = { navController.navigate("sport") },
                     onAsk = { navController.navigate("ask") },
                     onMealLog = { navController.navigate("meallog") },
-                    onMethod = { navController.navigate("method") }
+                    onMethod = { navController.navigate("method") },
+                    onFocus = { navController.navigate("focus") }
                 )
             }
             composable("goals") {
@@ -242,7 +286,8 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings, openRoute: Str
                     vm, settings,
                     onGoToSettings = { navController.navigate("sync") },
                     onScreenTime = { navController.navigate("screentime") },
-                    onHealth = { navController.navigate("health") }
+                    onHealth = { navController.navigate("health") },
+                    onLetter = { week -> navController.navigate("letter/$week") }
                 )
             }
             composable("me") {
@@ -264,7 +309,8 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings, openRoute: Str
                     onMethod = { navController.navigate("method") },
                     onSync = { navController.navigate("sync") },
                     onStatus = { navController.navigate("status") },
-                    onProfile = { navController.navigate("profile") }
+                    onProfile = { navController.navigate("profile") },
+                    onFocus = { navController.navigate("focus") }
                 )
             }
             composable("day/{date}") { entry ->
@@ -316,6 +362,21 @@ private fun MainScaffold(vm: AppViewModel, settings: AppSettings, openRoute: Str
                 // Destination principale : pas de flèche de retour, le bouton
                 // système du téléphone suffit — comme sur les quatre autres.
                 PerformanceScreen(vm, settings, onBack = null)
+            }
+            composable("focus") {
+                com.notresemaine.app.ui.FocusScreen(
+                    vm, settings,
+                    onScreenTime = { navController.navigate("screentime") },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable("letter/{weekStart}") { entry ->
+                val week = entry.arguments?.getString("weekStart")
+                    ?: com.notresemaine.app.data.Dates.weekStartIso()
+                com.notresemaine.app.ui.WeekLetterScreen(
+                    vm, settings, week,
+                    onBack = { navController.popBackStack() }
+                )
             }
             composable("status") {
                 StatusScreen(

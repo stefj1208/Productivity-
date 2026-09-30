@@ -188,6 +188,28 @@ fun PerformanceScreen(
                 modifier = Modifier.weight(1f)
             )
         }
+        // La concentration : le seul chiffre de la page qui mesure le travail
+        // lui-même, et pas ce qui l'entoure.
+        val focusByDay = settings.focusMinutesByDay()
+        val focusWeek = days.sumOf { focusByDay[it] ?: 0 }
+        val focusSessionsDays = days.count { (focusByDay[it] ?: 0) > 0 }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(top = 10.dp)
+        ) {
+            KpiTile(
+                value = if (focusWeek == 0) "—" else formatMinutes(focusWeek),
+                label = "concentration",
+                accent = accent,
+                modifier = Modifier.weight(1f)
+            )
+            KpiTile(
+                value = if (focusSessionsDays == 0) "—" else "$focusSessionsDays j",
+                label = "jours avec une séance",
+                accent = accent,
+                modifier = Modifier.weight(1f)
+            )
+        }
 
         // ----- Pourquoi tel chiffre manque -----
         //
@@ -213,6 +235,7 @@ fun PerformanceScreen(
                 )
             }
             if (myWeights.isEmpty()) add("Poids : aucune pesée enregistrée (Moi → Mon poids).")
+            if (focusWeek == 0) add("Concentration : aucune séance cette semaine (Planning → 🎧 Focus).")
         }
         if (missing.isNotEmpty()) {
             Spacer(Modifier.height(12.dp))

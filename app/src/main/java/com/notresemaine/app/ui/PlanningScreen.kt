@@ -69,7 +69,8 @@ fun PlanningScreen(
     onSport: () -> Unit,
     onAsk: () -> Unit,
     onMealLog: () -> Unit,
-    onMethod: () -> Unit
+    onMethod: () -> Unit,
+    onFocus: () -> Unit = {}
 ) {
     val today = Dates.todayIso()
     val myId = settings.myUserId
@@ -167,6 +168,28 @@ fun PlanningScreen(
                 )
             }
 
+            // ----- Une séance de concentration en cours -----
+            //
+            // Revenir sur le Planning pendant une séance, c'est souvent le début
+            // de la dispersion : on rappelle où on en était, et on y ramène.
+            if (settings.focusActive()) {
+                val end = java.time.Instant.ofEpochMilli(settings.focusUntil)
+                    .atZone(java.time.ZoneId.systemDefault()).toLocalTime()
+                Text(
+                    text = "🎧 En concentration jusqu'à %02d:%02d".format(end.hour, end.minute) +
+                        if (settings.focusTitle.isNotBlank()) " · ${settings.focusTitle}" else "",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = accent,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp)
+                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+                        .clickable { onFocus() }
+                        .defaultMinSize(minHeight = 56.dp)
+                        .padding(horizontal = 16.dp, vertical = 14.dp)
+                )
+            }
+
             // ----- Maintenant -----
             Spacer(Modifier.height(8.dp))
             CompassCard(
@@ -226,6 +249,56 @@ fun PlanningScreen(
                 }
             }
 
+            // ----- Ensuite -----
+            //
+            // Les anneaux disent où on en est ; il manquait ce qui vient. La
+            // prochaine chose à heure fixe, et dans combien de temps : c'est
+            // l'information qu'on cherche en rouvrant l'application à 11 h 50.
+            val nowHm = "%02d:%02d".format(LocalTime.now().hour, LocalTime.now().minute)
+            val next = tasks
+                .filter { !it.done && it.startTime.isNotBlank() && it.startTime >= nowHm }
+                .minByOrNull { it.startTime }
+            if (next != null) {
+                val wait = runCatching {
+                    java.time.Duration.between(LocalTime.now(), LocalTime.parse(next.startTime)).toMinutes().toInt()
+                }.getOrDefault(-1)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 6.dp, bottom = 4.dp)
+                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(14.dp))
+                        .clickable { onDay(today) }
+                        .defaultMinSize(minHeight = 56.dp)
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                ) {
+                    Text("⏭️", style = MaterialTheme.typography.titleMedium)
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(start = 12.dp)
+                    ) {
+                        Text(
+                            text = "Ensuite · ${next.startTime}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(next.title, style = MaterialTheme.typography.bodyLarge)
+                    }
+                    if (wait >= 0) {
+                        Text(
+                            text = when {
+                                wait < 1 -> "maintenant"
+                                wait < 60 -> "dans $wait min"
+                                else -> "dans ${formatMinutes(wait)}"
+                            },
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = accent
+                        )
+                    }
+                }
+            }
+
             if (tasks.isEmpty()) {
                 EmptyState(
                     emoji = "🌤️",
@@ -252,7 +325,21 @@ fun PlanningScreen(
                         note = noteFor(task)
                     )
                 }
-                TextButton(onClick = { addingTask = true }) { Text("+ Ajouter une tâche") }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(
+                        onClick = { addingTask = true },
+                        modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                    ) { Text("+ Ajouter une tâche") }
+                    Spacer(Modifier.weight(1f))
+                    // Le passage du « quoi » au « maintenant » : un tap, et la
+                    // priorité devient une séance protégée.
+                    if (priority != null && !priority.done && !settings.focusActive()) {
+                        TextButton(
+                            onClick = onFocus,
+                            modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                        ) { Text("🎧 Me concentrer") }
+                    }
+                }
             }
 
             val p = plan
@@ -371,7 +458,10 @@ fun PlanningScreen(
                     "📥", "Notes", onInbox, Modifier.weight(1f),
                     badge = if (inboxCount > 0) "$inboxCount" else null
                 )
-                BigShortcut("🔁", "Habitudes", onHabits, Modifier.weight(1f))
+                BigShortcut(
+                    "🎧", "Focus", onFocus, Modifier.weight(1f),
+                    badge = if (settings.focusActive()) "en cours" else null
+                )
             }
             // « Repas » vient en tête : c'est le raccourci qu'on ouvre trois fois
             // par jour, alors que les menus ne se remplissent qu'une fois par semaine.
@@ -398,7 +488,9 @@ fun PlanningScreen(
                 ShortcutIcon("📵", "Pacte", onScreenTime, Modifier.weight(1f))
                 ShortcutIcon("😴", "Santé", onHealth, Modifier.weight(1f))
                 ShortcutIcon("⚖️", "Poids", onWeight, Modifier.weight(1f))
-                ShortcutIcon("📈", "Perfs", onPerformance, Modifier.weight(1f))
+                // « Progrès » est dans la barre du bas : le répéter ici laissait
+                // les habitudes sans raccourci.
+                ShortcutIcon("🔁", "Habitudes", onHabits, Modifier.weight(1f))
             }
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),

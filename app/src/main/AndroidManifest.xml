@@ -67,6 +67,10 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Appui long sur l'icône : repas, note, concentration, journée -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
             <!-- Android 14+ : écran expliquant pourquoi l'app lit Health Connect -->
             <intent-filter>
                 <action android:name="androidx.health.connect.action.SHOW_PERMISSIONS_RATIONALE" />
@@ -127,6 +131,19 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- Widget « Ma journée » sur l'écran d'accueil -->
+        <receiver
+            android:name=".widget.TodayWidget"
+            android:exported="true"
+            android:label="Ma journée">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_today_info" />
+        </receiver>
 
         <receiver
             android:name=".notif.ReminderReceiver"

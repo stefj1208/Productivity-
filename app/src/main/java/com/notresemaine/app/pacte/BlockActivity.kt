@@ -48,6 +48,15 @@ class BlockActivity : ComponentActivity() {
         val repo = Repository.get(applicationContext)
         val sync = SyncManager(repo)
 
+        if (intent.getBooleanExtra("focus", false)) {
+            showFocus(
+                repo,
+                intent.getStringExtra("focusTitle").orEmpty(),
+                intent.getIntExtra("focusLeft", 0)
+            )
+            return
+        }
+
         setContent {
             AppTheme(mode = "sombre") {
                 var requested by remember { mutableStateOf(false) }
@@ -191,6 +200,62 @@ class BlockActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Pendant une séance de concentration : pas un blocage, un rappel.
+     *
+     * On s'est donné soi-même ce moment ; l'écran ne demande donc rien à
+     * personne. Il dit ce qu'on faisait et combien il reste, propose d'y
+     * retourner — ou d'arrêter franchement, ce qui vaut mieux que de tricher.
+     */
+    private fun showFocus(repo: Repository, title: String, minutesLeft: Int) {
+        setContent {
+            AppTheme(mode = "sombre") {
+                Surface(color = MaterialTheme.colorScheme.background) {
+                    Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
+                        Spacer(Modifier.weight(1f))
+                        Text("🎧", style = MaterialTheme.typography.displaySmall)
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            text = "Tu es en concentration.",
+                            style = MaterialTheme.typography.displaySmall
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            text = (if (title.isNotBlank()) "« $title »\n" else "") +
+                                "Encore $minutesLeft min. Les réseaux t'attendront.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.weight(1f))
+                        BigButton(
+                            text = "Revenir à ma séance",
+                            onClick = {
+                                startActivity(
+                                    Intent(this@BlockActivity, com.notresemaine.app.MainActivity::class.java)
+                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        .putExtra(com.notresemaine.app.MainActivity.EXTRA_ROUTE, "focus")
+                                )
+                                finish()
+                            }
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        TextButton(
+                            onClick = {
+                                lifecycleScope.launch {
+                                    repo.settings.endFocus()
+                                    com.notresemaine.app.notif.Alarms.cancelFocusEnd(applicationContext)
+                                    finish()
+                                }
+                            },
+                            modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                        ) { Text("Arrêter la séance") }
+                        Spacer(Modifier.height(16.dp))
+                    }
+                }
+            }
+        }
+    }
+
     override fun onStart() {
         super.onStart()
         visible = true
@@ -229,6 +294,13 @@ class BlockActivity : ComponentActivity() {
                 .putExtra("minutes", minutes)
                 .putExtra("curfew", curfew)
                 .putExtra("curfewLabel", curfewLabel)
+
+        fun focusIntent(context: android.content.Context, title: String, minutesLeft: Int): Intent =
+            Intent(context, BlockActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                .putExtra("focus", true)
+                .putExtra("focusTitle", title)
+                .putExtra("focusLeft", minutesLeft)
     }
 }
 

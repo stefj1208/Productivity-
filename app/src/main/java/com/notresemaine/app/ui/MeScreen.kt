@@ -47,7 +47,8 @@ fun MeScreen(
     onMethod: () -> Unit,
     onSync: () -> Unit,
     onStatus: () -> Unit,
-    onProfile: () -> Unit
+    onProfile: () -> Unit,
+    onFocus: () -> Unit = {}
 ) {
     val myId = settings.myUserId
     val weekStart = Dates.weekStartIso()
@@ -112,6 +113,18 @@ fun MeScreen(
             },
             onClick = onScreenTime,
             highlight = settings.pacteEnabled
+        )
+        val focusWeek = days.sumOf { settings.focusMinutesByDay()[it] ?: 0 }
+        ShortcutTile(
+            emoji = "🎧",
+            title = "Concentration",
+            subtitle = when {
+                settings.focusActive() -> "Séance en cours · ${settings.focusTitle.ifBlank { "travail profond" }}"
+                focusWeek > 0 -> "${formatMinutes(focusWeek)} cette semaine"
+                else -> "Une tâche, une durée, les réseaux écartés"
+            },
+            onClick = onFocus,
+            highlight = settings.focusActive()
         )
         ShortcutTile(
             emoji = "😴",

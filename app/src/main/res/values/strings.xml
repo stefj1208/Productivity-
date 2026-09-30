@@ -1,4 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Notre Semaine</string>
+    <string name="widget_description">Ma journée : la priorité, ce qui vient ensuite, et trois gestes rapides</string>
+    <string name="sc_meal_short">Noter un repas</string>
+    <string name="sc_meal_long">Noter ce que j\'ai mangé</string>
+    <string name="sc_capture_short">Vider sa tête</string>
+    <string name="sc_capture_long">Noter une idée, une tâche</string>
+    <string name="sc_focus_short">Concentration</string>
+    <string name="sc_focus_long">Démarrer une séance de concentration</string>
+    <string name="sc_today_short">Ma journée</string>
+    <string name="sc_today_long">Voir le déroulé de ma journée</string>
 </resources>

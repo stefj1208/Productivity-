@@ -86,6 +86,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val syncRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
     init {
+        // Le widget de l'écran d'accueil suit ce qui change ici : une tâche
+        // cochée, un repas noté, une séance lancée. Room réémet à chaque
+        // écriture ; on regroupe les rafales pour ne redessiner qu'une fois.
+        viewModelScope.launch {
+            kotlinx.coroutines.flow.merge(
+                repo.db.tasks().byWeekAllUsers(com.notresemaine.app.data.Dates.weekStartIso()),
+                repo.db.mealLogs().between(
+                    com.notresemaine.app.data.Dates.todayIso(),
+                    com.notresemaine.app.data.Dates.todayIso()
+                ),
+                repo.settings.flow
+            ).debounce(1_000).collect {
+                com.notresemaine.app.widget.TodayWidget.refresh(getApplication())
+            }
+        }
         viewModelScope.launch {
             syncRequests.debounce(3_000).collect {
                 sync.syncNow()
@@ -826,6 +841,46 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * MagicOS et One UI tuent volontiers les services en arrière-plan. À chaque
      * retour dans l'application, on remet la surveillance en marche si besoin.
      */
+    // ----- Concentration -----
+
+    /**
+     * Démarre une séance : l'heure de fin est notée, la sonnerie de fin posée,
+     * et la surveillance lancée — c'est elle qui écarte les réseaux pendant la
+     * séance, que le Pacte soit activé ou non.
+     */
+    fun startFocus(minutes: Int, title: String) {
+        viewModelScope.launch {
+            val app = getApplication<Application>()
+            // Une séance précédente jamais close : son temps est noté avant
+            // d'en ouvrir une autre, sinon il disparaîtrait du carnet.
+            if (repo.settings.current().focusStartedAt > 0L) repo.settings.endFocus()
+            repo.settings.startFocus(minutes.coerceIn(5, 180), title.trim())
+            val s = repo.settings.current()
+            Alarms.scheduleFocusEnd(app, s.focusUntil, s.focusTitle, s.alertSound)
+            BlockerService.startIfEnabled(app, true)
+            com.notresemaine.app.widget.TodayWidget.refresh(app)
+        }
+    }
+
+    /** Clôt la séance ; si une tâche est désignée, elle est cochée dans la foulée. */
+    fun endFocus(markDoneTaskId: String? = null) {
+        viewModelScope.launch {
+            val app = getApplication<Application>()
+            val spent = repo.settings.endFocus()
+            Alarms.cancelFocusEnd(app)
+            Alarms.dismissNotification(app)
+            if (markDoneTaskId != null) {
+                val task = repo.db.tasks().byId(markDoneTaskId)
+                if (task != null && !task.done) repo.toggleDone(markDoneTaskId)
+                requestSync()
+            }
+            // Le service ne reste en vie que si le Pacte, lui, le demande.
+            if (!repo.settings.current().pacteEnabled) BlockerService.startIfEnabled(app, false)
+            com.notresemaine.app.widget.TodayWidget.refresh(app)
+            if (spent > 0) toast("$spent min de concentration notées")
+        }
+    }
+
     fun ensureBlockerRunning() {
         viewModelScope.launch {
             if (repo.settings.current().pacteEnabled) {

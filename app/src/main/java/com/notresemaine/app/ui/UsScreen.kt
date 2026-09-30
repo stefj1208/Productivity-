@@ -58,7 +58,8 @@ fun UsScreen(
     settings: AppSettings,
     onGoToSettings: () -> Unit,
     onScreenTime: () -> Unit,
-    onHealth: () -> Unit
+    onHealth: () -> Unit,
+    onLetter: (String) -> Unit = {}
 ) {
     val myId = settings.myUserId
     val weekStart = Dates.weekStartIso()
@@ -112,6 +113,13 @@ fun UsScreen(
                         "verrez chacun le pacte d'écran de l'autre.",
                     actionLabel = "Relier nos téléphones",
                     onAction = onGoToSettings
+                )
+                Spacer(Modifier.height(12.dp))
+                ShortcutTile(
+                    emoji = "📜",
+                    title = "Ma semaine en une page",
+                    subtitle = "Tout ce qui s'est passé, en phrases — à copier ou envoyer",
+                    onClick = { onLetter(weekStart) }
                 )
                 Spacer(Modifier.height(24.dp))
             } else {
@@ -178,6 +186,19 @@ fun UsScreen(
                         )
                     }
                 }
+
+                // La lettre de la semaine : surtout utile le week-end, mais
+                // toujours là — on veut parfois relire la semaine passée.
+                Spacer(Modifier.height(16.dp))
+                val weekend = java.time.LocalDate.now().dayOfWeek.value >= 5
+                ShortcutTile(
+                    emoji = "📜",
+                    title = "Notre semaine en une page",
+                    subtitle = if (weekend) "À relire ensemble ce week-end"
+                    else "Chacun, à deux, et la semaine qui vient",
+                    onClick = { onLetter(weekStart) },
+                    highlight = weekend
+                )
 
                 // ----- 3. Ce qu'on s'est confié -----
                 //

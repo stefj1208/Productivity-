@@ -40,6 +40,7 @@ private val books = listOf(
         "La valeur vient des blocs de concentration longs et protégés, pas des miettes de temps.",
         listOf(
             "Le bloc de concentration décidé la veille, affiché le matin",
+            "🎧 Le mode Concentration : une tâche, une durée, les réseaux écartés, une sonnerie à la fin",
             "Les séances d'objectifs générées comme des blocs dédiés",
             "Le Pacte d'écran qui coupe les distractions au-delà de la limite"
         )

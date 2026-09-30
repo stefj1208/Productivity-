@@ -21,6 +21,8 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
         // s'annoncer, même application fermée : c'est tout l'intérêt du
         // travail de fond.
         com.notresemaine.app.notif.Announcements.afterSync(applicationContext, repo)
+        // Une tâche confiée par l'autre doit aussi apparaître sur le widget.
+        com.notresemaine.app.widget.TodayWidget.refresh(applicationContext)
         return Result.success()
     }
 

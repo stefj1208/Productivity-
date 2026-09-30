@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Appui long sur l'icône : les quatre gestes qu'on fait sans vouloir « ouvrir l'application ». -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="repas"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/sc_meal_short"
+        android:shortcutLongLabel="@string/sc_meal_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.notresemaine.app"
+            android:targetClass="com.notresemaine.app.MainActivity">
+            <extra android:name="route" android:value="meallog" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="noter"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/sc_capture_short"
+        android:shortcutLongLabel="@string/sc_capture_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.notresemaine.app"
+            android:targetClass="com.notresemaine.app.MainActivity">
+            <extra android:name="route" android:value="capture" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="focus"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/sc_focus_short"
+        android:shortcutLongLabel="@string/sc_focus_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.notresemaine.app"
+            android:targetClass="com.notresemaine.app.MainActivity">
+            <extra android:name="route" android:value="focus" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="journee"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/sc_today_short"
+        android:shortcutLongLabel="@string/sc_today_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.notresemaine.app"
+            android:targetClass="com.notresemaine.app.MainActivity">
+            <extra android:name="route" android:value="today" />
+        </intent>
+    </shortcut>
+</shortcuts>
