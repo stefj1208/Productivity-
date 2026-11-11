@@ -92,25 +92,28 @@ fun StatusScreen(
             )
 
             Spacer(Modifier.height(12.dp))
-            SectionLabel("À DEUX")
+            SectionLabel(if (settings.solo) "SAUVEGARDE" else "À DEUX")
             StatusLine(
-                ok = syncConfigured && syncSignedIn && syncPaired,
+                ok = syncConfigured && syncSignedIn && (syncPaired || settings.solo),
                 label = when {
+                    !syncConfigured && settings.solo -> "Sauvegarde en ligne non configurée — tout reste sur ce téléphone (c'est un choix possible)"
                     !syncConfigured -> "Synchronisation non configurée — l'application marche, mais seule sur ce téléphone"
                     !syncSignedIn -> "Compte non connecté : rien ne part ni n'arrive"
-                    !syncPaired -> "Espace du couple non rejoint : vos deux téléphones s'ignorent"
+                    !syncPaired && !settings.solo -> "Espace du couple non rejoint : vos deux téléphones s'ignorent"
                     else -> "Reliée à ${settings.authEmail}"
                 },
-                actionLabel = if (syncConfigured && syncSignedIn && syncPaired) null else "Configurer",
+                actionLabel = if (syncConfigured && syncSignedIn && (syncPaired || settings.solo)) null else "Configurer",
                 onAction = onSync
             )
-            StatusLine(
-                ok = partner != null,
-                label = if (partner != null) "Binôme visible : ${partner.name}"
-                else "Aucun binôme reçu pour l'instant — il apparaîtra à la première synchronisation réussie",
-                actionLabel = if (partner == null) "Voir" else null,
-                onAction = onSync
-            )
+            if (!settings.solo) {
+                StatusLine(
+                    ok = partner != null,
+                    label = if (partner != null) "Binôme visible : ${partner.name}"
+                    else "Aucun binôme reçu pour l'instant — il apparaîtra à la première synchronisation réussie",
+                    actionLabel = if (partner == null) "Voir" else null,
+                    onAction = onSync
+                )
+            }
             StatusLine(
                 ok = lastSync > 0,
                 label = if (lastSync > 0) "Dernier échange : ${ago(lastSync)}"

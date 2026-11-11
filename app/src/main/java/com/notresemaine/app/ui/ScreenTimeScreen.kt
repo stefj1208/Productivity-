@@ -256,7 +256,10 @@ fun ScreenTimeScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit
             SectionLabel("5 · LE PACTE")
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "Au-delà de la limite, blocage. Seule l'autre moitié peut " +
+                    text = if (settings.solo)
+                        "Au-delà de la limite, blocage. Une pause de 15 min par jour reste " +
+                            "possible, après deux minutes de réflexion."
+                    else "Au-delà de la limite, blocage. Seule l'autre moitié peut " +
                         "accorder une pause.",
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.weight(1f)

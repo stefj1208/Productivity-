@@ -5,6 +5,9 @@ on:
     branches: ["**"]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -28,3 +31,22 @@ jobs:
         with:
           name: NotreSemaine-APK
           path: app/build/outputs/apk/debug/app-debug.apk
+
+      # Une adresse stable, sans connexion GitHub : l'APK de chaque branche est
+      # aussi publié comme « release », remplacé à chaque construction.
+      # https://github.com/stefj1208/Productivity-/releases/download/apk-<branche>/NotreSemaine.apk
+      - name: Nommer l'APK et la release
+        id: meta
+        run: |
+          tag="apk-$(echo "${GITHUB_REF_NAME}" | tr '/' '-' | tr -c 'A-Za-z0-9._-\n' '-')"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          cp app/build/outputs/apk/debug/app-debug.apk NotreSemaine.apk
+
+      - name: Publier l'APK à une adresse fixe
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: "APK · ${{ github.ref_name }}"
+          body: "Dernière construction de la branche ${{ github.ref_name }} (${{ github.sha }}). Installez NotreSemaine.apk par-dessus la version précédente."
+          prerelease: true
+          files: NotreSemaine.apk

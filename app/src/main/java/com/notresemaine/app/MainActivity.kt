@@ -146,11 +146,15 @@ private data class Tab(val route: String, val label: String, val icon: ImageVect
 // trois fois par an, on regarde où on en est toutes les semaines : la barre du
 // bas doit porter le geste fréquent, pas le geste rare. Les objectifs restent à
 // un tap, depuis les raccourcis du Planning et depuis « Moi ».
-private val tabs = listOf(
+//
+// En solo, « Nous » n'a plus de sens : sa place revient aux Défis. À deux, les
+// Défis restent accessibles depuis le Planning et « Moi ».
+private fun tabsFor(settings: AppSettings) = listOf(
     Tab("planning", "Planning", Icons.Filled.WbSunny),
     Tab("performance", "Progrès", Icons.Filled.ShowChart),
     Tab("house", "Maison", Icons.Filled.Home),
-    Tab("us", "Nous", Icons.Filled.Favorite),
+    if (settings.solo) Tab("challenges", "Défis", Icons.Filled.Flag)
+    else Tab("us", "Nous", Icons.Filled.Favorite),
     Tab("me", "Moi", Icons.Filled.Person)
 )
 
@@ -200,7 +204,7 @@ private fun MainScaffold(
             val backStack by navController.currentBackStackEntryAsState()
             val currentRoute = backStack?.destination?.route
             NavigationBar {
-                tabs.forEach { tab ->
+                tabsFor(settings).forEach { tab ->
                     NavigationBarItem(
                         selected = currentRoute == tab.route,
                         onClick = {
@@ -262,7 +266,10 @@ private fun MainScaffold(
                     onAsk = { navController.navigate("ask") },
                     onMealLog = { navController.navigate("meallog") },
                     onMethod = { navController.navigate("method") },
-                    onFocus = { navController.navigate("focus") }
+                    onFocus = { navController.navigate("focus") },
+                    onChallenges = { navController.navigate("challenges") },
+                    onLetter = { week -> navController.navigate("letter/$week") },
+                    onStatus = { navController.navigate("status") }
                 )
             }
             composable("goals") {
@@ -310,7 +317,8 @@ private fun MainScaffold(
                     onSync = { navController.navigate("sync") },
                     onStatus = { navController.navigate("status") },
                     onProfile = { navController.navigate("profile") },
-                    onFocus = { navController.navigate("focus") }
+                    onFocus = { navController.navigate("focus") },
+                    onChallenges = { navController.navigate("challenges") }
                 )
             }
             composable("day/{date}") { entry ->
@@ -362,6 +370,14 @@ private fun MainScaffold(
                 // Destination principale : pas de flèche de retour, le bouton
                 // système du téléphone suffit — comme sur les quatre autres.
                 PerformanceScreen(vm, settings, onBack = null)
+            }
+            composable("challenges") {
+                com.notresemaine.app.ui.ChallengesScreen(
+                    vm, settings,
+                    onReminders = { navController.navigate("reminders") },
+                    // Onglet principal en solo : pas de flèche ; porte secondaire à deux : une flèche.
+                    onBack = if (settings.solo) null else ({ navController.popBackStack() })
+                )
             }
             composable("focus") {
                 com.notresemaine.app.ui.FocusScreen(

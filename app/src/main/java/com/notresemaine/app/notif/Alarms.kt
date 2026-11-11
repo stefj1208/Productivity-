@@ -144,11 +144,18 @@ object Alarms {
             }
         }
 
+        // Le défi du jour : une phrase précise (« 7 objet(s) »), pas un rappel vague.
+        val challengeLines = if (settings.myUserId.isBlank() || !settings.challengeRemindersEnabled) emptyList()
+        else repo.db.challenges().activeOnce(settings.myUserId)
+            .filter { !com.notresemaine.app.data.Challenges.isOver(it) }
+            .map { it.emoji + " " + it.title to com.notresemaine.app.data.Challenges.todayLine(it) }
+
         val alerts = upcoming(
             settings,
             goals.map { it.title to (it.preferredTime to it.preferredDays) },
             hasRitual,
-            taskSlots = slots
+            taskSlots = slots,
+            challengeLines = challengeLines
         )
         val now = LocalDateTime.now()
         val all = (alerts + habitMoments.filter { it.at.isAfter(now) && it.at.isBefore(now.plusHours(24)) })
@@ -167,7 +174,8 @@ object Alarms {
         goals: List<Pair<String, Pair<String, String>>>,
         hasRitual: Boolean,
         taskSlots: List<Triple<String, String, String>> = emptyList(), // date, HH:MM, intitulé
-        now: LocalDateTime = LocalDateTime.now()
+        now: LocalDateTime = LocalDateTime.now(),
+        challengeLines: List<Pair<String, String>> = emptyList() // titre, phrase du jour
     ): List<Alert> {
         val alerts = mutableListOf<Alert>()
 
@@ -203,7 +211,8 @@ object Alarms {
             if (day.dayOfWeek == DayOfWeek.SUNDAY) {
                 add(
                     day, parseTime(settings.sundayReminder), "🗓️", "Revue de la semaine",
-                    "10 minutes à deux pour préparer la semaine."
+                    if (settings.solo) "10 minutes pour préparer la semaine."
+                    else "10 minutes à deux pour préparer la semaine."
                 )
             }
             // Les repas : on note ce qu'on a mangé pendant qu'on s'en souvient.
@@ -224,6 +233,16 @@ object Alarms {
                     day, parseTime(settings.mealReminderEvening), "🌙",
                     "Dîner", "Dernier repas de la journée : notez-le avant d'oublier.",
                     route = "meallog", action = "Noter mon repas", nudge = true
+                )
+            }
+            // Un seul rappel pour tous les défis du jour : les sonneries s'additionnent vite.
+            challengeLines.firstOrNull()?.let { (title, line) ->
+                add(
+                    day, parseTime(settings.challengeReminder), "🏁",
+                    if (challengeLines.size == 1) title else "${challengeLines.size} défis aujourd'hui",
+                    if (challengeLines.size == 1) line
+                    else challengeLines.joinToString("\n") { "${it.first} · ${it.second}" },
+                    route = "challenges", action = "Cocher mon défi", nudge = true
                 )
             }
             if (settings.curfewEnabled) {

@@ -92,6 +92,29 @@ fun ProfileScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
             )
 
             Spacer(Modifier.height(24.dp))
+            SectionLabel("SEUL OU À DEUX")
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                listOf("solo" to "🧍 Solo", "duo" to "💞 À deux").forEach { (mode, label) ->
+                    FilterChip(
+                        selected = settings.mode == mode,
+                        onClick = { vm.setMode(mode) },
+                        label = { Text(label, style = MaterialTheme.typography.labelLarge) },
+                        modifier = Modifier.height(48.dp)
+                    )
+                }
+            }
+            Text(
+                text = if (settings.solo)
+                    "En solo, l'onglet « Nous » laisse la place aux Défis, et le Pacte se tient " +
+                        "avec soi-même. Rien n'est effacé : repasser « à deux » retrouve tout."
+                else "À deux, l'onglet « Nous » montre la semaine de l'autre, et c'est l'autre " +
+                    "qui tient le Pacte. Les Défis restent à un tap depuis le Planning.",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+
+            Spacer(Modifier.height(24.dp))
             SectionLabel("APPARENCE")
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 listOf("sombre" to "Sombre", "auto" to "Auto", "clair" to "Clair").forEach { (mode, label) ->

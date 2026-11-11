@@ -303,6 +303,41 @@ data class ShoppingItemEntity(
     val updatedAt: Long
 )
 
+/**
+ * Un défi en cours ou terminé : « 30 jours de minimalisme », « 21 matins à 6 h ».
+ *
+ * Le défi ne porte aucune logique : il garde sa règle ([rule], [unit]) et les
+ * jours cochés ([doneDays]). C'est [Challenges] qui sait ce que « jour 7 » veut
+ * dire. Ajouter un type de défi, c'est donc ajouter une entrée au catalogue —
+ * jamais une colonne ici.
+ */
+@Entity(tableName = "challenges")
+data class ChallengeEntity(
+    @PrimaryKey val id: String,
+    val userId: String,
+    /** Entrée du catalogue d'origine, ou « perso » pour un défi inventé. */
+    val templateId: String,
+    val emoji: String,
+    val title: String,
+    val description: String = "",
+    val days: Int,
+    /** constant : la même chose chaque jour · croissant : jour n = n fois · libre : une case à cocher. */
+    val rule: String = "constant",
+    /** Ce qu'on compte : « objet(s) », « page(s) », vide pour « libre ». */
+    val unit: String = "",
+    /** Quantité par jour pour « constant », point de départ pour « croissant ». */
+    val amount: Int = 1,
+    val startDate: String,
+    /** Numéros de jours accomplis, « 1,2,5 ». Un jour manqué n'est noté nulle part. */
+    val doneDays: String = "",
+    /** actif · termine · arrete */
+    val status: String = "actif",
+    /** Visible par le binôme ? Non par défaut : un défi est d'abord une affaire avec soi-même. */
+    val shared: Boolean = false,
+    val deleted: Boolean = false,
+    val updatedAt: Long
+)
+
 /** Sommeil, pas et sport d'une journée — Health Connect ou saisie manuelle. */
 @Entity(tableName = "health_days")
 data class HealthDayEntity(
@@ -490,6 +525,24 @@ interface RitualDao {
 
     @Upsert
     suspend fun upsertLog(log: RitualLogEntity)
+}
+
+@Dao
+interface ChallengeDao {
+    @Query("SELECT * FROM challenges WHERE deleted = 0 ORDER BY status, startDate DESC")
+    fun all(): Flow<List<ChallengeEntity>>
+
+    @Query("SELECT * FROM challenges WHERE userId = :userId AND status = 'actif' AND deleted = 0 ORDER BY startDate")
+    suspend fun activeOnce(userId: String): List<ChallengeEntity>
+
+    @Query("SELECT * FROM challenges WHERE id = :id")
+    suspend fun byId(id: String): ChallengeEntity?
+
+    @Query("SELECT * FROM challenges WHERE updatedAt > :ts")
+    suspend fun modifiedSince(ts: Long): List<ChallengeEntity>
+
+    @Upsert
+    suspend fun upsert(challenge: ChallengeEntity)
 }
 
 @Dao
@@ -695,9 +748,9 @@ interface HealthDao {
         InboxItemEntity::class, UsageDayEntity::class, GraceRequestEntity::class,
         MealEntity::class, ShoppingItemEntity::class, HealthDayEntity::class,
         HouseItemEntity::class, WeightEntity::class, HabitEntity::class,
-        MealLogEntity::class
+        MealLogEntity::class, ChallengeEntity::class
     ],
-    version = 11,
+    version = 12,
     exportSchema = false
 )
 abstract class AppDb : RoomDatabase() {
@@ -713,6 +766,7 @@ abstract class AppDb : RoomDatabase() {
     abstract fun grace(): GraceDao
     abstract fun meals(): MealDao
     abstract fun mealLogs(): MealLogDao
+    abstract fun challenges(): ChallengeDao
     abstract fun shopping(): ShoppingDao
     abstract fun health(): HealthDao
     abstract fun houseItems(): HouseItemDao
@@ -776,6 +830,31 @@ abstract class AppDb : RoomDatabase() {
                             )
                         }
                     }
+                }
+            },
+            // 11 → 12 : les défis. Une table, pas une par type de défi : la règle
+            // est une donnée, pour qu'un nouveau défi n'exige jamais de migration.
+            object : Migration(11, 12) {
+                override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS challenges (" +
+                            "id TEXT NOT NULL PRIMARY KEY, " +
+                            "userId TEXT NOT NULL, " +
+                            "templateId TEXT NOT NULL, " +
+                            "emoji TEXT NOT NULL, " +
+                            "title TEXT NOT NULL, " +
+                            "description TEXT NOT NULL DEFAULT '', " +
+                            "days INTEGER NOT NULL, " +
+                            "rule TEXT NOT NULL DEFAULT 'constant', " +
+                            "unit TEXT NOT NULL DEFAULT '', " +
+                            "amount INTEGER NOT NULL DEFAULT 1, " +
+                            "startDate TEXT NOT NULL, " +
+                            "doneDays TEXT NOT NULL DEFAULT '', " +
+                            "status TEXT NOT NULL DEFAULT 'actif', " +
+                            "shared INTEGER NOT NULL DEFAULT 0, " +
+                            "deleted INTEGER NOT NULL DEFAULT 0, " +
+                            "updatedAt INTEGER NOT NULL)"
+                    )
                 }
             }
         )

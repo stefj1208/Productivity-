@@ -29,7 +29,18 @@ object Ai {
     const val ANTHROPIC = "anthropic"
 
     private const val GOOGLE_MODEL = "gemini-3.6-flash"
-    private const val ANTHROPIC_MODEL = "claude-opus-5"
+
+    /**
+     * Deux modèles Claude, selon ce qu'on demande.
+     *
+     * Les tâches courtes et fréquentes — classer une note, comprendre une phrase
+     * dictée, estimer un repas — n'ont pas besoin du plus gros modèle : Haiku
+     * répond en une seconde pour cinq fois moins cher. Les tâches qui demandent
+     * du jugement — composer des menus, lire une photo, relire la semaine —
+     * passent par Sonnet. Un seul interrupteur, [fast], choisit.
+     */
+    private const val ANTHROPIC_MODEL = "claude-sonnet-5"
+    private const val ANTHROPIC_FAST_MODEL = "claude-haiku-4-5"
 
     private val JSON = "application/json; charset=utf-8".toMediaType()
 
@@ -59,12 +70,13 @@ object Ai {
         apiKey: String,
         system: String,
         prompt: String,
-        maxTokens: Int = 4000
+        maxTokens: Int = 4000,
+        fast: Boolean = false
     ): String = withContext(Dispatchers.IO) {
         val key = apiKey.trim()
         if (key.isBlank()) throw AiException("Aucune clé enregistrée.")
         val text = when (providerOf(key)) {
-            ANTHROPIC -> askAnthropic(key, system, prompt, maxTokens)
+            ANTHROPIC -> askAnthropic(key, system, prompt, maxTokens, fast = fast)
             else -> askGoogle(key, system, prompt, maxTokens)
         }
         if (text.isBlank()) throw AiException("Réponse vide de l'assistant.")
@@ -173,7 +185,8 @@ object Ai {
         prompt: String,
         maxTokens: Int,
         imageBase64: String = "",
-        mimeType: String = ""
+        mimeType: String = "",
+        fast: Boolean = false
     ): String {
         val requestContent = JSONArray()
         if (imageBase64.isNotBlank()) {
@@ -192,7 +205,7 @@ object Ai {
         requestContent.put(JSONObject().put("type", "text").put("text", prompt))
 
         val body = JSONObject().apply {
-            put("model", ANTHROPIC_MODEL)
+            put("model", if (fast) ANTHROPIC_FAST_MODEL else ANTHROPIC_MODEL)
             put("max_tokens", maxTokens)
             put("system", system)
             put(

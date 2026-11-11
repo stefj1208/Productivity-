@@ -70,7 +70,10 @@ fun PlanningScreen(
     onAsk: () -> Unit,
     onMealLog: () -> Unit,
     onMethod: () -> Unit,
-    onFocus: () -> Unit = {}
+    onFocus: () -> Unit = {},
+    onChallenges: () -> Unit = {},
+    onLetter: (String) -> Unit = {},
+    onStatus: () -> Unit = {}
 ) {
     val today = Dates.todayIso()
     val myId = settings.myUserId
@@ -110,6 +113,18 @@ fun PlanningScreen(
         .collectAsState(initial = emptyList())
     val mealLogs by remember(today) { vm.repo.db.mealLogs().between(today, today) }
         .collectAsState(initial = emptyList())
+    val challenges by remember { vm.repo.db.challenges().all() }
+        .collectAsState(initial = emptyList())
+    // Les défis du jour pas encore cochés : la seule chose qu'on peut oublier
+    // sans que rien, nulle part, ne le signale.
+    val challengesToday = challenges.filter {
+        it.userId == myId && it.status == "actif" &&
+            com.notresemaine.app.data.Challenges.dayNumber(it) in 1..it.days
+    }
+    val challengesLeft = challengesToday.filter {
+        com.notresemaine.app.data.Challenges.dayNumber(it) !in
+            com.notresemaine.app.data.Challenges.doneDays(it)
+    }
 
     val targetWeek = Dates.planningTargetWeekIso()
     val targetWeekPlan by remember(myId, targetWeek) { vm.repo.db.weekPlans().byWeek(myId, targetWeek) }
@@ -342,6 +357,50 @@ fun PlanningScreen(
                 }
             }
 
+            // ----- Le défi du jour -----
+            challengesToday.forEach { c ->
+                val done = c !in challengesLeft
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 6.dp)
+                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(14.dp))
+                        .clickable { onChallenges() }
+                        .defaultMinSize(minHeight = 56.dp)
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                ) {
+                    Text(c.emoji, style = MaterialTheme.typography.titleMedium)
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(start = 12.dp)
+                    ) {
+                        Text(
+                            text = com.notresemaine.app.data.Challenges.todayLine(c),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = if (done) MaterialTheme.colorScheme.onSurfaceVariant
+                            else MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = c.title,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    if (done) {
+                        Text("✅", style = MaterialTheme.typography.bodyLarge)
+                    } else {
+                        TextButton(
+                            onClick = {
+                                vm.toggleChallengeDay(c.id, com.notresemaine.app.data.Challenges.dayNumber(c))
+                            },
+                            modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                        ) { Text("Fait") }
+                    }
+                }
+            }
+
             val p = plan
             if (p?.focusBlocks != null) {
                 Text(
@@ -502,6 +561,18 @@ fun PlanningScreen(
                 // Le bilan a déjà son bouton en bas de l'écran : le répéter ici
                 // prenait la place d'un raccourci qui manquait.
                 ShortcutIcon("🎯", "Objectifs", onGoals, Modifier.weight(1f))
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(top = 8.dp)
+            ) {
+                ShortcutIcon(
+                    "🏁", "Défis", onChallenges, Modifier.weight(1f),
+                    badge = if (challengesLeft.isNotEmpty()) "(${challengesLeft.size})" else null
+                )
+                ShortcutIcon("📜", "Semaine", { onLetter(weekStart) }, Modifier.weight(1f))
+                ShortcutIcon("🩺", "État", onStatus, Modifier.weight(1f))
+                ShortcutIcon("📖", "Méthode", onMethod, Modifier.weight(1f))
             }
             Spacer(Modifier.height(24.dp))
         }

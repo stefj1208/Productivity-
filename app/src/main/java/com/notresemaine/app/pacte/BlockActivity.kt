@@ -82,13 +82,37 @@ class BlockActivity : ComponentActivity() {
                             style = MaterialTheme.typography.displaySmall
                         )
                         Spacer(Modifier.height(16.dp))
+                        // En solo, personne d'autre ne tient le pacte : on se donne
+                        // soi-même une pause, mais après deux minutes de réflexion
+                        // et une seule fois par jour. Le délai est la seule chose
+                        // qui sépare une décision d'un réflexe.
+                        val solo = s?.solo == true
+                        var countdown by remember { mutableStateOf(-1) }
+                        androidx.compose.runtime.LaunchedEffect(countdown) {
+                            if (countdown > 0) {
+                                kotlinx.coroutines.delay(1_000)
+                                countdown -= 1
+                            } else if (countdown == 0) {
+                                repo.settings.grantSelfGrace(15)
+                                countdown = -1
+                            }
+                        }
+                        val selfUsedToday = s?.selfGraceDate == Dates.todayIso()
                         Text(
-                            text = if (requested)
-                                "Demande envoyée. Son téléphone la regarde toutes les " +
-                                    "5 minutes, et le tien vérifie la réponse toutes les " +
-                                    "15 secondes tant qu'elle n'est pas arrivée."
-                            else
-                                "C'était le pacte : seule l'autre moitié peut accorder une pause.",
+                            text = when {
+                                solo && countdown > 0 ->
+                                    "Deux minutes pour y réfléchir. Si l'envie tient encore dans " +
+                                        "${countdown / 60}:${"%02d".format(countdown % 60)}, la pause s'ouvrira."
+                                solo && selfUsedToday ->
+                                    "La pause d'aujourd'hui a déjà été prise. C'était le pacte avec toi-même."
+                                solo -> "C'est le pacte que tu as pris avec toi-même. Une pause par jour " +
+                                    "reste possible, après deux minutes de réflexion."
+                                requested ->
+                                    "Demande envoyée. Son téléphone la regarde toutes les " +
+                                        "5 minutes, et le tien vérifie la réponse toutes les " +
+                                        "15 secondes tant qu'elle n'est pas arrivée."
+                                else -> "C'était le pacte : seule l'autre moitié peut accorder une pause."
+                            },
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -128,7 +152,20 @@ class BlockActivity : ComponentActivity() {
                         }
 
                         Spacer(Modifier.weight(1f))
-                        if (!requested && s != null) {
+                        if (solo && s != null) {
+                            if (!selfUsedToday && countdown < 0) {
+                                BigButton(
+                                    text = "Prendre 15 min — après 2 min de réflexion",
+                                    onClick = { countdown = 120 }
+                                )
+                                Spacer(Modifier.height(8.dp))
+                            } else if (countdown > 0) {
+                                TextButton(
+                                    onClick = { countdown = -1 },
+                                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                                ) { Text("Finalement non, je pose le téléphone") }
+                            }
+                        } else if (!requested && s != null) {
                             BigButton(
                                 text = "Demander 15 min à mon binôme",
                                 onClick = {

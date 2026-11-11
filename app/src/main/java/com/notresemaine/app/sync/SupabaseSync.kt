@@ -1,5 +1,6 @@
 package com.notresemaine.app.sync
 
+import com.notresemaine.app.data.ChallengeEntity
 import com.notresemaine.app.data.DayPlanEntity
 import com.notresemaine.app.data.EncouragementEntity
 import com.notresemaine.app.data.GoalEntity
@@ -219,6 +220,26 @@ data class HabitDto(
 )
 
 /** Pesée. Ne quitte le téléphone que si son propriétaire a coché le partage. */
+@Serializable
+data class ChallengeDto(
+    val id: String,
+    @SerialName("user_id") val userId: String,
+    @SerialName("template_id") val templateId: String,
+    val emoji: String,
+    val title: String,
+    val description: String = "",
+    val days: Int,
+    val rule: String = "constant",
+    val unit: String = "",
+    val amount: Int = 1,
+    @SerialName("start_date") val startDate: String,
+    @SerialName("done_days") val doneDays: String = "",
+    val status: String = "actif",
+    val shared: Boolean = false,
+    val deleted: Boolean = false,
+    @SerialName("updated_at") val updatedAt: Long
+)
+
 @Serializable
 data class WeightDto(
     val id: String,
@@ -560,6 +581,19 @@ class SyncManager(private val repo: Repository) {
                     EncouragementDto(it.id, it.fromUser, it.toUser, it.date, it.message, it.deleted, it.updatedAt)
                 }, EncouragementDto.serializer())
 
+                // Les défis : tous les miens partent (sauvegarde), mais la ligne
+                // n'est lisible par le binôme que si « shared » est vrai — c'est
+                // la politique côté serveur qui filtre. Table récente : si le
+                // schéma n'a pas encore été rejoué, on ne bloque pas le reste.
+                val challenges = db.challenges().modifiedSince(s.lastPushTs).filter { it.userId == myId }
+                val challengesOk = runCatching {
+                    api.upsert("challenges", token, challenges.map {
+                        ChallengeDto(it.id, it.userId, it.templateId, it.emoji, it.title, it.description,
+                            it.days, it.rule, it.unit, it.amount, it.startDate, it.doneDays, it.status,
+                            it.shared, it.deleted, it.updatedAt)
+                    }, ChallengeDto.serializer())
+                }.isSuccess
+
                 val pushMark = (tasks.map { it.updatedAt } + dayPlans.map { it.updatedAt } +
                         weekPlans.map { it.updatedAt } + profiles.map { it.updatedAt } +
                         encouragements.map { it.updatedAt } + goals.map { it.updatedAt } +
@@ -569,6 +603,7 @@ class SyncManager(private val repo: Repository) {
                         shopping.map { it.updatedAt } + healthDays.map { it.updatedAt } +
                         houseItems.map { it.updatedAt } + weights.map { it.updatedAt } +
                         habits.map { it.updatedAt } +
+                        (if (challengesOk) challenges.map { it.updatedAt } else emptyList()) +
                         s.lastPushTs).max()
 
                 // Réception : tout ce qui a changé dans le couple ; la ligne la plus récente gagne.
@@ -700,6 +735,17 @@ class SyncManager(private val repo: Repository) {
                     val local = db.encouragements().byId(dto.id)
                     if (local == null || dto.updatedAt > local.updatedAt) {
                         db.encouragements().upsert(EncouragementEntity(dto.id, dto.fromUser, dto.toUser, dto.date, dto.message, dto.deleted, dto.updatedAt))
+                    }
+                }
+                runCatching {
+                    api.select("challenges", token, s.lastPullTs, ChallengeDto.serializer())
+                }.getOrDefault(emptyList()).forEach { dto ->
+                    pullMark = maxOf(pullMark, dto.updatedAt)
+                    val local = db.challenges().byId(dto.id)
+                    if (local == null || dto.updatedAt > local.updatedAt) {
+                        db.challenges().upsert(ChallengeEntity(dto.id, dto.userId, dto.templateId, dto.emoji,
+                            dto.title, dto.description, dto.days, dto.rule, dto.unit, dto.amount, dto.startDate,
+                            dto.doneDays, dto.status, dto.shared, dto.deleted, dto.updatedAt))
                     }
                 }
 

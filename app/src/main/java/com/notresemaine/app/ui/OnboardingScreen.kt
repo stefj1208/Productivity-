@@ -30,6 +30,7 @@ import com.notresemaine.app.ui.theme.accentLabel
 fun OnboardingScreen(vm: AppViewModel) {
     var name by remember { mutableStateOf("") }
     var color by remember { mutableStateOf("A") }
+    var mode by remember { mutableStateOf("duo") }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -43,7 +44,8 @@ fun OnboardingScreen(vm: AppViewModel) {
         Spacer(Modifier.weight(1f))
         Text(text = "Notre Semaine", style = MaterialTheme.typography.displaySmall)
         Text(
-            text = "Planifier à deux, sans se surcharger.",
+            text = if (mode == "solo") "Planifier sa semaine, sans se surcharger."
+            else "Planifier à deux, sans se surcharger.",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 8.dp)
@@ -60,7 +62,28 @@ fun OnboardingScreen(vm: AppViewModel) {
         )
 
         Spacer(Modifier.height(20.dp))
-        SectionLabel("TA COULEUR (l'autre prendra la seconde)")
+        SectionLabel("SEUL OU À DEUX ?")
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            listOf("solo" to "🧍 Solo", "duo" to "💞 À deux").forEach { (value, label) ->
+                FilterChip(
+                    selected = mode == value,
+                    onClick = { mode = value },
+                    label = { Text(label, style = MaterialTheme.typography.labelLarge) },
+                    modifier = Modifier.height(48.dp)
+                )
+            }
+        }
+        Text(
+            text = if (mode == "solo")
+                "Tout pour soi : planning, défis, repas, pacte d'écran. Ça se change plus tard dans Profil."
+            else "Vos deux téléphones se relient dans « Moi → Synchronisation ». Ça se change plus tard dans Profil.",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+
+        Spacer(Modifier.height(20.dp))
+        SectionLabel(if (mode == "solo") "TA COULEUR" else "TA COULEUR (l'autre prendra la seconde)")
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             listOf("A", "B").forEach { role ->
                 FilterChip(
@@ -86,7 +109,7 @@ fun OnboardingScreen(vm: AppViewModel) {
                 if (Build.VERSION.SDK_INT >= 33) {
                     permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }
-                vm.completeOnboarding(name, color)
+                vm.completeOnboarding(name, color, mode)
             },
             modifier = Modifier.padding(bottom = 24.dp)
         )

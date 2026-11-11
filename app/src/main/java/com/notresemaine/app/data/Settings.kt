@@ -115,8 +115,26 @@ data class AppSettings(
     val focusStartedAt: Long = 0L,
     val focusTitle: String = "",
     /** Minutes de concentration par jour, « 2026-09-30=50;2026-09-29=25 » (60 jours). */
-    val focusLog: String = ""
+    val focusLog: String = "",
+    /**
+     * « solo » ou « duo ».
+     *
+     * L'application est née pour deux, mais se coordonner n'est pas toujours
+     * possible — et une semaine seul reste une semaine à organiser. En solo,
+     * l'onglet « Nous » laisse place aux Défis, le Pacte se tient sans binôme
+     * (une pause s'accorde après deux minutes de réflexion, une fois par jour),
+     * et la synchronisation ne sert plus qu'à sauvegarder. Rien n'est perdu en
+     * changeant de mode : les données restent, seule la lecture change.
+     */
+    val mode: String = "duo",
+    /** Rappel quotidien du défi en cours, et son heure. */
+    val challengeRemindersEnabled: Boolean = true,
+    val challengeReminder: String = "19:00",
+    /** Dernier jour où l'on s'est accordé une pause soi-même (mode solo). */
+    val selfGraceDate: String = ""
 ) {
+    val solo: Boolean get() = mode == "solo"
+
     /** Minutes de concentration notées pour chaque jour. */
     fun focusMinutesByDay(): Map<String, Int> = focusLog.split(";")
         .mapNotNull { entry ->
@@ -193,6 +211,10 @@ class SettingsStore(private val context: Context) {
         val focusStartedAt = longPreferencesKey("focusStartedAt")
         val focusTitle = stringPreferencesKey("focusTitle")
         val focusLog = stringPreferencesKey("focusLog")
+        val mode = stringPreferencesKey("mode")
+        val challengeRemindersEnabled = booleanPreferencesKey("challengeRemindersEnabled")
+        val challengeReminder = stringPreferencesKey("challengeReminder")
+        val selfGraceDate = stringPreferencesKey("selfGraceDate")
     }
 
     val flow: Flow<AppSettings> = context.dataStore.data.map { p ->
@@ -252,18 +274,42 @@ class SettingsStore(private val context: Context) {
             focusUntil = p[K.focusUntil] ?: 0L,
             focusStartedAt = p[K.focusStartedAt] ?: 0L,
             focusTitle = p[K.focusTitle] ?: "",
-            focusLog = p[K.focusLog] ?: ""
+            focusLog = p[K.focusLog] ?: "",
+            mode = p[K.mode] ?: "duo",
+            challengeRemindersEnabled = p[K.challengeRemindersEnabled] ?: true,
+            challengeReminder = p[K.challengeReminder] ?: "19:00",
+            selfGraceDate = p[K.selfGraceDate] ?: ""
         )
     }
 
     suspend fun current(): AppSettings = flow.first()
 
-    suspend fun completeOnboarding(userId: String, name: String, color: String) {
+    suspend fun completeOnboarding(userId: String, name: String, color: String, mode: String = "duo") {
         context.dataStore.edit { p ->
             p[K.onboarded] = true
             p[K.myUserId] = userId
             p[K.myName] = name
             p[K.myColor] = color
+            p[K.mode] = if (mode == "solo") "solo" else "duo"
+        }
+    }
+
+    suspend fun setMode(mode: String) {
+        context.dataStore.edit { p -> p[K.mode] = if (mode == "solo") "solo" else "duo" }
+    }
+
+    suspend fun setChallengeReminder(enabled: Boolean, time: String) {
+        context.dataStore.edit { p ->
+            p[K.challengeRemindersEnabled] = enabled
+            if (Dates.isValidTime(time)) p[K.challengeReminder] = time
+        }
+    }
+
+    /** Pause que l'on s'accorde soi-même, en solo : une par jour, et datée. */
+    suspend fun grantSelfGrace(minutes: Int) {
+        context.dataStore.edit { p ->
+            p[K.selfGraceDate] = Dates.todayIso()
+            p[K.graceUntil] = System.currentTimeMillis() + minutes * 60_000L
         }
     }
 

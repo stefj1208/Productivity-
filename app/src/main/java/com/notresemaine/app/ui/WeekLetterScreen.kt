@@ -72,6 +72,7 @@ fun WeekLetterScreen(
         .collectAsState(initial = emptyList())
     val meals by remember(weekStart) { vm.repo.db.meals().between(days.first(), days.last()) }
         .collectAsState(initial = emptyList())
+    val challenges by remember { vm.repo.db.challenges().all() }.collectAsState(initial = emptyList())
 
     val me = profiles.firstOrNull { it.id == myId }
     val partner = profiles.firstOrNull { it.id != myId }
@@ -117,6 +118,14 @@ fun WeekLetterScreen(
         if (userId == myId) {
             val focus = days.sumOf { settings.focusMinutesByDay()[it] ?: 0 }
             if (focus > 0) add("🎧 ${formatMinutes(focus)} de concentration")
+        }
+        // Les défis : les miens, et ceux que l'autre partage.
+        challenges.filter { it.userId == userId && !it.deleted && (userId == myId || it.shared) }.forEach { c ->
+            val done = com.notresemaine.app.data.Challenges.doneDays(c)
+            val week = days.count { d ->
+                com.notresemaine.app.data.Challenges.dayNumber(c, java.time.LocalDate.parse(d)) in done
+            }
+            if (week > 0) add("${c.emoji} ${c.title} : $week jour(s) cette semaine")
         }
         if (isEmpty()) add("Rien de mesuré cette semaine — ce n'est pas un reproche, juste un blanc.")
     }

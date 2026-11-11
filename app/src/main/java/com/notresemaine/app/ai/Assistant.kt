@@ -320,7 +320,7 @@ object Assistant {
 
     /** Envoie : uniquement la note que vous venez d'écrire. */
     suspend fun clarifyCapture(apiKey: String, text: String): Clarified? {
-        val line = cleanLines(Ai.ask(apiKey, CAPTURE_SYSTEM, "Note : ${text.trim()}", maxTokens = 1000))
+        val line = cleanLines(Ai.ask(apiKey, CAPTURE_SYSTEM, "Note : ${text.trim()}", maxTokens = 1000, fast = true))
             .firstOrNull { it.contains('|') } ?: return null
         val parts = fields(line)
         if (parts.size < 2 || parts[0].isBlank()) return null
@@ -349,7 +349,7 @@ object Assistant {
     suspend fun classifyAisles(apiKey: String, labels: List<String>): Map<String, String> {
         if (labels.isEmpty()) return emptyMap()
         val prompt = labels.take(40).joinToString("\n") { "- $it" }
-        return cleanLines(Ai.ask(apiKey, AISLE_SYSTEM, prompt, maxTokens = 3000))
+        return cleanLines(Ai.ask(apiKey, AISLE_SYSTEM, prompt, maxTokens = 3000, fast = true))
             .filter { it.contains('|') }
             .mapNotNull { line ->
                 val parts = fields(line)
@@ -592,6 +592,55 @@ object Assistant {
             .take(count)
     }
 
+    // ----- 14 bis. Un défi sur mesure -----
+
+    data class ChallengeIdea(
+        val emoji: String,
+        val title: String,
+        val days: Int,
+        val rule: String,
+        val unit: String,
+        val amount: Int,
+        val why: String
+    )
+
+    private const val CHALLENGE_SYSTEM =
+        "Tu proposes un défi personnel borné dans le temps, un geste par jour, " +
+            "réaliste et concret, à partir de ce que la personne veut changer. " +
+            "Réponds UNIQUEMENT par une ligne au format exact :\n" +
+            "emoji|titre|jours|regle|unite|quantite|pourquoi\n" +
+            "titre = moins de 8 mots, avec la durée dedans (ex. : « 21 jours sans écran au lit »). " +
+            "jours = un entier entre 7 et 60. " +
+            "regle = constant (même quantité chaque jour), croissant (jour n = n fois la quantité) " +
+            "ou libre (une simple case à cocher). " +
+            "unite = ce qu'on compte, au singulier avec (s) (ex. : page(s), objet(s)), vide si libre. " +
+            "quantite = entier, 1 si libre. " +
+            "pourquoi = une phrase de moins de 20 mots qui dit ce que ça change. " +
+            "Pas de commentaire, une seule ligne."
+
+    /** Envoie : uniquement ce que vous avez écrit sur ce que vous voulez changer. */
+    suspend fun suggestChallenge(apiKey: String, wish: String): ChallengeIdea? {
+        val line = cleanLines(Ai.ask(apiKey, CHALLENGE_SYSTEM, "Envie : ${wish.trim()}", maxTokens = 800, fast = true))
+            .firstOrNull { it.count { c -> c == '|' } >= 5 } ?: return null
+        val p = fields(line)
+        val title = p.getOrElse(1) { "" }
+        if (title.isBlank()) return null
+        val rule = when (p.getOrElse(3) { "" }.lowercase()) {
+            "croissant" -> "croissant"
+            "constant" -> "constant"
+            else -> "libre"
+        }
+        return ChallengeIdea(
+            emoji = p[0].ifBlank { "🏁" }.take(4),
+            title = title,
+            days = p.getOrElse(2) { "" }.toIntOrNull()?.coerceIn(7, 60) ?: 21,
+            rule = rule,
+            unit = if (rule == "libre") "" else p.getOrElse(4) { "" },
+            amount = p.getOrElse(5) { "" }.toIntOrNull()?.coerceAtLeast(1) ?: 1,
+            why = p.getOrElse(6) { "" }
+        )
+    }
+
     // ----- 15. Programme de sport -----
 
     data class SportSession(val dayIndex: Int, val title: String, val minutes: Int)
@@ -674,7 +723,7 @@ object Assistant {
 
     /** Envoie : uniquement la phrase que vous venez de dicter. */
     suspend fun understandVoice(apiKey: String, spoken: String): VoiceCommand? {
-        val line = cleanLines(Ai.ask(apiKey, VOICE_SYSTEM, "Phrase : ${spoken.trim()}", maxTokens = 1000))
+        val line = cleanLines(Ai.ask(apiKey, VOICE_SYSTEM, "Phrase : ${spoken.trim()}", maxTokens = 1000, fast = true))
             .firstOrNull { it.contains('|') } ?: return null
         val parts = fields(line)
         if (parts.size < 2 || parts[1].isBlank()) return null

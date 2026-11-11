@@ -48,7 +48,8 @@ fun MeScreen(
     onSync: () -> Unit,
     onStatus: () -> Unit,
     onProfile: () -> Unit,
-    onFocus: () -> Unit = {}
+    onFocus: () -> Unit = {},
+    onChallenges: () -> Unit = {}
 ) {
     val myId = settings.myUserId
     val weekStart = Dates.weekStartIso()
@@ -134,6 +135,22 @@ fun MeScreen(
             onClick = onHealth
         )
 
+        val challenges by remember { vm.repo.db.challenges().all() }
+            .collectAsState(initial = emptyList())
+        val activeChallenges = challenges.filter { it.userId == myId && it.status == "actif" }
+        ShortcutTile(
+            emoji = "🏁",
+            title = "Mes défis",
+            subtitle = when (activeChallenges.size) {
+                0 -> "30 jours de minimalisme, 21 matins… un geste par jour"
+                1 -> activeChallenges.first().let {
+                    "${it.emoji} ${com.notresemaine.app.data.Challenges.todayLine(it)}"
+                }
+                else -> "${activeChallenges.size} défis en cours"
+            },
+            onClick = onChallenges,
+            highlight = activeChallenges.isNotEmpty()
+        )
         ShortcutTile(
             emoji = "🔁",
             title = "Mes habitudes",
@@ -225,7 +242,9 @@ fun MeScreen(
             emoji = "☁️",
             title = "Synchronisation",
             subtitle = when {
-                settings.supabaseUrl.isBlank() -> "Non configurée — l'app marche sans"
+                settings.supabaseUrl.isBlank() ->
+                    if (settings.solo) "Non configurée — sert de sauvegarde, facultative"
+                    else "Non configurée — l'app marche sans"
                 settings.refreshToken.isBlank() -> "À terminer : créer votre compte"
                 settings.coupleCode.isBlank() -> "À terminer : relier vos deux téléphones"
                 else -> "Reliée ✓ · ${settings.authEmail}"

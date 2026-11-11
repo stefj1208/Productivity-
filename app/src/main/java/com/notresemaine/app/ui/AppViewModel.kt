@@ -145,10 +145,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ----- Démarrage -----
 
-    fun completeOnboarding(name: String, color: String) {
+    fun completeOnboarding(name: String, color: String, mode: String = "duo") {
         viewModelScope.launch {
             val userId = UUID.randomUUID().toString()
-            repo.settings.completeOnboarding(userId, name, color)
+            repo.settings.completeOnboarding(userId, name, color, mode)
             repo.saveMyProfile(userId, name, color)
             Alarms.rescheduleAll(getApplication())
         }
@@ -1426,6 +1426,93 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setThemeMode(mode: String) {
         viewModelScope.launch { repo.settings.setThemeMode(mode) }
+    }
+
+    /** Solo ou à deux. Rien n'est effacé : seule la lecture de l'application change. */
+    fun setMode(mode: String) {
+        viewModelScope.launch {
+            repo.settings.setMode(mode)
+            Alarms.rescheduleAll(getApplication())
+            toast(if (mode == "solo") "Mode solo ✓" else "Mode à deux ✓")
+        }
+    }
+
+    // ----- Défis -----
+
+    /** L'idée de défi proposée par l'assistant, tant qu'on n'a pas dit oui. */
+    val aiChallenge = MutableStateFlow<com.notresemaine.app.ai.Assistant.ChallengeIdea?>(null)
+
+    fun startChallenge(template: com.notresemaine.app.data.Challenges.Template, shared: Boolean) {
+        viewModelScope.launch {
+            repo.startChallenge(myId(), template, shared = shared)
+            Alarms.rescheduleAll(getApplication())
+            requestSync()
+            toast("${template.emoji} C'est parti : jour 1 aujourd'hui")
+        }
+    }
+
+    fun startCustomChallenge(
+        title: String, emoji: String, days: Int, rule: String, unit: String, amount: Int, shared: Boolean
+    ) {
+        if (title.isBlank()) return
+        viewModelScope.launch {
+            repo.startChallenge(
+                myId(), null, customTitle = title, customEmoji = emoji.ifBlank { "🏁" },
+                customDays = days, customRule = rule, customUnit = unit, customAmount = amount, shared = shared
+            )
+            aiChallenge.value = null
+            Alarms.rescheduleAll(getApplication())
+            requestSync()
+            toast("$emoji C'est parti : jour 1 aujourd'hui")
+        }
+    }
+
+    fun toggleChallengeDay(id: String, day: Int) {
+        viewModelScope.launch {
+            repo.toggleChallengeDay(id, day)
+            requestSync()
+            com.notresemaine.app.widget.TodayWidget.refresh(getApplication())
+        }
+    }
+
+    fun setChallengeStatus(id: String, status: String) {
+        viewModelScope.launch {
+            repo.setChallengeStatus(id, status)
+            Alarms.rescheduleAll(getApplication())
+            requestSync()
+        }
+    }
+
+    fun setChallengeShared(id: String, shared: Boolean) {
+        viewModelScope.launch { repo.setChallengeShared(id, shared); requestSync() }
+    }
+
+    fun deleteChallenge(id: String) {
+        viewModelScope.launch {
+            repo.deleteChallenge(id)
+            Alarms.rescheduleAll(getApplication())
+            requestSync()
+        }
+    }
+
+    fun saveChallengeReminder(enabled: Boolean, time: String) {
+        viewModelScope.launch {
+            repo.settings.setChallengeReminder(enabled, time)
+            Alarms.rescheduleAll(getApplication())
+            toast("Rappel du défi enregistré ✓")
+        }
+    }
+
+    /** Envoie à l'assistant : uniquement la phrase écrite sur ce qu'on veut changer. */
+    fun suggestChallenge(wish: String) = runAi { key ->
+        val idea = com.notresemaine.app.ai.Assistant.suggestChallenge(key, wish)
+        if (idea == null) toast("L'assistant n'a pas trouvé de défi clair : essayez en une phrase.")
+        else aiChallenge.value = idea
+    }
+
+    /** Pause que l'on s'accorde soi-même (mode solo) : une par jour. */
+    fun grantSelfGrace(minutes: Int) {
+        viewModelScope.launch { repo.settings.grantSelfGrace(minutes) }
     }
 
     fun saveSupabaseConfig(url: String, key: String) {

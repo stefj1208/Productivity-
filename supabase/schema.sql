@@ -96,6 +96,28 @@ create table if not exists ritual_logs (
   updated_at bigint not null default 0
 );
 
+-- Défis (V20). Tous les défis d'une personne sont sauvegardés ; le binôme ne
+-- voit que ceux marqués « shared ».
+create table if not exists challenges (
+  id text primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  couple_id uuid,
+  template_id text not null default 'perso',
+  emoji text not null default '🏁',
+  title text not null,
+  description text not null default '',
+  days int not null default 21,
+  rule text not null default 'constant',
+  unit text not null default '',
+  amount int not null default 1,
+  start_date text not null,
+  done_days text not null default '',
+  status text not null default 'actif',
+  shared boolean not null default false,
+  deleted boolean not null default false,
+  updated_at bigint not null default 0
+);
+
 create table if not exists usage_days (
   id text primary key,
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -299,6 +321,8 @@ create or replace trigger weights_stamp before insert or update on weights
 create or replace trigger habits_stamp before insert or update on habits
   for each row execute function stamp_couple();
 create or replace trigger meal_logs_stamp before insert or update on meal_logs
+  for each row execute function stamp_couple();
+create or replace trigger challenges_stamp before insert or update on challenges
   for each row execute function stamp_couple();
 
 -- Crée l'espace couple et renvoie le code à partager (6 caractères).
@@ -533,4 +557,16 @@ create policy meal_logs_select on meal_logs for select
 create policy meal_logs_insert on meal_logs for insert
   with check (user_id = auth.uid());
 create policy meal_logs_update on meal_logs for update
+  using (user_id = auth.uid());
+
+-- Défis : les miens toujours, ceux du binôme seulement s'il les partage.
+alter table challenges enable row level security;
+drop policy if exists challenges_select on challenges;
+drop policy if exists challenges_insert on challenges;
+drop policy if exists challenges_update on challenges;
+create policy challenges_select on challenges for select
+  using (user_id = auth.uid() or (shared and couple_id is not null and couple_id = my_couple()));
+create policy challenges_insert on challenges for insert
+  with check (user_id = auth.uid());
+create policy challenges_update on challenges for update
   using (user_id = auth.uid());

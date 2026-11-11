@@ -44,10 +44,12 @@ fun RemindersScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit)
     var mealMorning by remember(settings.mealReminderMorning) { mutableStateOf(settings.mealReminderMorning) }
     var mealNoon by remember(settings.mealReminderNoon) { mutableStateOf(settings.mealReminderNoon) }
     var mealEvening by remember(settings.mealReminderEvening) { mutableStateOf(settings.mealReminderEvening) }
+    var challengeOn by remember(settings.challengeRemindersEnabled) { mutableStateOf(settings.challengeRemindersEnabled) }
+    var challengeTime by remember(settings.challengeReminder) { mutableStateOf(settings.challengeReminder) }
 
     val timesOk = Dates.isValidTime(evening) && Dates.isValidTime(sunday) &&
         Dates.isValidTime(mealMorning) && Dates.isValidTime(mealNoon) &&
-        Dates.isValidTime(mealEvening)
+        Dates.isValidTime(mealEvening) && Dates.isValidTime(challengeTime)
 
     Column(
         modifier = Modifier
@@ -153,6 +155,17 @@ fun RemindersScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit)
                 onTime = { mealNoon = it }, onToggle = { mealsOn = it })
             ReminderRow("Dîner", mealEvening, mealsOn,
                 onTime = { mealEvening = it }, onToggle = { mealsOn = it })
+
+            Spacer(Modifier.height(20.dp))
+            SectionLabel("LE DÉFI DU JOUR")
+            Text(
+                text = "Un seul rappel, le soir de préférence : le moment où l'on peut encore " +
+                    "cocher la case, et où l'on a oublié de le faire.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            ReminderRow("Défi en cours", challengeTime, challengeOn,
+                onTime = { challengeTime = it }, onToggle = { challengeOn = it })
             if (!timesOk) {
                 Text(
                     "Format d'heure attendu : HH:MM",
@@ -222,6 +235,7 @@ fun RemindersScreen(vm: AppViewModel, settings: AppSettings, onBack: () -> Unit)
                 vm.saveReminders(evening, eveningOn, sunday, sundayOn)
                 vm.saveAlerts(alertsOn, alertSound)
                 vm.saveMealReminders(mealsOn, mealMorning, mealNoon, mealEvening)
+                vm.saveChallengeReminder(challengeOn, challengeTime)
                 onBack()
             },
             modifier = Modifier.padding(bottom = 16.dp)

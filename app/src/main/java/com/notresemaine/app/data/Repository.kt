@@ -471,6 +471,69 @@ class Repository private constructor(context: Context) {
         return streak
     }
 
+    // ----- Défis -----
+
+    /** Lance un défi du catalogue, ou un défi inventé si [template] est null. */
+    suspend fun startChallenge(
+        userId: String,
+        template: Challenges.Template?,
+        customTitle: String = "",
+        customEmoji: String = "🏁",
+        customDays: Int = 21,
+        customRule: String = "libre",
+        customUnit: String = "",
+        customAmount: Int = 1,
+        startDate: String = Dates.todayIso(),
+        shared: Boolean = false
+    ): String {
+        val id = UUID.randomUUID().toString()
+        db.challenges().upsert(
+            if (template != null) ChallengeEntity(
+                id = id, userId = userId, templateId = template.id, emoji = template.emoji,
+                title = template.title, description = template.description, days = template.days,
+                rule = template.rule, unit = template.unit, amount = template.amount,
+                startDate = startDate, shared = shared, updatedAt = now()
+            ) else ChallengeEntity(
+                id = id, userId = userId, templateId = Challenges.CUSTOM, emoji = customEmoji,
+                title = customTitle.trim(), days = customDays.coerceIn(1, 365),
+                rule = customRule, unit = customUnit.trim(), amount = customAmount.coerceAtLeast(1),
+                startDate = startDate, shared = shared, updatedAt = now()
+            )
+        )
+        return id
+    }
+
+    /** Coche ou décoche un jour. Hors de la durée du défi, rien ne se passe. */
+    suspend fun toggleChallengeDay(id: String, day: Int) {
+        val c = db.challenges().byId(id) ?: return
+        if (day < 1 || day > c.days) return
+        val done = Challenges.doneDays(c).toMutableSet()
+        if (!done.add(day)) done.remove(day)
+        val finished = Challenges.isOver(c) || (done.size == c.days)
+        db.challenges().upsert(
+            c.copy(
+                doneDays = done.sorted().joinToString(","),
+                status = if (finished && c.status == "actif") "termine" else c.status,
+                updatedAt = now()
+            )
+        )
+    }
+
+    suspend fun setChallengeStatus(id: String, status: String) {
+        val c = db.challenges().byId(id) ?: return
+        db.challenges().upsert(c.copy(status = status, updatedAt = now()))
+    }
+
+    suspend fun setChallengeShared(id: String, shared: Boolean) {
+        val c = db.challenges().byId(id) ?: return
+        db.challenges().upsert(c.copy(shared = shared, updatedAt = now()))
+    }
+
+    suspend fun deleteChallenge(id: String) {
+        val c = db.challenges().byId(id) ?: return
+        db.challenges().upsert(c.copy(deleted = true, updatedAt = now()))
+    }
+
     // ----- Capture rapide (GTD) -----
 
     /** Capture une note : datée si une date est reconnue, sinon boîte de réception. */

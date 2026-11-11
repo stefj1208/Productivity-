@@ -118,18 +118,28 @@ class TodayWidget : AppWidgetProvider() {
                 val meals = repo.db.mealLogs().betweenOnce(s.myUserId, today, today)
                     .count { !it.deleted }
                 val done = tasks.count { it.done }
+                // Le défi du jour pas encore coché passe devant les repas : c'est
+                // le geste qu'on oublie le plus facilement.
+                val challenge = repo.db.challenges().activeOnce(s.myUserId).firstOrNull {
+                    val day = com.notresemaine.app.data.Challenges.dayNumber(it)
+                    day in 1..it.days && day !in com.notresemaine.app.data.Challenges.doneDays(it)
+                }
                 views.setTextViewText(
                     R.id.w_progress,
                     buildString {
                         if (tasks.isNotEmpty()) append("$done/${tasks.size} fait")
                         if (isNotEmpty()) append(" · ")
-                        append(
-                            when (meals) {
-                                0 -> "aucun repas noté"
-                                1 -> "1 repas noté"
-                                else -> "$meals repas notés"
-                            }
-                        )
+                        if (challenge != null) {
+                            append(challenge.emoji + " " + com.notresemaine.app.data.Challenges.todayLine(challenge))
+                        } else {
+                            append(
+                                when (meals) {
+                                    0 -> "aucun repas noté"
+                                    1 -> "1 repas noté"
+                                    else -> "$meals repas notés"
+                                }
+                            )
+                        }
                     }
                 )
             }

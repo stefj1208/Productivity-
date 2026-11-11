@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.notresemaine.app.data.AppSettings
@@ -400,6 +401,40 @@ fun PerformanceScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp)
             )
+        }
+
+        // ----- Les défis -----
+        val challenges by remember { vm.repo.db.challenges().all() }
+            .collectAsState(initial = emptyList())
+        val myChallenges = challenges.filter { it.userId == myId && it.status == "actif" }
+        if (myChallenges.isNotEmpty()) {
+            Spacer(Modifier.height(24.dp))
+            SectionLabel("MES DÉFIS")
+            myChallenges.forEach { c ->
+                val done = com.notresemaine.app.data.Challenges.doneDays(c)
+                val day = com.notresemaine.app.data.Challenges.dayNumber(c).coerceIn(0, c.days)
+                val thisWeek = days.count { d ->
+                    val n = com.notresemaine.app.data.Challenges.dayNumber(c, java.time.LocalDate.parse(d))
+                    n in done
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp)
+                ) {
+                    Text(c.emoji, style = MaterialTheme.typography.titleMedium)
+                    Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
+                        Text(c.title, style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            text = "$thisWeek jour(s) cette semaine · ${done.size} sur $day écoulés" +
+                                if (c.rule != "libre") " · ${com.notresemaine.app.data.Challenges.achieved(c)} ${c.unit}" else "",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
         }
 
         Spacer(Modifier.height(24.dp))
