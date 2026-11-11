@@ -38,7 +38,7 @@ jobs:
       - name: Nommer l'APK et la release
         id: meta
         run: |
-          tag="apk-$(echo "${GITHUB_REF_NAME}" | tr '/' '-' | tr -c 'A-Za-z0-9._-\n' '-')"
+          tag="apk-$(echo "${GITHUB_REF_NAME}" | sed -E 's#[^A-Za-z0-9._-]+#-#g')"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           cp app/build/outputs/apk/debug/app-debug.apk NotreSemaine.apk
 
